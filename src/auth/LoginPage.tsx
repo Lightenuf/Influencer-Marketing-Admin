@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { Button, Card, Field, Input, Select } from '@/components/ui'
 
@@ -85,6 +85,15 @@ export default function LoginPage() {
             {pending ? '로그인 중...' : '로그인'}
           </Button>
         </form>
+
+        {!isMockMode && (
+          <p className="mt-5 text-center text-sm text-slate-500">
+            계정이 없으신가요?{' '}
+            <Link to="/signup" className="text-violet-600 hover:underline">
+              회사 이메일로 가입
+            </Link>
+          </p>
+        )}
 
         {isMockMode && (
           <p className="mt-6 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-700">

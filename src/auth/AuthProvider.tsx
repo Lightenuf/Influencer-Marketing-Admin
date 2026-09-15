@@ -13,8 +13,12 @@ interface AuthContextValue {
   isMockMode: boolean
   signInAsMember: (memberId: string) => void
   signInWithPassword: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, displayName: string) => Promise<void>
   signOut: () => Promise<void>
 }
+
+/** 가입 가능한 회사 이메일 도메인 — DB 트리거(0002 마이그레이션)와 같은 값이어야 한다. */
+export const ALLOWED_EMAIL_DOMAIN = '@lightenuf.com'
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
@@ -97,6 +101,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.')
   }, [])
 
+  const signUp = useCallback(async (email: string, password: string, displayName: string) => {
+    if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.')
+    if (!email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+      throw new Error(`회사 이메일(${ALLOWED_EMAIL_DOMAIN})로만 가입할 수 있습니다.`)
+    }
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: displayName } },
+    })
+    if (!error) return
+
+    // DB 트리거가 도메인을 거부하면 Supabase는 일반적인 DB 오류로 감싸서 돌려준다.
+    if (/domain|database error/i.test(error.message)) {
+      throw new Error(`회사 이메일(${ALLOWED_EMAIL_DOMAIN})로만 가입할 수 있습니다.`)
+    }
+    if (/already registered|already exists/i.test(error.message)) {
+      throw new Error('이미 가입된 이메일입니다. 로그인해주세요.')
+    }
+    throw new Error(error.message)
+  }, [])
+
   const signOut = useCallback(async () => {
     localStorage.removeItem(SESSION_KEY)
     if (supabase) await supabase.auth.signOut()
@@ -112,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isMockMode,
         signInAsMember,
         signInWithPassword,
+        signUp,
         signOut,
       }}
     >
