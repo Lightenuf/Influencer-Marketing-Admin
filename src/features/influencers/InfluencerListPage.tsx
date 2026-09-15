@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DncBadge, StatusBadge } from '@/components/badges'
 import { Button, Card, EmptyState, Input, linkButtonClass, Select, Spinner } from '@/components/ui'
+import { isMockMode } from '@/data'
 import {
   CATEGORIES,
   INFLUENCER_STATUSES,
@@ -165,13 +166,15 @@ export default function InfluencerListPage() {
                   <Link to="/influencers/new" className={linkButtonClass}>
                     인플루언서 등록
                   </Link>
-                  <Button
-                    variant="secondary"
-                    onClick={() => demo.mutate('load')}
-                    disabled={demo.isPending}
-                  >
-                    예시 데이터 넣기
-                  </Button>
+                  {isMockMode && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => demo.mutate('load')}
+                      disabled={demo.isPending}
+                    >
+                      예시 데이터 넣기
+                    </Button>
+                  )}
                 </div>
               ) : undefined
             }

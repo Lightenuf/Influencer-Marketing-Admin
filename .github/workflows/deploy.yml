@@ -27,6 +27,10 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
+          # 저장소 Settings → Secrets and variables → Actions 에 등록하면 실제 DB 모드로 빌드된다.
+          # 등록 전에는 값이 비어 있어 미리보기(목업) 모드로 동작한다.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

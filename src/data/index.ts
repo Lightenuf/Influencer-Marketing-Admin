@@ -1,10 +1,9 @@
+import { supabase } from '@/lib/supabase'
 import { mockAdapter } from './mockAdapter'
 import type { DataRepository } from './repository'
+import { supabaseAdapter } from './supabaseAdapter'
 
-/**
- * Supabase 환경변수가 설정되면 자동으로 Supabase 어댑터를 쓰도록 이 지점만 바꾸면 된다.
- * (2단계에서 supabaseAdapter.ts 추가 후 아래 분기를 활성화)
- */
-export const repository: DataRepository = mockAdapter
+/** Supabase 환경변수가 설정되면 자동으로 실제 DB를 사용한다. */
+export const isMockMode = supabase === null
 
-export const isMockMode = repository === mockAdapter
+export const repository: DataRepository = isMockMode ? mockAdapter : supabaseAdapter

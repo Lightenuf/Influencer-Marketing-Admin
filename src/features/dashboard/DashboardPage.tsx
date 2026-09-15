@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CollabTypeBadge, StageBadge } from '@/components/badges'
-import { Button, Card, CardHeader, EmptyState, Spinner } from '@/components/ui'
+import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '@/components/ui'
+import { isMockMode } from '@/data'
 import { INFLUENCER_STATUSES } from '@/data/types'
 import { useCollabs, useDemoData, useInfluencers, useShipments } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
@@ -121,16 +122,18 @@ export default function DashboardPage() {
           description="인플루언서를 등록하면 이곳에 현황이 표시됩니다. 화면을 먼저 둘러보고 싶다면 예시 데이터를 넣어보세요."
           action={
             <div className="flex gap-2">
-              <Link to="/influencers/new">
-                <Button>인플루언서 등록</Button>
+              <Link to="/influencers/new" className={linkButtonClass}>
+                인플루언서 등록
               </Link>
-              <Button
-                variant="secondary"
-                onClick={() => demo.mutate('load')}
-                disabled={demo.isPending}
-              >
-                예시 데이터 넣기
-              </Button>
+              {isMockMode && (
+                <Button
+                  variant="secondary"
+                  onClick={() => demo.mutate('load')}
+                  disabled={demo.isPending}
+                >
+                  예시 데이터 넣기
+                </Button>
+              )}
             </div>
           }
         />
@@ -145,15 +148,17 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-slate-900">대시보드</h1>
           <p className="mt-1 text-sm text-slate-500">인플루언서 관계와 협업 현황 요약</p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (confirm('모든 데이터를 삭제하고 빈 상태로 되돌릴까요?')) demo.mutate('reset')
-          }}
-        >
-          데이터 초기화
-        </Button>
+        {isMockMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (confirm('모든 데이터를 삭제하고 빈 상태로 되돌릴까요?')) demo.mutate('reset')
+            }}
+          >
+            데이터 초기화
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
