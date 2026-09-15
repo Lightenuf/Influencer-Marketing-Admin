@@ -1,0 +1,308 @@
+import type { Database } from './mockAdapter'
+import type { Collab, DncAuditEntry, Influencer, Shipment } from './types'
+
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+const dateOnly = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10)
+
+type InfluencerSeed = Pick<
+  Influencer,
+  'name' | 'snsPlatform' | 'snsHandle' | 'followerCount' | 'categories' | 'avgRevenueBand' | 'status'
+> &
+  Partial<Influencer>
+
+const seeds: InfluencerSeed[] = [
+  {
+    name: '날씬쿡',
+    snsPlatform: 'instagram',
+    snsHandle: 'nalssin_cook',
+    followerCount: 161_000,
+    categories: ['푸드', '헬스/건강'],
+    avgRevenueBand: '3,000~5,000만',
+    status: '진행중',
+    memo: '탑미드 크리에이터. 누적 판매 성과 좋음.',
+  },
+  {
+    name: '요정핏',
+    snsPlatform: 'instagram',
+    snsHandle: 'xyojeong',
+    followerCount: 22_000,
+    categories: ['운동', '헬스/건강'],
+    avgRevenueBand: '1,000~3,000만',
+    status: '협의중',
+    memo: '구매 전환율 높은 편.',
+  },
+  {
+    name: '고은',
+    snsPlatform: 'instagram',
+    snsHandle: 'goeun_daily',
+    followerCount: 48_000,
+    categories: ['라이프스타일', '뷰티'],
+    avgRevenueBand: '500~1,000만',
+    status: '진행중',
+  },
+  {
+    name: '헬시맘',
+    snsPlatform: 'youtube',
+    snsHandle: 'healthymom',
+    followerCount: 87_000,
+    categories: ['육아', '헬스/건강'],
+    avgRevenueBand: '1,000~3,000만',
+    status: '제안중',
+  },
+  {
+    name: '다이어터진',
+    snsPlatform: 'tiktok',
+    snsHandle: 'dieter_jin',
+    followerCount: 133_000,
+    categories: ['운동', '푸드'],
+    avgRevenueBand: '500~1,000만',
+    status: '취소',
+  },
+  {
+    name: '소소한하루',
+    snsPlatform: 'blog',
+    snsHandle: 'soso_day',
+    followerCount: 12_000,
+    categories: ['라이프스타일'],
+    avgRevenueBand: '~500만',
+    status: '취소',
+  },
+  {
+    name: '비건레시피',
+    snsPlatform: 'instagram',
+    snsHandle: 'vegan_recipe_kr',
+    followerCount: 65_000,
+    categories: ['푸드'],
+    avgRevenueBand: '500~1,000만',
+    status: '완료',
+  },
+  {
+    name: '트레이너윤',
+    snsPlatform: 'youtube',
+    snsHandle: 'trainer_yoon',
+    followerCount: 204_000,
+    categories: ['운동'],
+    avgRevenueBand: '5,000만+',
+    status: '재협업대상',
+  },
+]
+
+export function buildDemoDatabase(): Database {
+  const influencers: Influencer[] = seeds.map((seed, index) => ({
+    id: `demo-inf-${index + 1}`,
+    name: seed.name,
+    snsPlatform: seed.snsPlatform,
+    snsHandle: seed.snsHandle,
+    snsUrl: `https://instagram.com/${seed.snsHandle}`,
+    followerCount: seed.followerCount,
+    categories: seed.categories,
+    avgRevenueBand: seed.avgRevenueBand,
+    contactEmail: `${seed.snsHandle}@example.com`,
+    contactPhone: '',
+    contactEtc: '',
+    status: seed.status,
+    memo: seed.memo ?? '',
+    doNotContact: false,
+    dncReason: null,
+    dncSetBy: null,
+    dncSetAt: null,
+    createdBy: 'u-1',
+    createdAt: daysAgo(60 - index * 5),
+    updatedAt: daysAgo(10),
+  }))
+
+  const dncAuditLog: DncAuditEntry[] = []
+
+  // 취소 이력이 있는 두 명은 연락 금지 상태로 시작한다.
+  const blockDnc = (influencerIndex: number, reason: DncAuditEntry['reason'], detail: string, ago: number) => {
+    const influencer = influencers[influencerIndex]
+    influencer.doNotContact = true
+    influencer.dncReason = reason
+    influencer.dncSetBy = 'u-2'
+    influencer.dncSetAt = daysAgo(ago)
+    dncAuditLog.push({
+      id: `demo-dnc-${influencerIndex}`,
+      influencerId: influencer.id,
+      action: 'set',
+      reason,
+      reasonDetail: detail,
+      setBy: 'u-2',
+      setAt: daysAgo(ago),
+    })
+  }
+
+  blockDnc(4, '본인 거절 의사', '건강기능식품 카테고리는 더 이상 협업하지 않겠다고 회신.', 21)
+  blockDnc(5, '단가 미합의', '제안 단가 대비 3배 요구, 협의 중단.', 40)
+
+  const collabs: Collab[] = [
+    {
+      id: 'demo-collab-1',
+      influencerId: 'demo-inf-1',
+      title: '9월 마켓 공동구매',
+      collabType: '마켓',
+      stage: '진행중',
+      stageEnteredAt: daysAgo(6),
+      startDate: dateOnly(4),
+      endDate: dateOnly(-3),
+      sampleShipDate: dateOnly(12),
+      contentDueDate: dateOnly(-1),
+      fee: 0,
+      isCancelled: false,
+      cancelReason: null,
+      cancelReasonDetail: '',
+      cancelledAt: null,
+      createdAt: daysAgo(20),
+      updatedAt: daysAgo(6),
+    },
+    {
+      id: 'demo-collab-2',
+      influencerId: 'demo-inf-2',
+      title: '프리바이오틱스 샘플 리뷰',
+      collabType: '샘플',
+      stage: '협의중',
+      stageEnteredAt: daysAgo(18),
+      startDate: null,
+      endDate: null,
+      sampleShipDate: dateOnly(3),
+      contentDueDate: dateOnly(-7),
+      fee: 0,
+      isCancelled: false,
+      cancelReason: null,
+      cancelReasonDetail: '',
+      cancelledAt: null,
+      createdAt: daysAgo(18),
+      updatedAt: daysAgo(18),
+    },
+    {
+      id: 'demo-collab-3',
+      influencerId: 'demo-inf-4',
+      title: '10월 유가 광고 제안',
+      collabType: '유가광고',
+      stage: '요청',
+      stageEnteredAt: daysAgo(3),
+      startDate: null,
+      endDate: null,
+      sampleShipDate: null,
+      contentDueDate: null,
+      fee: 1_500_000,
+      isCancelled: false,
+      cancelReason: null,
+      cancelReasonDetail: '',
+      cancelledAt: null,
+      createdAt: daysAgo(3),
+      updatedAt: daysAgo(3),
+    },
+    {
+      id: 'demo-collab-4',
+      influencerId: 'demo-inf-7',
+      title: '8월 마켓 협업',
+      collabType: '마켓',
+      stage: '종료',
+      stageEnteredAt: daysAgo(15),
+      startDate: dateOnly(45),
+      endDate: dateOnly(30),
+      sampleShipDate: dateOnly(50),
+      contentDueDate: dateOnly(35),
+      fee: 0,
+      isCancelled: false,
+      cancelReason: null,
+      cancelReasonDetail: '',
+      cancelledAt: null,
+      createdAt: daysAgo(55),
+      updatedAt: daysAgo(15),
+    },
+    {
+      id: 'demo-collab-5',
+      influencerId: 'demo-inf-5',
+      title: '9월 샘플 발송 건',
+      collabType: '샘플',
+      stage: '종료',
+      stageEnteredAt: daysAgo(21),
+      startDate: null,
+      endDate: null,
+      sampleShipDate: null,
+      contentDueDate: null,
+      fee: 0,
+      isCancelled: true,
+      cancelReason: '본인 거절 의사',
+      cancelReasonDetail: '카테고리 미협업 회신',
+      cancelledAt: daysAgo(21),
+      createdAt: daysAgo(35),
+      updatedAt: daysAgo(21),
+    },
+  ]
+
+  const shipments: Shipment[] = [
+    {
+      id: 'demo-ship-1',
+      influencerId: 'demo-inf-1',
+      collabId: 'demo-collab-1',
+      status: '완료',
+      collabType: '마켓',
+      productName: '브리보 프리바이오틱스 애사비 355ml',
+      quantity: 12,
+      carrier: 'CJ대한통운',
+      trackingNumber: '123456789012',
+      requestedAt: daysAgo(14),
+      shippedAt: dateOnly(12),
+      deliveredAt: dateOnly(10),
+      createdAt: daysAgo(14),
+      updatedAt: daysAgo(10),
+    },
+    {
+      id: 'demo-ship-2',
+      influencerId: 'demo-inf-3',
+      collabId: null,
+      status: '배송중',
+      collabType: '샘플',
+      productName: '브리보 프리바이오틱스 애사비 355ml',
+      quantity: 2,
+      carrier: '우체국택배',
+      trackingNumber: '987654321098',
+      requestedAt: daysAgo(4),
+      shippedAt: dateOnly(2),
+      deliveredAt: null,
+      createdAt: daysAgo(4),
+      updatedAt: daysAgo(2),
+    },
+    {
+      id: 'demo-ship-3',
+      influencerId: 'demo-inf-2',
+      collabId: 'demo-collab-2',
+      status: '배송준비중',
+      collabType: '샘플',
+      productName: '브리보 프리바이오틱스 애사비 355ml',
+      quantity: 2,
+      carrier: '',
+      trackingNumber: '',
+      requestedAt: daysAgo(1),
+      shippedAt: null,
+      deliveredAt: null,
+      createdAt: daysAgo(1),
+      updatedAt: daysAgo(1),
+    },
+  ]
+
+  return {
+    influencers,
+    dncAuditLog,
+    collabs,
+    shipments,
+    notes: [
+      {
+        id: 'demo-note-1',
+        influencerId: 'demo-inf-1',
+        authorId: 'u-1',
+        note: 'DM으로 9월 마켓 일정 확정. 샘플 12개 선발송 요청함.',
+        loggedAt: daysAgo(14),
+      },
+      {
+        id: 'demo-note-2',
+        influencerId: 'demo-inf-5',
+        authorId: 'u-2',
+        note: '건기식 카테고리는 앞으로 협업 안 한다고 회신 받음. 연락 금지 등록 처리.',
+        loggedAt: daysAgo(21),
+      },
+    ],
+  }
+}

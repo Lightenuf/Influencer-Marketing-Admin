@@ -1,0 +1,147 @@
+export const SNS_PLATFORMS = ['instagram', 'youtube', 'tiktok', 'blog', 'other'] as const
+export type SnsPlatform = (typeof SNS_PLATFORMS)[number]
+
+export const SNS_PLATFORM_LABELS: Record<SnsPlatform, string> = {
+  instagram: '인스타그램',
+  youtube: '유튜브',
+  tiktok: '틱톡',
+  blog: '블로그',
+  other: '기타',
+}
+
+export const INFLUENCER_STATUSES = [
+  '제안중',
+  '협의중',
+  '진행중',
+  '완료',
+  '취소',
+  '재협업대상',
+] as const
+export type InfluencerStatus = (typeof INFLUENCER_STATUSES)[number]
+
+export const REVENUE_BANDS = [
+  '미확인',
+  '~500만',
+  '500~1,000만',
+  '1,000~3,000만',
+  '3,000~5,000만',
+  '5,000만+',
+] as const
+export type RevenueBand = (typeof REVENUE_BANDS)[number]
+
+export const CATEGORIES = [
+  '뷰티',
+  '푸드',
+  '헬스/건강',
+  '패션',
+  '라이프스타일',
+  '육아',
+  '운동',
+  '기타',
+] as const
+
+export const DNC_REASONS = [
+  '단가 미합의',
+  '일정 불가',
+  '컨셉 불일치',
+  '무응답',
+  '본인 거절 의사',
+  '협업 품질 이슈',
+  '기타',
+] as const
+export type DncReason = (typeof DNC_REASONS)[number]
+
+export const COLLAB_TYPES = ['마켓', '샘플', '유가광고'] as const
+export type CollabType = (typeof COLLAB_TYPES)[number]
+
+export const COLLAB_STAGES = ['요청', '협의중', '진행중', '종료'] as const
+export type CollabStage = (typeof COLLAB_STAGES)[number]
+
+export const SHIPMENT_STATUSES = ['배송준비중', '배송중', '완료', '취소요청', '취소'] as const
+export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number]
+
+export interface TeamMember {
+  id: string
+  email: string
+  displayName: string
+  role: 'admin' | 'member'
+}
+
+export interface Influencer {
+  id: string
+  name: string
+  snsPlatform: SnsPlatform
+  snsHandle: string
+  snsUrl: string
+  followerCount: number
+  categories: string[]
+  avgRevenueBand: RevenueBand
+  contactEmail: string
+  contactPhone: string
+  contactEtc: string
+  status: InfluencerStatus
+  memo: string
+  /** 조회 성능용 캐시값. 진실의 원천은 dncAuditLog 이다. */
+  doNotContact: boolean
+  dncReason: DncReason | null
+  dncSetBy: string | null
+  dncSetAt: string | null
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DncAuditEntry {
+  id: string
+  influencerId: string
+  action: 'set' | 'unset'
+  reason: DncReason
+  reasonDetail: string
+  setBy: string
+  setAt: string
+}
+
+export interface Collab {
+  id: string
+  influencerId: string
+  title: string
+  collabType: CollabType
+  stage: CollabStage
+  stageEnteredAt: string
+  startDate: string | null
+  endDate: string | null
+  sampleShipDate: string | null
+  contentDueDate: string | null
+  fee: number
+  isCancelled: boolean
+  cancelReason: DncReason | null
+  cancelReasonDetail: string
+  cancelledAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Shipment {
+  id: string
+  influencerId: string
+  collabId: string | null
+  status: ShipmentStatus
+  collabType: CollabType
+  productName: string
+  quantity: number
+  carrier: string
+  trackingNumber: string
+  requestedAt: string
+  shippedAt: string | null
+  deliveredAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CommunicationLog {
+  id: string
+  influencerId: string
+  authorId: string
+  note: string
+  loggedAt: string
+}

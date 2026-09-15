@@ -1,0 +1,253 @@
+import clsx from 'clsx'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { DncBadge, StatusBadge } from '@/components/badges'
+import { Button, Card, EmptyState, Input, linkButtonClass, Select, Spinner } from '@/components/ui'
+import {
+  CATEGORIES,
+  INFLUENCER_STATUSES,
+  SNS_PLATFORM_LABELS,
+  SNS_PLATFORMS,
+  type Influencer,
+} from '@/data/types'
+import DncChangeDialog from '@/features/dnc/DncChangeDialog'
+import { useDemoData, useInfluencers } from '@/hooks/queries'
+import { downloadCsv } from '@/utils/csv'
+import { formatDate, formatFollowers, formatNumber } from '@/utils/format'
+
+type ContactFilter = 'all' | 'contactable' | 'blocked'
+
+export default function InfluencerListPage() {
+  const { data: influencers, isLoading } = useInfluencers()
+  const demo = useDemoData()
+
+  const [keyword, setKeyword] = useState('')
+  const [status, setStatus] = useState('')
+  const [platform, setPlatform] = useState('')
+  const [category, setCategory] = useState('')
+  const [contactFilter, setContactFilter] = useState<ContactFilter>('all')
+  const [dncTarget, setDncTarget] = useState<Influencer | null>(null)
+
+  const filtered = useMemo(() => {
+    const query = keyword.trim().toLowerCase()
+    return (influencers ?? []).filter((influencer) => {
+      if (query && !`${influencer.name} ${influencer.snsHandle}`.toLowerCase().includes(query))
+        return false
+      if (status && influencer.status !== status) return false
+      if (platform && influencer.snsPlatform !== platform) return false
+      if (category && !influencer.categories.includes(category)) return false
+      if (contactFilter === 'contactable' && influencer.doNotContact) return false
+      if (contactFilter === 'blocked' && !influencer.doNotContact) return false
+      return true
+    })
+  }, [influencers, keyword, status, platform, category, contactFilter])
+
+  const exportCsv = () => {
+    downloadCsv(
+      contactFilter === 'contactable' ? '연락가능_인플루언서' : '인플루언서_목록',
+      filtered.map((i) => ({
+        이름: i.name,
+        플랫폼: SNS_PLATFORM_LABELS[i.snsPlatform],
+        계정: i.snsHandle,
+        팔로워: i.followerCount,
+        카테고리: i.categories.join('/'),
+        평균매출: i.avgRevenueBand,
+        상태: i.status,
+        연락금지: i.doNotContact ? 'Y' : 'N',
+        금지사유: i.dncReason ?? '',
+        이메일: i.contactEmail,
+        연락처: i.contactPhone,
+        등록일: formatDate(i.createdAt),
+      })),
+    )
+  }
+
+  const resetFilters = () => {
+    setKeyword('')
+    setStatus('')
+    setPlatform('')
+    setCategory('')
+    setContactFilter('all')
+  }
+
+  const total = influencers?.length ?? 0
+  const blocked = (influencers ?? []).filter((i) => i.doNotContact).length
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">인플루언서</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            전체 {formatNumber(total)}명 · 연락 가능 {formatNumber(total - blocked)}명 · 연락 금지{' '}
+            <span className="font-medium text-rose-600">{formatNumber(blocked)}명</span>
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={exportCsv} disabled={filtered.length === 0}>
+            엑셀 다운로드
+          </Button>
+          <Link to="/influencers/new" className={linkButtonClass}>
+            + 인플루언서 등록
+          </Link>
+        </div>
+      </div>
+
+      <Card className="p-4">
+        <div className="grid gap-3 md:grid-cols-5">
+          <Input
+            placeholder="이름 · 계정 검색"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">상태 전체</option>
+            {INFLUENCER_STATUSES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </Select>
+          <Select value={platform} onChange={(e) => setPlatform(e.target.value)}>
+            <option value="">플랫폼 전체</option>
+            {SNS_PLATFORMS.map((item) => (
+              <option key={item} value={item}>
+                {SNS_PLATFORM_LABELS[item]}
+              </option>
+            ))}
+          </Select>
+          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">카테고리 전체</option>
+            {CATEGORIES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={contactFilter}
+            onChange={(e) => setContactFilter(e.target.value as ContactFilter)}
+          >
+            <option value="all">연락 여부 전체</option>
+            <option value="contactable">연락 가능만 보기</option>
+            <option value="blocked">연락 금지만 보기</option>
+          </Select>
+        </div>
+        {contactFilter === 'contactable' && (
+          <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            연락 금지 대상이 제외된 목록입니다. 이 상태로 엑셀을 내려받으면 그대로 발송 대상 명단이
+            됩니다.
+          </p>
+        )}
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between px-5 py-3 text-sm">
+          <span className="font-medium text-slate-700">{formatNumber(filtered.length)}명</span>
+          <button className="text-slate-400 hover:text-slate-600" onClick={resetFilters}>
+            필터 초기화
+          </button>
+        </div>
+
+        {isLoading ? (
+          <Spinner />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title={total === 0 ? '아직 등록된 인플루언서가 없습니다' : '조건에 맞는 결과가 없습니다'}
+            description={
+              total === 0
+                ? '직접 등록하거나, 화면을 먼저 둘러보려면 예시 데이터를 넣어보세요.'
+                : '필터를 변경해보세요.'
+            }
+            action={
+              total === 0 ? (
+                <div className="flex gap-2">
+                  <Link to="/influencers/new" className={linkButtonClass}>
+                    인플루언서 등록
+                  </Link>
+                  <Button
+                    variant="secondary"
+                    onClick={() => demo.mutate('load')}
+                    disabled={demo.isPending}
+                  >
+                    예시 데이터 넣기
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-5 py-2.5 text-left font-medium">이름 / 계정</th>
+                  <th className="px-3 py-2.5 text-left font-medium">플랫폼</th>
+                  <th className="px-3 py-2.5 text-right font-medium">팔로워</th>
+                  <th className="px-3 py-2.5 text-left font-medium">카테고리</th>
+                  <th className="px-3 py-2.5 text-left font-medium">평균 매출</th>
+                  <th className="px-3 py-2.5 text-left font-medium">상태</th>
+                  <th className="px-3 py-2.5 text-left font-medium">등록일</th>
+                  <th className="px-5 py-2.5 text-right font-medium">연락 금지</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map((influencer) => (
+                  <tr
+                    key={influencer.id}
+                    className={clsx(
+                      'hover:bg-slate-50',
+                      influencer.doNotContact && 'bg-rose-50/40',
+                    )}
+                  >
+                    <td className="px-5 py-3">
+                      <Link
+                        to={`/influencers/${influencer.id}`}
+                        className="font-medium text-slate-900 hover:text-violet-600"
+                      >
+                        {influencer.name}
+                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-400">@{influencer.snsHandle}</span>
+                        {influencer.doNotContact && <DncBadge compact />}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">
+                      {SNS_PLATFORM_LABELS[influencer.snsPlatform]}
+                    </td>
+                    <td className="tabular px-3 py-3 text-right text-slate-600">
+                      {formatFollowers(influencer.followerCount)}
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">
+                      {influencer.categories.join(', ') || '-'}
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">{influencer.avgRevenueBand}</td>
+                    <td className="px-3 py-3">
+                      <StatusBadge status={influencer.status} />
+                    </td>
+                    <td className="px-3 py-3 text-slate-500">{formatDate(influencer.createdAt)}</td>
+                    <td className="px-5 py-3 text-right">
+                      <Button
+                        size="sm"
+                        variant={influencer.doNotContact ? 'secondary' : 'ghost'}
+                        onClick={() => setDncTarget(influencer)}
+                      >
+                        {influencer.doNotContact ? '해제' : '등록'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <DncChangeDialog
+        influencer={dncTarget}
+        open={dncTarget !== null}
+        onClose={() => setDncTarget(null)}
+      />
+    </div>
+  )
+}
