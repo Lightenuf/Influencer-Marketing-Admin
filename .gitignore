@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code 로컬 실행 설정 (컴퓨터마다 경로가 달라 공유하지 않음)
+.claude/

@@ -1,15 +1,18 @@
 import clsx from 'clsx'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CollabTypeBadge, DncBadge } from '@/components/badges'
+import { DncBadge } from '@/components/badges'
 import { Button, Card, EmptyState, Spinner } from '@/components/ui'
 import { COLLAB_STAGES, type Collab, type CollabStage } from '@/data/types'
 import CancelCollabDialog from '@/features/pipeline/CancelCollabDialog'
 import CollabFormDialog from '@/features/pipeline/CollabFormDialog'
+import StageActions from '@/features/pipeline/StageActions'
 import { useCollabs, useInfluencers, useMoveCollabStage } from '@/hooks/queries'
-import { daysSince, formatDate } from '@/utils/format'
+import { daysSince } from '@/utils/format'
 
 const STALE_DAYS = 15
+const FIRST_STAGE = COLLAB_STAGES[0]
+const LAST_STAGE = COLLAB_STAGES[COLLAB_STAGES.length - 1]
 
 export default function PipelinePage() {
   const { data: collabs, isLoading } = useCollabs()
@@ -17,20 +20,11 @@ export default function PipelinePage() {
   const moveStage = useMoveCollabStage()
 
   const [formOpen, setFormOpen] = useState(false)
-  const [editing, setEditing] = useState<Collab | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Collab | null>(null)
 
   const influencerOf = (id: string) => influencers.find((i) => i.id === id)
 
-  const openNew = () => {
-    setEditing(null)
-    setFormOpen(true)
-  }
-
-  const openEdit = (collab: Collab) => {
-    setEditing(collab)
-    setFormOpen(true)
-  }
+  const openNew = () => setFormOpen(true)
 
   const move = (collab: Collab, direction: -1 | 1) => {
     const index = COLLAB_STAGES.indexOf(collab.stage)
@@ -48,7 +42,7 @@ export default function PipelinePage() {
           </p>
         </div>
         <Button onClick={openNew} disabled={influencers.length === 0}>
-          + 협업 추가
+          + 크리에이터 추가
         </Button>
       </div>
 
@@ -58,11 +52,11 @@ export default function PipelinePage() {
         <Card>
           <EmptyState
             title="먼저 인플루언서를 등록해주세요"
-            description="협업 건은 등록된 인플루언서에 연결됩니다."
+            description="파이프라인 카드는 등록된 크리에이터 한 명에 해당합니다."
           />
         </Card>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {COLLAB_STAGES.map((stage) => {
             const items = (collabs ?? []).filter((collab) => collab.stage === stage)
             return (
@@ -79,20 +73,19 @@ export default function PipelinePage() {
                   {items.map((collab) => {
                     const influencer = influencerOf(collab.influencerId)
                     const waiting = daysSince(collab.stageEnteredAt)
-                    const isStale = waiting >= STALE_DAYS && stage !== '종료'
+                    const isStale = waiting >= STALE_DAYS && stage !== LAST_STAGE
                     return (
                       <Card key={collab.id} className="p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <Link
-                            to={`/influencers/${collab.influencerId}`}
-                            className="text-sm font-medium text-slate-900 hover:text-violet-600"
-                          >
-                            {influencer?.name ?? '삭제된 크리에이터'}
-                          </Link>
-                          <CollabTypeBadge type={collab.collabType} />
-                        </div>
+                        <Link
+                          to={`/influencers/${collab.influencerId}`}
+                          className="block text-sm font-medium text-slate-900 hover:text-violet-600"
+                        >
+                          {influencer?.name ?? '삭제된 크리에이터'}
+                        </Link>
 
-                        <p className="mt-1 text-xs text-slate-500">{collab.title}</p>
+                        {influencer?.snsHandle && (
+                          <p className="mt-0.5 text-[11px] text-slate-400">@{influencer.snsHandle}</p>
+                        )}
 
                         {influencer?.doNotContact && (
                           <div className="mt-1.5">
@@ -100,13 +93,13 @@ export default function PipelinePage() {
                           </div>
                         )}
 
+                        <StageActions
+                          collab={collab}
+                          stage={stage}
+                          onReject={() => setCancelTarget(collab)}
+                        />
+
                         <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
-                          {collab.sampleShipDate && (
-                            <p>샘플 발송 {formatDate(collab.sampleShipDate)}</p>
-                          )}
-                          {collab.contentDueDate && (
-                            <p>콘텐츠 마감 {formatDate(collab.contentDueDate)}</p>
-                          )}
                           <p className={clsx(isStale && 'font-semibold text-amber-600')}>
                             {collab.isCancelled
                               ? `취소됨 · ${collab.cancelReason}`
@@ -115,32 +108,31 @@ export default function PipelinePage() {
                           </p>
                         </div>
 
-                        <div className="mt-2.5 flex items-center gap-1">
+                        <div className="mt-2.5 flex items-center gap-0.5 whitespace-nowrap">
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="px-1.5"
                             onClick={() => move(collab, -1)}
-                            disabled={stage === '요청'}
+                            disabled={stage === FIRST_STAGE}
                           >
                             ←
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="px-1.5"
                             onClick={() => move(collab, 1)}
-                            disabled={stage === '종료'}
+                            disabled={stage === LAST_STAGE}
                           >
                             →
                           </Button>
                           <span className="flex-1" />
-                          <Button size="sm" variant="ghost" onClick={() => openEdit(collab)}>
-                            수정
-                          </Button>
                           {!collab.isCancelled && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="text-rose-500 hover:bg-rose-50"
+                              className="px-1.5 text-rose-500 hover:bg-rose-50"
                               onClick={() => setCancelTarget(collab)}
                             >
                               취소
@@ -157,7 +149,7 @@ export default function PipelinePage() {
         </div>
       )}
 
-      <CollabFormDialog open={formOpen} onClose={() => setFormOpen(false)} editing={editing} />
+      <CollabFormDialog open={formOpen} onClose={() => setFormOpen(false)} />
       <CancelCollabDialog
         collab={cancelTarget}
         open={cancelTarget !== null}

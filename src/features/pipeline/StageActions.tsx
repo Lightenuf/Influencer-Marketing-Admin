@@ -1,0 +1,242 @@
+import clsx from 'clsx'
+import type { Collab, CollabStage } from '@/data/types'
+import { useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
+import { daysSince, formatDate } from '@/utils/format'
+
+/** 연락한 지 이 일수가 지나면 '재연락' 표시가 뜬다. */
+const RECONTACT_DAYS = 3
+
+/**
+ * 음료를 보내고 이 일수가 지나도 반응 표시가 없으면 확인 알림을 띄운다.
+ * 배송 1~2일 + 체험 기간을 감안한 값.
+ */
+const TEST_CHECK_DAYS = 4
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+/** 오늘부터 해당 날짜까지 남은 일수. 지난 날짜면 음수. */
+function daysUntil(date: string) {
+  const target = new Date(`${date}T00:00:00`).getTime()
+  const now = new Date(today() + 'T00:00:00').getTime()
+  return Math.round((target - now) / 86_400_000)
+}
+
+const chip =
+  'rounded-md px-2 py-1 text-[11px] font-medium transition disabled:opacity-50'
+const chipOff = 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+
+function DateRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string | null
+  onChange: (v: string | null) => void
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <input
+        type="date"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="mt-0.5 w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
+      />
+    </label>
+  )
+}
+
+export default function StageActions({
+  collab,
+  stage,
+  onReject,
+}: {
+  collab: Collab
+  stage: CollabStage
+  /** '불만족'을 눌렀을 때 — 사유를 남기고 연락 금지로 보내는 창을 연다. */
+  onReject: () => void
+}) {
+  const update = useUpdateCollab()
+  const moveStage = useMoveCollabStage()
+  const patch = (fields: Parameters<typeof update.mutate>[0]['patch']) =>
+    update.mutate({ id: collab.id, patch: fields })
+
+  if (collab.isCancelled) return null
+
+  // ── 회신완료: 회신을 받은 날짜만 보여준다 ──
+  if (stage === '회신완료') {
+    return (
+      <p className="mt-2 text-[11px] text-slate-500">
+        회신 확인 {formatDate(collab.createdAt)}
+      </p>
+    )
+  }
+
+  // ── 테스트중: 음료를 보냈는지 + 받아본 반응 ──
+  if (stage === '테스트중') {
+    // 발송일은 화면에 보여주지 않지만, '4일 경과' 알림을 세기 위해 저장해 둔다.
+    const shipped = Boolean(collab.sampleShipDate)
+    const sinceShip = collab.sampleShipDate ? daysSince(collab.sampleShipDate) : null
+    const needsCheck =
+      shipped && collab.testFeedback === null && sinceShip !== null && sinceShip >= TEST_CHECK_DAYS
+    return (
+      <div className="mt-2 space-y-1.5">
+        <button
+          type="button"
+          onClick={() => patch({ sampleShipDate: shipped ? null : today() })}
+          className={clsx(
+            chip,
+            'w-full',
+            shipped ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : chipOff,
+          )}
+        >
+          {shipped ? '✓ 음료 보냄' : '음료 보내기 전'}
+        </button>
+
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              patch({ testFeedback: '긍정' })
+              moveStage.mutate({ id: collab.id, stage: '미팅 조율중' })
+            }}
+            className={clsx(
+              chip,
+              'flex-1',
+              collab.testFeedback === '긍정'
+                ? 'bg-violet-100 text-violet-700'
+                : chipOff + ' hover:bg-violet-100 hover:text-violet-700',
+            )}
+          >
+            만족
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              patch({ testFeedback: '부정' })
+              onReject()
+            }}
+            className={clsx(
+              chip,
+              'flex-1',
+              collab.testFeedback === '부정'
+                ? 'bg-rose-100 text-rose-700'
+                : chipOff + ' hover:bg-rose-100 hover:text-rose-700',
+            )}
+          >
+            불만족
+          </button>
+        </div>
+
+        {needsCheck && (
+          <p className="text-[11px] font-medium text-amber-600">
+            체험 확인 연락 필요 — 보낸 지 {sinceShip}일
+          </p>
+        )}
+
+        {collab.testFeedback === '부정' && (
+          <p className="text-[11px] text-rose-600">불만족 — 취소 처리가 필요합니다</p>
+        )}
+      </div>
+    )
+  }
+
+  // ── 미팅 조율중: 연락을 보냈는지, 답이 없으면 재연락 알림 ──
+  if (stage === '미팅 조율중') {
+    const contacted = Boolean(collab.lastContactedAt)
+    const waited = collab.lastContactedAt ? daysSince(collab.lastContactedAt) : null
+    const needsRecontact = waited !== null && waited >= RECONTACT_DAYS
+    return (
+      <div className="mt-2 space-y-1.5">
+        <button
+          type="button"
+          title={contacted ? '다시 누르면 오늘 날짜로 갱신됩니다' : undefined}
+          onClick={() => patch({ lastContactedAt: today() })}
+          className={clsx(
+            chip,
+            'w-full',
+            contacted ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : chipOff,
+          )}
+        >
+          {contacted ? '✓ 연락함' : '연락 전'}
+        </button>
+
+        {needsRecontact && (
+          <p className="text-[11px] font-medium text-amber-600">
+            재연락 필요 — 연락한 지 {waited}일
+          </p>
+        )}
+
+        <DateRow
+          label="미팅 날짜가 잡히면 입력"
+          value={collab.meetingAt}
+          onChange={(v) => {
+            if (!v) return
+            // 날짜가 정해졌다는 건 곧 '미팅 확정' — 한 번에 넘긴다.
+            patch({ meetingAt: v })
+            moveStage.mutate({ id: collab.id, stage: '미팅 확정' })
+          }}
+        />
+      </div>
+    )
+  }
+
+  // ── 미팅 확정: 미팅 날짜 ──
+  if (stage === '미팅 확정') {
+    const left = collab.meetingAt ? daysUntil(collab.meetingAt) : null
+    return (
+      <div className="mt-2 space-y-1.5">
+        <DateRow label="미팅 날짜" value={collab.meetingAt} onChange={(v) => patch({ meetingAt: v })} />
+
+        {left !== null && (
+          <p
+            className={clsx(
+              'text-[11px]',
+              left < 0 ? 'font-medium text-amber-600' : 'text-slate-500',
+            )}
+          >
+            {left > 0 ? `미팅 D-${left}` : left === 0 ? '오늘 미팅' : `미팅일이 ${-left}일 지났습니다`}
+          </p>
+        )}
+
+        <DateRow
+          label="마켓 날짜가 정해지면 입력"
+          value={collab.marketDate}
+          onChange={(v) => {
+            if (!v) return
+            // 마켓 날짜가 잡혔으면 곧 '마켓 대기중'.
+            patch({ marketDate: v })
+            moveStage.mutate({ id: collab.id, stage: '마켓 대기중' })
+          }}
+        />
+      </div>
+    )
+  }
+
+  // ── 마켓 대기중: 마켓 여는 날짜 ──
+  if (stage === '마켓 대기중') {
+    const left = collab.marketDate ? daysUntil(collab.marketDate) : null
+    return (
+      <div className="mt-2 space-y-1.5">
+        <DateRow
+          label="마켓 예정일"
+          value={collab.marketDate}
+          onChange={(v) => patch({ marketDate: v })}
+        />
+        {left !== null && (
+          <p
+            className={clsx(
+              'text-[11px]',
+              left <= 3 ? 'font-medium text-amber-600' : 'text-slate-500',
+            )}
+          >
+            {left > 0 ? `마켓 D-${left}` : left === 0 ? '오늘 마켓' : `마켓일이 ${-left}일 지났습니다`}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return null
+}

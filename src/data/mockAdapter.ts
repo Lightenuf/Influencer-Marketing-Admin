@@ -40,11 +40,38 @@ const emptyDb = (): Database => ({
   notes: [],
 })
 
+/**
+ * 단계 이름을 5단계로 바꾸기 전에 저장된 기록을 새 이름으로 옮긴다.
+ * 이미 저장돼 있던 카드가 어느 칸에도 안 나타나는 일을 막기 위한 것.
+ */
+const LEGACY_STAGES: Record<string, CollabStage> = {
+  요청: '회신완료',
+  협의중: '테스트중',
+  진행중: '미팅 확정',
+  종료: '마켓 대기중',
+}
+
+function migrate(db: Database): Database {
+  db.collabs = db.collabs.map((collab) => ({
+    ...collab,
+    stage: LEGACY_STAGES[collab.stage] ?? collab.stage,
+    testFeedback: collab.testFeedback ?? null,
+    lastContactedAt: collab.lastContactedAt ?? null,
+    meetingAt: collab.meetingAt ?? null,
+    marketDate: collab.marketDate ?? null,
+  }))
+  db.influencers = db.influencers.map((influencer) => ({
+    ...influencer,
+    followingCount: influencer.followingCount ?? 0,
+  }))
+  return db
+}
+
 function read(): Database {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return emptyDb()
-    return { ...emptyDb(), ...(JSON.parse(raw) as Partial<Database>) }
+    return migrate({ ...emptyDb(), ...(JSON.parse(raw) as Partial<Database>) })
   } catch {
     return emptyDb()
   }
@@ -209,8 +236,6 @@ export const mockAdapter: DataRepository = {
     const db = read()
     const collab = requireCollab(db, id)
     collab.isCancelled = true
-    collab.stage = '종료'
-    collab.stageEnteredAt = now()
     collab.cancelReason = reason
     collab.cancelReasonDetail = reasonDetail
     collab.cancelledAt = now()

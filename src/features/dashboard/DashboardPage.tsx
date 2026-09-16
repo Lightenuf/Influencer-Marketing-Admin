@@ -4,11 +4,12 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { CollabTypeBadge, StageBadge } from '@/components/badges'
 import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '@/components/ui'
 import { isMockMode } from '@/data'
-import { INFLUENCER_STATUSES } from '@/data/types'
+import { COLLAB_STAGES, INFLUENCER_STATUSES } from '@/data/types'
 import { useCollabs, useDemoData, useInfluencers, useShipments } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
 
 const STALE_DAYS = 15
+const LAST_STAGE = COLLAB_STAGES[COLLAB_STAGES.length - 1]
 
 const STATUS_COLORS: Record<string, string> = {
   제안중: '#94a3b8',
@@ -58,7 +59,7 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const all = influencers ?? []
     const blocked = all.filter((i) => i.doNotContact)
-    const activeCollabs = collabs.filter((c) => !c.isCancelled && c.stage === '진행중')
+    const activeCollabs = collabs.filter((c) => !c.isCancelled)
     const cancelled = collabs.filter((c) => c.isCancelled)
 
     const sampledIds = new Set(
@@ -95,7 +96,7 @@ export default function DashboardPage() {
   const stalled = useMemo(
     () =>
       collabs
-        .filter((c) => !c.isCancelled && c.stage !== '종료' && daysSince(c.stageEnteredAt) >= STALE_DAYS)
+        .filter((c) => !c.isCancelled && c.stage !== LAST_STAGE && daysSince(c.stageEnteredAt) >= STALE_DAYS)
         .sort((a, b) => a.stageEnteredAt.localeCompare(b.stageEnteredAt)),
     [collabs],
   )

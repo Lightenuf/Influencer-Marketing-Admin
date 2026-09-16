@@ -1,95 +1,196 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button, Field, Input, Modal, Select } from '@/components/ui'
-import { COLLAB_STAGES, COLLAB_TYPES, type Collab, type CollabStage, type CollabType } from '@/data/types'
-import { useCreateCollab, useInfluencers, useUpdateCollab } from '@/hooks/queries'
-import { toDateInputValue } from '@/utils/format'
+import { COLLAB_STAGES, SNS_PLATFORM_LABELS, type CollabStage, type Influencer } from '@/data/types'
+import { useCollabs, useCreateCollab, useInfluencers } from '@/hooks/queries'
+import { formatNumber } from '@/utils/format'
 
-const emptyForm = {
-  influencerId: '',
-  title: '',
-  collabType: '마켓' as CollabType,
-  stage: '요청' as CollabStage,
-  startDate: '',
-  endDate: '',
-  sampleShipDate: '',
-  contentDueDate: '',
-  fee: 0,
+/** 검색어를 아이디 형태로 정리한다. 인스타 링크를 통째로 붙여넣어도 아이디만 남는다. */
+function normalize(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/^(instagram|youtube|tiktok)\.com\//, '')
+    .replace(/^@/, '')
+    .replace(/\/.*$/, '')
+    .replace(/\?.*$/, '')
 }
 
+const MAX_RESULTS = 8
+
+/**
+ * 파이프라인에 크리에이터를 올리는 창.
+ * 여기 올라오는 분들은 전부 최종 마켓(공구)이 목표이므로 구분·건명은 받지 않는다.
+ */
 export default function CollabFormDialog({
   open,
   onClose,
-  editing,
 }: {
   open: boolean
   onClose: () => void
-  editing?: Collab | null
 }) {
   const { data: influencers = [] } = useInfluencers()
+  const { data: collabs = [] } = useCollabs()
   const createCollab = useCreateCollab()
-  const updateCollab = useUpdateCollab()
-  const [form, setForm] = useState(emptyForm)
+
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<Influencer | null>(null)
+  const [stage, setStage] = useState<CollabStage>(COLLAB_STAGES[0])
 
   useEffect(() => {
-    if (editing) {
-      setForm({
-        influencerId: editing.influencerId,
-        title: editing.title,
-        collabType: editing.collabType,
-        stage: editing.stage,
-        startDate: toDateInputValue(editing.startDate),
-        endDate: toDateInputValue(editing.endDate),
-        sampleShipDate: toDateInputValue(editing.sampleShipDate),
-        contentDueDate: toDateInputValue(editing.contentDueDate),
-        fee: editing.fee,
-      })
-    } else {
-      setForm(emptyForm)
+    if (open) {
+      setQuery('')
+      setSelected(null)
+      setStage(COLLAB_STAGES[0])
     }
-  }, [editing, open])
+  }, [open])
 
-  const selected = influencers.find((i) => i.id === form.influencerId)
+  // 한 사람당 카드 한 장 — 이미 올라와 있는지 표시해준다.
+  const alreadyInPipeline = useMemo(
+    () => new Set(collabs.map((c) => c.influencerId)),
+    [collabs],
+  )
+
+  const matches = useMemo(() => {
+    const q = normalize(query)
+    if (!q) return []
+    const raw = query.trim().toLowerCase()
+    return influencers
+      .filter(
+        (i) =>
+          i.snsHandle.toLowerCase().includes(q) ||
+          i.name.toLowerCase().includes(raw) ||
+          i.snsUrl.toLowerCase().includes(q),
+      )
+      .slice(0, MAX_RESULTS)
+  }, [query, influencers])
+
+  const firstSelectableId = matches.find((m) => !alreadyInPipeline.has(m.id))?.id
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      influencerId: form.influencerId,
-      title: form.title.trim(),
-      collabType: form.collabType,
-      stage: form.stage,
-      startDate: form.startDate || null,
-      endDate: form.endDate || null,
-      sampleShipDate: form.sampleShipDate || null,
-      contentDueDate: form.contentDueDate || null,
-      fee: Number(form.fee) || 0,
-    }
-    if (editing) {
-      updateCollab.mutate({ id: editing.id, patch: payload }, { onSuccess: onClose })
-    } else {
-      createCollab.mutate(payload, { onSuccess: onClose })
-    }
+    if (!selected) return
+    createCollab.mutate(
+      {
+        influencerId: selected.id,
+        stage,
+        title: '',
+        collabType: '마켓',
+        // 아래 값들은 카드에서 단계별로 채운다.
+        startDate: null,
+        endDate: null,
+        sampleShipDate: null,
+        contentDueDate: null,
+        fee: 0,
+        testFeedback: null,
+        lastContactedAt: null,
+        meetingAt: null,
+        marketDate: null,
+      },
+      { onSuccess: onClose },
+    )
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? '협업 수정' : '협업 추가'}>
+    <Modal open={open} onClose={onClose} title="파이프라인에 추가">
       <form onSubmit={submit} className="space-y-4">
         <Field label="크리에이터" required>
-          <Select
-            value={form.influencerId}
-            onChange={(e) => setForm({ ...form, influencerId: e.target.value })}
-            required
-            disabled={Boolean(editing)}
-          >
-            <option value="" disabled>
-              선택해주세요
-            </option>
-            {influencers.map((influencer) => (
-              <option key={influencer.id} value={influencer.id}>
-                {influencer.name} (@{influencer.snsHandle})
-                {influencer.doNotContact ? ' — 연락 금지' : ''}
-              </option>
-            ))}
-          </Select>
+          {selected ? (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-900">{selected.name}</p>
+                <p className="truncate text-xs text-slate-500">@{selected.snsHandle}</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSelected(null)
+                  setQuery('')
+                }}
+              >
+                변경
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter 한 번으로 첫 후보 선택 (붙여넣고 바로 엔터)
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  const first = matches.find((m) => !alreadyInPipeline.has(m.id))
+                  if (first) setSelected(first)
+                }}
+                placeholder="아이디 붙여넣기 (예: nalssin_cook) 또는 이름으로 검색"
+                autoFocus
+              />
+              {query.trim() !== '' && (
+                <div className="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-200">
+                  {matches.length === 0 ? (
+                    <div className="px-3 py-3">
+                      <p className="text-xs text-slate-500">
+                        등록된 크리에이터 중에 없습니다. 인플루언서로 먼저 등록해야 여기에
+                        나타납니다.
+                      </p>
+                      <Link
+                        to={`/influencers/new?url=${encodeURIComponent(query.trim())}`}
+                        className="mt-2 inline-block rounded-md bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+                      >
+                        이 링크로 등록하러 가기
+                      </Link>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {matches.map((influencer) => {
+                        const taken = alreadyInPipeline.has(influencer.id)
+                        return (
+                          <li key={influencer.id}>
+                            <button
+                              type="button"
+                              disabled={taken}
+                              onClick={() => setSelected(influencer)}
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-violet-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:hover:bg-slate-50"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm text-slate-900">
+                                  {influencer.name}
+                                  {influencer.doNotContact && (
+                                    <span className="ml-1 text-xs text-rose-600">⛔ 연락 금지</span>
+                                  )}
+                                </span>
+                                <span className="block truncate text-xs text-slate-500">
+                                  @{influencer.snsHandle} ·{' '}
+                                  {SNS_PLATFORM_LABELS[influencer.snsPlatform]} · 팔로워{' '}
+                                  {formatNumber(influencer.followerCount)}
+                                </span>
+                              </span>
+                              {taken ? (
+                                <span className="shrink-0 text-[11px] text-slate-400">
+                                  이미 추가됨
+                                </span>
+                              ) : (
+                                influencer.id === firstSelectableId && (
+                                  <span className="shrink-0 rounded border border-slate-200 px-1 text-[10px] text-slate-400">
+                                    Enter
+                                  </span>
+                                )
+                              )}
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </Field>
 
         {selected?.doNotContact && (
@@ -98,84 +199,22 @@ export default function CollabFormDialog({
           </p>
         )}
 
-        <Field label="협업명" required>
-          <Input
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="예) 10월 마켓 공동구매"
-            required
-          />
+        <Field label="시작 단계">
+          <Select value={stage} onChange={(e) => setStage(e.target.value as CollabStage)}>
+            {COLLAB_STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
         </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="구분">
-            <Select
-              value={form.collabType}
-              onChange={(e) => setForm({ ...form, collabType: e.target.value as CollabType })}
-            >
-              {COLLAB_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="단계">
-            <Select
-              value={form.stage}
-              onChange={(e) => setForm({ ...form, stage: e.target.value as CollabStage })}
-            >
-              {COLLAB_STAGES.map((stage) => (
-                <option key={stage} value={stage}>
-                  {stage}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="협업 시작일">
-            <Input
-              type="date"
-              value={form.startDate}
-              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-            />
-          </Field>
-          <Field label="협업 종료일">
-            <Input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-            />
-          </Field>
-          <Field label="샘플 발송일">
-            <Input
-              type="date"
-              value={form.sampleShipDate}
-              onChange={(e) => setForm({ ...form, sampleShipDate: e.target.value })}
-            />
-          </Field>
-          <Field label="콘텐츠 마감일">
-            <Input
-              type="date"
-              value={form.contentDueDate}
-              onChange={(e) => setForm({ ...form, contentDueDate: e.target.value })}
-            />
-          </Field>
-          <Field label="협업비 (원)">
-            <Input
-              type="number"
-              min={0}
-              value={form.fee}
-              onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })}
-            />
-          </Field>
-        </div>
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             취소
           </Button>
-          <Button type="submit" disabled={!form.influencerId || !form.title.trim()}>
-            {editing ? '저장' : '추가'}
+          <Button type="submit" disabled={!selected}>
+            추가
           </Button>
         </div>
       </form>

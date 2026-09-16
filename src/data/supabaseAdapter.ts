@@ -34,6 +34,7 @@ const toInfluencer = (row: Row): Influencer => ({
   snsHandle: row.sns_handle,
   snsUrl: row.sns_url,
   followerCount: row.follower_count,
+  followingCount: row.following_count ?? 0,
   categories: row.categories ?? [],
   avgRevenueBand: row.avg_revenue_band,
   contactEmail: row.contact_email,
@@ -57,6 +58,7 @@ const influencerColumns = (input: Partial<InfluencerInput>): Row => {
   if (input.snsHandle !== undefined) row.sns_handle = input.snsHandle
   if (input.snsUrl !== undefined) row.sns_url = input.snsUrl
   if (input.followerCount !== undefined) row.follower_count = input.followerCount
+  if (input.followingCount !== undefined) row.following_count = input.followingCount
   if (input.categories !== undefined) row.categories = input.categories
   if (input.avgRevenueBand !== undefined) row.avg_revenue_band = input.avgRevenueBand
   if (input.contactEmail !== undefined) row.contact_email = input.contactEmail
@@ -89,6 +91,10 @@ const toCollab = (row: Row): Collab => ({
   sampleShipDate: row.sample_ship_date,
   contentDueDate: row.content_due_date,
   fee: row.fee,
+  testFeedback: row.test_feedback,
+  lastContactedAt: row.last_contacted_at,
+  meetingAt: row.meeting_at,
+  marketDate: row.market_date,
   isCancelled: row.is_cancelled,
   cancelReason: row.cancel_reason,
   cancelReasonDetail: row.cancel_reason_detail,
@@ -108,6 +114,10 @@ const collabColumns = (input: Partial<CollabInput>): Row => {
   if (input.sampleShipDate !== undefined) row.sample_ship_date = input.sampleShipDate
   if (input.contentDueDate !== undefined) row.content_due_date = input.contentDueDate
   if (input.fee !== undefined) row.fee = input.fee
+  if (input.testFeedback !== undefined) row.test_feedback = input.testFeedback
+  if (input.lastContactedAt !== undefined) row.last_contacted_at = input.lastContactedAt
+  if (input.meetingAt !== undefined) row.meeting_at = input.meetingAt
+  if (input.marketDate !== undefined) row.market_date = input.marketDate
   return row
 }
 
@@ -270,7 +280,6 @@ export const supabaseAdapter: DataRepository = {
         .from('collabs')
         .update({
           is_cancelled: true,
-          stage: '종료',
           cancel_reason: reason,
           cancel_reason_detail: reasonDetail,
           cancelled_at: new Date().toISOString(),

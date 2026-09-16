@@ -120,7 +120,7 @@ create table if not exists public.collabs (
   influencer_id uuid not null references public.influencers (id) on delete cascade,
   title text not null default '',
   collab_type text not null default '마켓',
-  stage text not null default '요청',
+  stage text not null default '회신완료',
   stage_entered_at timestamptz not null default now(),
   start_date date,
   end_date date,

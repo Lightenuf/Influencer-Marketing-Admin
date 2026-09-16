@@ -54,7 +54,16 @@ export type DncReason = (typeof DNC_REASONS)[number]
 export const COLLAB_TYPES = ['마켓', '샘플', '유가광고'] as const
 export type CollabType = (typeof COLLAB_TYPES)[number]
 
-export const COLLAB_STAGES = ['요청', '협의중', '진행중', '종료'] as const
+export const TEST_FEEDBACKS = ['긍정', '부정'] as const
+export type TestFeedback = (typeof TEST_FEEDBACKS)[number]
+
+export const COLLAB_STAGES = [
+  '회신완료',
+  '테스트중',
+  '미팅 조율중',
+  '미팅 확정',
+  '마켓 대기중',
+] as const
 export type CollabStage = (typeof COLLAB_STAGES)[number]
 
 export const SHIPMENT_STATUSES = ['배송준비중', '배송중', '완료', '취소요청', '취소'] as const
@@ -74,6 +83,7 @@ export interface Influencer {
   snsHandle: string
   snsUrl: string
   followerCount: number
+  followingCount: number
   categories: string[]
   avgRevenueBand: RevenueBand
   contactEmail: string
@@ -113,6 +123,14 @@ export interface Collab {
   sampleShipDate: string | null
   contentDueDate: string | null
   fee: number
+  /** 테스트중 — 음료를 받아본 반응. '긍정'이면 미팅 조율중으로 넘어간다. */
+  testFeedback: TestFeedback | null
+  /** 미팅 조율중 — 마지막으로 연락한 날 */
+  lastContactedAt: string | null
+  /** 미팅 확정 — 미팅 날짜 */
+  meetingAt: string | null
+  /** 마켓 대기중 — 마켓 여는 날짜 */
+  marketDate: string | null
   isCancelled: boolean
   cancelReason: DncReason | null
   cancelReasonDetail: string
