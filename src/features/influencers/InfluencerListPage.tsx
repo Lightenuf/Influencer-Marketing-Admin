@@ -6,13 +6,14 @@ import { Button, Card, EmptyState, Input, linkButtonClass, Select, Spinner } fro
 import { isMockMode } from '@/data'
 import {
   CATEGORIES,
+  COLLAB_STAGES,
   INFLUENCER_STATUSES,
   SNS_PLATFORM_LABELS,
   SNS_PLATFORMS,
   type Influencer,
 } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
-import { useDemoData, useInfluencers } from '@/hooks/queries'
+import { useCollabs, useCreateCollab, useDemoData, useInfluencers } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
 import { formatDate, formatFollowers, formatNumber } from '@/utils/format'
 
@@ -20,6 +21,8 @@ type ContactFilter = 'all' | 'contactable' | 'blocked'
 
 export default function InfluencerListPage() {
   const { data: influencers, isLoading } = useInfluencers()
+  const { data: collabs = [] } = useCollabs()
+  const createCollab = useCreateCollab()
   const demo = useDemoData()
 
   const [keyword, setKeyword] = useState('')
@@ -42,6 +45,31 @@ export default function InfluencerListPage() {
       return true
     })
   }, [influencers, keyword, status, platform, category, contactFilter])
+
+  /** 파이프라인에 이미 올라와 있는 사람은 다시 올리지 않는다 (한 사람당 카드 한 장). */
+  const collabByInfluencer = useMemo(
+    () => new Map(collabs.map((collab) => [collab.influencerId, collab])),
+    [collabs],
+  )
+
+  /** 회신을 받았다는 표시 — 파이프라인 첫 단계에 카드를 만든다. */
+  const markReplied = (influencer: Influencer) => {
+    createCollab.mutate({
+      influencerId: influencer.id,
+      stage: COLLAB_STAGES[0],
+      title: '',
+      collabType: '마켓',
+      startDate: null,
+      endDate: null,
+      sampleShipDate: null,
+      contentDueDate: null,
+      fee: 0,
+      testFeedback: null,
+      lastContactedAt: null,
+      meetingAt: null,
+      marketDate: null,
+    })
+  }
 
   const exportCsv = () => {
     downloadCsv(
@@ -191,6 +219,7 @@ export default function InfluencerListPage() {
                   <th className="px-3 py-2.5 text-left font-medium">평균 매출</th>
                   <th className="px-3 py-2.5 text-left font-medium">상태</th>
                   <th className="px-3 py-2.5 text-left font-medium">등록일</th>
+                  <th className="px-3 py-2.5 text-right font-medium">회신 받음</th>
                   <th className="px-5 py-2.5 text-right font-medium">연락 금지</th>
                 </tr>
               </thead>
@@ -229,6 +258,36 @@ export default function InfluencerListPage() {
                       <StatusBadge status={influencer.status} />
                     </td>
                     <td className="px-3 py-3 text-slate-500">{formatDate(influencer.createdAt)}</td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {(() => {
+                        const collab = collabByInfluencer.get(influencer.id)
+                        if (collab) {
+                          return (
+                            <Link
+                              to="/pipeline"
+                              className="text-xs text-slate-400 hover:text-violet-600"
+                            >
+                              파이프라인 · {collab.isOnHold ? '보류' : collab.stage}
+                            </Link>
+                          )
+                        }
+                        return (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={influencer.doNotContact || createCollab.isPending}
+                            title={
+                              influencer.doNotContact
+                                ? '연락 금지 대상입니다. 먼저 해제해주세요.'
+                                : `파이프라인 '${COLLAB_STAGES[0]}' 단계에 추가합니다`
+                            }
+                            onClick={() => markReplied(influencer)}
+                          >
+                            회신 받음
+                          </Button>
+                        )
+                      })()}
+                    </td>
                     <td className="px-5 py-3 text-right">
                       <Button
                         size="sm"
