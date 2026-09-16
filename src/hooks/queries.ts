@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { repository } from '@/data'
-import type { CollabInput, DncChange, InfluencerInput, ShipmentInput } from '@/data/repository'
+import type {
+  CollabInput,
+  DncChange,
+  HoldChange,
+  InfluencerInput,
+  ShipmentInput,
+} from '@/data/repository'
 import type { CollabStage, DncReason } from '@/data/types'
 
 export const keys = {
@@ -123,6 +129,23 @@ export function useCancelCollab() {
   return useMutation({
     mutationFn: ({ id, reason, detail }: { id: string; reason: DncReason; detail: string }) =>
       repository.cancelCollab(id, reason, detail),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
+  })
+}
+
+export function useHoldCollab() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, change }: { id: string; change: Partial<HoldChange> }) =>
+      repository.holdCollab(id, change),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
+  })
+}
+
+export function useResumeCollab() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => repository.resumeCollab(id),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
   })
 }

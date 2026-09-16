@@ -6,6 +6,7 @@ import { Button, Card, EmptyState, Spinner } from '@/components/ui'
 import { COLLAB_STAGES, type Collab, type CollabStage } from '@/data/types'
 import CancelCollabDialog from '@/features/pipeline/CancelCollabDialog'
 import CollabFormDialog from '@/features/pipeline/CollabFormDialog'
+import HoldCollabDialog from '@/features/pipeline/HoldCollabDialog'
 import StageActions from '@/features/pipeline/StageActions'
 import { useCollabs, useInfluencers, useMoveCollabStage } from '@/hooks/queries'
 import { daysSince } from '@/utils/format'
@@ -21,6 +22,7 @@ export default function PipelinePage() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Collab | null>(null)
+  const [holdTarget, setHoldTarget] = useState<Collab | null>(null)
 
   const influencerOf = (id: string) => influencers.find((i) => i.id === id)
 
@@ -58,7 +60,9 @@ export default function PipelinePage() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {COLLAB_STAGES.map((stage) => {
-            const items = (collabs ?? []).filter((collab) => collab.stage === stage)
+            const items = (collabs ?? []).filter(
+              (collab) => collab.stage === stage && !collab.isOnHold,
+            )
             return (
               <div key={stage} className="rounded-xl bg-slate-200/60 p-2">
                 <div className="flex items-center justify-between px-2 py-1.5">
@@ -129,14 +133,24 @@ export default function PipelinePage() {
                           </Button>
                           <span className="flex-1" />
                           {!collab.isCancelled && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="px-1.5 text-rose-500 hover:bg-rose-50"
-                              onClick={() => setCancelTarget(collab)}
-                            >
-                              취소
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="px-1.5 text-amber-600 hover:bg-amber-50"
+                                onClick={() => setHoldTarget(collab)}
+                              >
+                                보류
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="px-1.5 text-rose-500 hover:bg-rose-50"
+                                onClick={() => setCancelTarget(collab)}
+                              >
+                                취소
+                              </Button>
+                            </>
                           )}
                         </div>
                       </Card>
@@ -154,6 +168,11 @@ export default function PipelinePage() {
         collab={cancelTarget}
         open={cancelTarget !== null}
         onClose={() => setCancelTarget(null)}
+      />
+      <HoldCollabDialog
+        collab={holdTarget}
+        open={holdTarget !== null}
+        onClose={() => setHoldTarget(null)}
       />
     </div>
   )

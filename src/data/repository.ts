@@ -1,6 +1,7 @@
 import type {
   Collab,
   CollabStage,
+  HoldReason,
   CommunicationLog,
   DncAuditEntry,
   DncReason,
@@ -23,8 +24,26 @@ export type InfluencerInput = Omit<
 
 export type CollabInput = Omit<
   Collab,
-  'id' | 'createdAt' | 'updatedAt' | 'stageEnteredAt' | 'isCancelled' | 'cancelReason' | 'cancelReasonDetail' | 'cancelledAt'
+  | 'id'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'stageEnteredAt'
+  | 'isCancelled'
+  | 'cancelReason'
+  | 'cancelReasonDetail'
+  | 'cancelledAt'
+  | 'isOnHold'
+  | 'holdReason'
+  | 'holdDetail'
+  | 'heldAt'
+  | 'recontactAt'
 >
+
+export interface HoldChange {
+  reason: HoldReason
+  detail: string
+  recontactAt: string | null
+}
 
 export type ShipmentInput = Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>
 
@@ -58,6 +77,14 @@ export interface DataRepository {
   updateCollab(id: string, patch: Partial<CollabInput>): Promise<Collab>
   moveCollabStage(id: string, stage: CollabStage): Promise<Collab>
   cancelCollab(id: string, reason: DncReason, reasonDetail: string): Promise<Collab>
+  /**
+   * 보류로 옮기거나, 이미 보류 중인 건의 정보를 고친다.
+   * 넘긴 항목만 바뀐다 — 날짜만 고치려고 사유·메모를 다시 보낼 필요가 없다.
+   * 단계는 그대로 두어 복귀할 자리를 기억한다.
+   */
+  holdCollab(id: string, change: Partial<HoldChange>): Promise<Collab>
+  /** 보류를 풀고 원래 단계로 되돌린다. */
+  resumeCollab(id: string): Promise<Collab>
   deleteCollab(id: string): Promise<void>
 
   listShipments(): Promise<Shipment[]>

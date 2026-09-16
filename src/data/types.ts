@@ -54,6 +54,15 @@ export type DncReason = (typeof DNC_REASONS)[number]
 export const COLLAB_TYPES = ['마켓', '샘플', '유가광고'] as const
 export type CollabType = (typeof COLLAB_TYPES)[number]
 
+export const HOLD_REASONS = [
+  '일정 불가',
+  '공구 경험 없음',
+  '단가 조율 필요',
+  '제품은 좋으나 시기 안 맞음',
+  '기타',
+] as const
+export type HoldReason = (typeof HOLD_REASONS)[number]
+
 export const TEST_FEEDBACKS = ['긍정', '부정'] as const
 export type TestFeedback = (typeof TEST_FEEDBACKS)[number]
 
@@ -131,6 +140,13 @@ export interface Collab {
   meetingAt: string | null
   /** 마켓 대기중 — 마켓 여는 날짜 */
   marketDate: string | null
+  /** 보류 — 거절은 아니지만 지금은 진행할 수 없는 상태. 나중에 다시 연락한다. */
+  isOnHold: boolean
+  holdReason: HoldReason | null
+  holdDetail: string
+  heldAt: string | null
+  /** 다시 연락하기로 한 날 */
+  recontactAt: string | null
   isCancelled: boolean
   cancelReason: DncReason | null
   cancelReasonDetail: string

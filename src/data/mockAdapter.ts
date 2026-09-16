@@ -2,6 +2,7 @@ import type {
   CollabInput,
   DataRepository,
   DncChange,
+  HoldChange,
   InfluencerInput,
   ShipmentInput,
 } from './repository'
@@ -55,6 +56,11 @@ function migrate(db: Database): Database {
   db.collabs = db.collabs.map((collab) => ({
     ...collab,
     stage: LEGACY_STAGES[collab.stage] ?? collab.stage,
+    isOnHold: collab.isOnHold ?? false,
+    holdReason: collab.holdReason ?? null,
+    holdDetail: collab.holdDetail ?? '',
+    heldAt: collab.heldAt ?? null,
+    recontactAt: collab.recontactAt ?? null,
     testFeedback: collab.testFeedback ?? null,
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
@@ -199,6 +205,11 @@ export const mockAdapter: DataRepository = {
       ...input,
       id: uid(),
       stageEnteredAt: now(),
+      isOnHold: false,
+      holdReason: null,
+      holdDetail: '',
+      heldAt: null,
+      recontactAt: null,
       isCancelled: false,
       cancelReason: null,
       cancelReasonDetail: '',
@@ -239,6 +250,36 @@ export const mockAdapter: DataRepository = {
     collab.cancelReason = reason
     collab.cancelReasonDetail = reasonDetail
     collab.cancelledAt = now()
+    collab.updatedAt = now()
+    write(db)
+    return tick(collab)
+  },
+
+  async holdCollab(id: string, change: Partial<HoldChange>) {
+    const db = read()
+    const collab = requireCollab(db, id)
+    collab.isOnHold = true
+    // 넘어온 항목만 바꾼다. 빠진 항목은 기존 값을 지킨다.
+    if (change.reason !== undefined) collab.holdReason = change.reason
+    if (change.detail !== undefined) collab.holdDetail = change.detail
+    if (change.recontactAt !== undefined) collab.recontactAt = change.recontactAt
+    // 수정일 때는 최초 보류일을 그대로 둔다.
+    if (!collab.heldAt) collab.heldAt = now()
+    collab.updatedAt = now()
+    write(db)
+    return tick(collab)
+  },
+
+  async resumeCollab(id: string) {
+    const db = read()
+    const collab = requireCollab(db, id)
+    collab.isOnHold = false
+    collab.holdReason = null
+    collab.holdDetail = ''
+    collab.heldAt = null
+    collab.recontactAt = null
+    // 보류 기간은 체류일수에서 빼준다 — 복귀한 날부터 다시 센다.
+    collab.stageEnteredAt = now()
     collab.updatedAt = now()
     write(db)
     return tick(collab)

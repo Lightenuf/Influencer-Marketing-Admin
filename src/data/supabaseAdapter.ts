@@ -3,6 +3,7 @@ import type {
   CollabInput,
   DataRepository,
   DncChange,
+  HoldChange,
   InfluencerInput,
   ShipmentInput,
 } from './repository'
@@ -95,6 +96,11 @@ const toCollab = (row: Row): Collab => ({
   lastContactedAt: row.last_contacted_at,
   meetingAt: row.meeting_at,
   marketDate: row.market_date,
+  isOnHold: row.is_on_hold ?? false,
+  holdReason: row.hold_reason,
+  holdDetail: row.hold_detail ?? '',
+  heldAt: row.held_at,
+  recontactAt: row.recontact_at,
   isCancelled: row.is_cancelled,
   cancelReason: row.cancel_reason,
   cancelReasonDetail: row.cancel_reason_detail,
@@ -283,6 +289,51 @@ export const supabaseAdapter: DataRepository = {
           cancel_reason: reason,
           cancel_reason_detail: reasonDetail,
           cancelled_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single(),
+    )
+    return toCollab(row)
+  },
+
+  async holdCollab(id: string, change: Partial<HoldChange>) {
+    const db = requireSupabase()
+    const current = unwrap(
+      await db.from('collabs').select('held_at').eq('id', id).single(),
+    )
+    // 넘어온 항목만 바꾼다. 빠진 항목은 기존 값을 지킨다.
+    const patch: Row = {
+      is_on_hold: true,
+      // 수정일 때는 최초 보류일을 그대로 둔다.
+      held_at: current.held_at ?? new Date().toISOString(),
+    }
+    if (change.reason !== undefined) patch.hold_reason = change.reason
+    if (change.detail !== undefined) patch.hold_detail = change.detail
+    if (change.recontactAt !== undefined) patch.recontact_at = change.recontactAt
+    const row = unwrap(
+      await db
+        .from('collabs')
+        .update(patch)
+        .eq('id', id)
+        .select()
+        .single(),
+    )
+    return toCollab(row)
+  },
+
+  async resumeCollab(id: string) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('collabs')
+        .update({
+          is_on_hold: false,
+          hold_reason: null,
+          hold_detail: '',
+          held_at: null,
+          recontact_at: null,
+          stage_entered_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()

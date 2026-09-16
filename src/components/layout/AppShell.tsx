@@ -3,12 +3,13 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { Button } from '@/components/ui'
 import { isMockMode } from '@/data'
-import { useInfluencers } from '@/hooks/queries'
+import { useCollabs, useInfluencers } from '@/hooks/queries'
 
 const navItems = [
   { to: '/dashboard', label: '대시보드', icon: '📊' },
   { to: '/influencers', label: '인플루언서', icon: '👥' },
   { to: '/pipeline', label: '협업 파이프라인', icon: '🗂️' },
+  { to: '/on-hold', label: '보류 명단', icon: '⏸️' },
   { to: '/do-not-contact', label: '연락 금지 관리', icon: '⛔' },
   { to: '/shipments', label: '출고 관리', icon: '📦' },
   { to: '/calendar', label: '캘린더', icon: '🗓️' },
@@ -17,7 +18,9 @@ const navItems = [
 export default function AppShell() {
   const { user, signOut } = useAuth()
   const { data: influencers = [] } = useInfluencers()
+  const { data: collabs = [] } = useCollabs()
   const dncCount = influencers.filter((i) => i.doNotContact).length
+  const holdCount = collabs.filter((c) => c.isOnHold && !c.isCancelled).length
 
   return (
     <div className="flex min-h-full">
@@ -46,6 +49,11 @@ export default function AppShell() {
               {item.to === '/do-not-contact' && dncCount > 0 && (
                 <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-xs font-semibold text-rose-600">
                   {dncCount}
+                </span>
+              )}
+              {item.to === '/on-hold' && holdCount > 0 && (
+                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
+                  {holdCount}
                 </span>
               )}
             </NavLink>
