@@ -10,7 +10,9 @@ import { formatDate, formatNumber } from '@/utils/format'
 export default function RejectedListPage() {
   const { data: collabs, isLoading } = useCollabs()
   const { data: influencers = [] } = useInfluencers()
-  const [dncTarget, setDncTarget] = useState<Influencer | null>(null)
+  const [dncTarget, setDncTarget] = useState<{ influencer: Influencer; reasons: string[] } | null>(
+    null,
+  )
 
   const rejected = (collabs ?? [])
     .filter((collab) => collab.isCancelled)
@@ -93,7 +95,9 @@ export default function RejectedListPage() {
                       size="sm"
                       variant="secondary"
                       className="w-full"
-                      onClick={() => setDncTarget(influencer)}
+                      onClick={() =>
+                        setDncTarget({ influencer, reasons: collab.cancelReasons })
+                      }
                     >
                       {influencer.doNotContact ? '연락 금지 해제' : '연락 금지 등록'}
                     </Button>
@@ -106,7 +110,8 @@ export default function RejectedListPage() {
       )}
 
       <DncChangeDialog
-        influencer={dncTarget}
+        influencer={dncTarget?.influencer ?? null}
+        presetReasons={dncTarget?.reasons}
         open={dncTarget !== null}
         onClose={() => setDncTarget(null)}
       />

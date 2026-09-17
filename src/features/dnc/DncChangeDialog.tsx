@@ -9,10 +9,13 @@ export default function DncChangeDialog({
   influencer,
   open,
   onClose,
+  presetReasons,
 }: {
   influencer: Influencer | null
   open: boolean
   onClose: () => void
+  /** 거절 사유를 그대로 쓸 때 넘긴다. 이 경우 사유를 다시 고르지 않고 메모만 받는다. */
+  presetReasons?: string[]
 }) {
   const user = useCurrentUser()
   const changeDnc = useChangeDnc(user.id)
@@ -22,6 +25,11 @@ export default function DncChangeDialog({
   if (!influencer) return null
 
   const isUnsetting = influencer.doNotContact
+  // 거절하면서 이미 사유를 고른 경우에는 같은 사유를 그대로 쓰고, 메모만 받는다.
+  const inherited = !isUnsetting && (presetReasons?.length ?? 0) > 0 ? presetReasons! : null
+  const effectiveReasons = inherited ?? reasons
+  const canSubmit = inherited ? detail.trim() !== '' : effectiveReasons.length > 0
+
   const close = () => {
     setReasons([])
     setDetail('')
@@ -30,12 +38,12 @@ export default function DncChangeDialog({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (reasons.length === 0) return
+    if (!canSubmit) return
     changeDnc.mutate(
       {
         influencerId: influencer.id,
         action: isUnsetting ? 'unset' : 'set',
-        reason: reasons.join(', '),
+        reason: effectiveReasons.join(', '),
         reasonDetail: detail.trim(),
       },
       { onSuccess: close },
@@ -57,16 +65,32 @@ export default function DncChangeDialog({
       }
     >
       <form onSubmit={submit} className="space-y-4">
-        <Field
-          label={isUnsetting ? '해제 사유' : '금지 사유'}
-          required
-          hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다"
-        >
-          <TagPicker selected={reasons} onChange={setReasons} />
-        </Field>
+        {inherited ? (
+          <Field label="금지 사유" hint="거절할 때 고른 사유를 그대로 씁니다">
+            <div className="flex flex-wrap gap-1.5 rounded-lg bg-slate-50 px-3 py-2.5">
+              {inherited.map((reason) => (
+                <span
+                  key={reason}
+                  className="rounded-md bg-rose-100 px-2 py-1 text-xs font-medium text-rose-700"
+                >
+                  {reason}
+                </span>
+              ))}
+            </div>
+          </Field>
+        ) : (
+          <Field
+            label={isUnsetting ? '해제 사유' : '금지 사유'}
+            required
+            hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다"
+          >
+            <TagPicker selected={reasons} onChange={setReasons} />
+          </Field>
+        )}
 
         <Field
           label="상세 메모"
+          required={Boolean(inherited)}
           hint="나중에 '왜 막았는지' 확인할 수 있도록 통화·DM 내용 등을 남겨주세요."
         >
           <Textarea
@@ -74,6 +98,7 @@ export default function DncChangeDialog({
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
             placeholder="예) 9/12 DM 회신 — 건기식 카테고리는 협업하지 않는다고 함"
+            autoFocus={Boolean(inherited)}
           />
         </Field>
 
@@ -93,7 +118,7 @@ export default function DncChangeDialog({
           <Button
             type="submit"
             variant={isUnsetting ? 'primary' : 'danger'}
-            disabled={reasons.length === 0 || changeDnc.isPending}
+            disabled={!canSubmit || changeDnc.isPending}
           >
             {isUnsetting ? '해제하기' : '연락 금지 등록'}
           </Button>
