@@ -247,7 +247,7 @@ export default function DashboardPage() {
         <CardHeader
           title="최근 연락 금지 등록"
           action={
-            <Link to="/do-not-contact" className="text-sm text-violet-600 hover:underline">
+            <Link to="/rejected" className="text-sm text-violet-600 hover:underline">
               전체 보기 →
             </Link>
           }

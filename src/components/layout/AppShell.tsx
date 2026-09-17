@@ -10,7 +10,6 @@ const navItems = [
   { to: '/influencers', label: '인플루언서', icon: '👥' },
   { to: '/pipeline', label: '협업 파이프라인', icon: '🗂️' },
   { to: '/rejected', label: '거절 명단', icon: '🚫' },
-  { to: '/do-not-contact', label: '연락 금지 관리', icon: '⛔' },
   { to: '/shipments', label: '출고 관리', icon: '📦' },
   { to: '/calendar', label: '캘린더', icon: '🗓️' },
 ]
@@ -44,7 +43,7 @@ export default function AppShell() {
             >
               <span aria-hidden>{item.icon}</span>
               <span className="flex-1">{item.label}</span>
-              {item.to === '/do-not-contact' && dncCount > 0 && (
+              {item.to === '/rejected' && dncCount > 0 && (
                 <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-xs font-semibold text-rose-600">
                   {dncCount}
                 </span>

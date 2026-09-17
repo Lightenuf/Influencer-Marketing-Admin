@@ -5,7 +5,6 @@ import SignupPage from '@/auth/SignupPage'
 import AppShell from '@/components/layout/AppShell'
 import CalendarPage from '@/features/calendar/CalendarPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
-import DoNotContactPage from '@/features/dnc/DoNotContactPage'
 import RejectedListPage from '@/features/rejected/RejectedListPage'
 import InfluencerDetailPage from '@/features/influencers/InfluencerDetailPage'
 import InfluencerFormPage from '@/features/influencers/InfluencerFormPage'
@@ -28,7 +27,8 @@ export default function App() {
           <Route path="/influencers/:id/edit" element={<InfluencerFormPage />} />
           <Route path="/pipeline" element={<PipelinePage />} />
           <Route path="/rejected" element={<RejectedListPage />} />
-          <Route path="/do-not-contact" element={<DoNotContactPage />} />
+          {/* 예전 주소로 들어오면 거절 명단으로 보낸다 */}
+          <Route path="/do-not-contact" element={<Navigate to="/rejected" replace />} />
           <Route path="/shipments" element={<ShipmentsPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
         </Route>
