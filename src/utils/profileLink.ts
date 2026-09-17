@@ -71,11 +71,22 @@ function toCount(raw: string): number | null {
   return Math.round(n * mul)
 }
 
+/**
+ * 붙여넣은 글에서 이메일 주소를 찾는다.
+ * 인스타 소개글에 적어둔 협업 문의 주소(@ + 도메인)를 잡기 위한 것으로,
+ * 아이디(@handle)는 도메인이 없어 걸리지 않는다.
+ */
+export function findEmail(text: string): string | null {
+  const match = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/)
+  return match ? match[0] : null
+}
+
 export interface ParsedProfileText {
   handle: string | null
   followerCount: number | null
   followingCount: number | null
   bio: string | null
+  email: string | null
 }
 
 /**
@@ -131,5 +142,5 @@ export function parseProfileText(text: string): ParsedProfileText {
       .slice(0, 6)
       .join('\n') || null
 
-  return { handle, followerCount, followingCount, bio }
+  return { handle, followerCount, followingCount, bio, email: findEmail(t) }
 }

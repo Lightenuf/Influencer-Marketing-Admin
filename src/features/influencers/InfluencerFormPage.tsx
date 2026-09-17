@@ -21,7 +21,7 @@ import {
   useUpdateInfluencer,
 } from '@/hooks/queries'
 import { formatDate, formatFollowers } from '@/utils/format'
-import { parseProfileLink, parseProfileText } from '@/utils/profileLink'
+import { findEmail, parseProfileLink, parseProfileText } from '@/utils/profileLink'
 
 /** 같은 아이디인지 비교할 때 쓰는 형태로 정리한다. @, 대소문자, 앞뒤 공백은 무시한다. */
 const normalizeHandle = (value: string) => value.trim().toLowerCase().replace(/^@/, '')
@@ -110,6 +110,13 @@ export default function InfluencerFormPage() {
     setLinkInput(value)
     const filled: string[] = []
     const single = value.trim().split(/\s+/).length === 1
+
+    // 소개글에 적어둔 협업 문의 주소를 이메일 칸으로 옮긴다.
+    const email = findEmail(value)
+    if (email && !watch('contactEmail')) {
+      setValue('contactEmail', email, { shouldDirty: true })
+      filled.push('이메일')
+    }
 
     if (single) {
       const parsed = parseProfileLink(value)
