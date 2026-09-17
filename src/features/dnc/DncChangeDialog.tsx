@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useCurrentUser } from '@/auth/AuthProvider'
-import { Button, Field, Modal, Select, Textarea } from '@/components/ui'
-import { DNC_REASONS, type DncReason, type Influencer } from '@/data/types'
+import TagPicker from '@/components/TagPicker'
+import { Button, Field, Modal, Textarea } from '@/components/ui'
+import type { Influencer } from '@/data/types'
 import { useChangeDnc } from '@/hooks/queries'
 
 export default function DncChangeDialog({
@@ -15,26 +16,26 @@ export default function DncChangeDialog({
 }) {
   const user = useCurrentUser()
   const changeDnc = useChangeDnc(user.id)
-  const [reason, setReason] = useState<DncReason | ''>('')
+  const [reasons, setReasons] = useState<string[]>([])
   const [detail, setDetail] = useState('')
 
   if (!influencer) return null
 
   const isUnsetting = influencer.doNotContact
   const close = () => {
-    setReason('')
+    setReasons([])
     setDetail('')
     onClose()
   }
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!reason) return
+    if (reasons.length === 0) return
     changeDnc.mutate(
       {
         influencerId: influencer.id,
         action: isUnsetting ? 'unset' : 'set',
-        reason,
+        reason: reasons.join(', '),
         reasonDetail: detail.trim(),
       },
       { onSuccess: close },
@@ -56,22 +57,12 @@ export default function DncChangeDialog({
       }
     >
       <form onSubmit={submit} className="space-y-4">
-        <Field label={isUnsetting ? '해제 사유' : '금지 사유'} required>
-          <Select
-            value={reason}
-            onChange={(e) => setReason(e.target.value as DncReason)}
-            required
-            autoFocus
-          >
-            <option value="" disabled>
-              선택해주세요
-            </option>
-            {DNC_REASONS.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </Select>
+        <Field
+          label={isUnsetting ? '해제 사유' : '금지 사유'}
+          required
+          hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다"
+        >
+          <TagPicker selected={reasons} onChange={setReasons} />
         </Field>
 
         <Field
@@ -102,7 +93,7 @@ export default function DncChangeDialog({
           <Button
             type="submit"
             variant={isUnsetting ? 'primary' : 'danger'}
-            disabled={!reason || changeDnc.isPending}
+            disabled={reasons.length === 0 || changeDnc.isPending}
           >
             {isUnsetting ? '해제하기' : '연락 금지 등록'}
           </Button>

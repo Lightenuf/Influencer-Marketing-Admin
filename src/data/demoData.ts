@@ -1,4 +1,5 @@
 import type { Database } from './mockAdapter'
+import { DEFAULT_REASON_TAGS } from './types'
 import type { Collab, DncAuditEntry, Influencer, Shipment } from './types'
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
@@ -160,7 +161,7 @@ export function buildDemoDatabase(): Database {
       heldAt: null,
       recontactAt: null,
       isCancelled: false,
-      cancelReason: null,
+      cancelReasons: [],
       cancelReasonDetail: '',
       cancelledAt: null,
       createdAt: daysAgo(20),
@@ -190,7 +191,7 @@ export function buildDemoDatabase(): Database {
       heldAt: null,
       recontactAt: null,
       isCancelled: false,
-      cancelReason: null,
+      cancelReasons: [],
       cancelReasonDetail: '',
       cancelledAt: null,
       createdAt: daysAgo(18),
@@ -220,7 +221,7 @@ export function buildDemoDatabase(): Database {
       heldAt: null,
       recontactAt: null,
       isCancelled: false,
-      cancelReason: null,
+      cancelReasons: [],
       cancelReasonDetail: '',
       cancelledAt: null,
       createdAt: daysAgo(3),
@@ -250,7 +251,7 @@ export function buildDemoDatabase(): Database {
       heldAt: null,
       recontactAt: null,
       isCancelled: false,
-      cancelReason: null,
+      cancelReasons: [],
       cancelReasonDetail: '',
       cancelledAt: null,
       createdAt: daysAgo(55),
@@ -280,7 +281,7 @@ export function buildDemoDatabase(): Database {
       heldAt: null,
       recontactAt: null,
       isCancelled: false,
-      cancelReason: null,
+      cancelReasons: [],
       cancelReasonDetail: '',
       cancelledAt: null,
       createdAt: daysAgo(7),
@@ -340,6 +341,12 @@ export function buildDemoDatabase(): Database {
   ]
 
   return {
+    reasonTags: DEFAULT_REASON_TAGS.map((label, index) => ({
+      id: `tag-default-${index}`,
+      label,
+      createdBy: null,
+      createdAt: new Date(0).toISOString(),
+    })),
     influencers,
     dncAuditLog,
     collabs,

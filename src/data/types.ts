@@ -40,7 +40,8 @@ export const CATEGORIES = [
   '기타',
 ] as const
 
-export const DNC_REASONS = [
+/** 처음 프로젝트를 시작할 때 채워 넣는 기본 사유. 이후에는 팀원이 태그를 직접 추가한다. */
+export const DEFAULT_REASON_TAGS = [
   '단가 미합의',
   '일정 불가',
   '컨셉 불일치',
@@ -49,7 +50,14 @@ export const DNC_REASONS = [
   '협업 품질 이슈',
   '기타',
 ] as const
-export type DncReason = (typeof DNC_REASONS)[number]
+
+/** 팀원이 직접 만들고 지우는 거절·연락 금지 사유 태그 */
+export interface ReasonTag {
+  id: string
+  label: string
+  createdBy: string | null
+  createdAt: string
+}
 
 export const COLLAB_TYPES = ['마켓', '샘플', '유가광고'] as const
 export type CollabType = (typeof COLLAB_TYPES)[number]
@@ -102,7 +110,7 @@ export interface Influencer {
   memo: string
   /** 조회 성능용 캐시값. 진실의 원천은 dncAuditLog 이다. */
   doNotContact: boolean
-  dncReason: DncReason | null
+  dncReason: string | null
   dncSetBy: string | null
   dncSetAt: string | null
   createdBy: string
@@ -114,7 +122,7 @@ export interface DncAuditEntry {
   id: string
   influencerId: string
   action: 'set' | 'unset'
-  reason: DncReason
+  reason: string
   reasonDetail: string
   setBy: string
   setAt: string
@@ -152,7 +160,7 @@ export interface Collab {
   /** 다시 연락하기로 한 날 */
   recontactAt: string | null
   isCancelled: boolean
-  cancelReason: DncReason | null
+  cancelReasons: string[]
   cancelReasonDetail: string
   cancelledAt: string | null
   createdAt: string

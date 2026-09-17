@@ -4,8 +4,8 @@ import type {
   HoldReason,
   CommunicationLog,
   DncAuditEntry,
-  DncReason,
   Influencer,
+  ReasonTag,
   Shipment,
   TeamMember,
 } from './types'
@@ -29,7 +29,7 @@ export type CollabInput = Omit<
   | 'updatedAt'
   | 'stageEnteredAt'
   | 'isCancelled'
-  | 'cancelReason'
+  | 'cancelReasons'
   | 'cancelReasonDetail'
   | 'cancelledAt'
   | 'isOnHold'
@@ -50,7 +50,7 @@ export type ShipmentInput = Omit<Shipment, 'id' | 'createdAt' | 'updatedAt'>
 export interface DncChange {
   influencerId: string
   action: 'set' | 'unset'
-  reason: DncReason
+  reason: string
   reasonDetail: string
 }
 
@@ -76,7 +76,7 @@ export interface DataRepository {
   createCollab(input: CollabInput): Promise<Collab>
   updateCollab(id: string, patch: Partial<CollabInput>): Promise<Collab>
   moveCollabStage(id: string, stage: CollabStage): Promise<Collab>
-  cancelCollab(id: string, reason: DncReason, reasonDetail: string): Promise<Collab>
+  cancelCollab(id: string, reasons: string[], reasonDetail: string): Promise<Collab>
   /**
    * 보류로 옮기거나, 이미 보류 중인 건의 정보를 고친다.
    * 넘긴 항목만 바뀐다 — 날짜만 고치려고 사유·메모를 다시 보낼 필요가 없다.
@@ -86,6 +86,11 @@ export interface DataRepository {
   /** 보류를 풀고 원래 단계로 되돌린다. */
   resumeCollab(id: string): Promise<Collab>
   deleteCollab(id: string): Promise<void>
+
+  /** 거절·연락 금지 사유 태그 — 팀원이 함께 관리한다 */
+  listReasonTags(): Promise<ReasonTag[]>
+  createReasonTag(label: string, actorId: string): Promise<ReasonTag>
+  deleteReasonTag(id: string): Promise<void>
 
   listShipments(): Promise<Shipment[]>
   createShipment(input: ShipmentInput): Promise<Shipment>

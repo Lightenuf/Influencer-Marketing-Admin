@@ -6,13 +6,14 @@ import type {
   InfluencerInput,
   ShipmentInput,
 } from './repository'
+import { DEFAULT_REASON_TAGS } from './types'
 import type {
   Collab,
   CollabStage,
   CommunicationLog,
   DncAuditEntry,
-  DncReason,
   Influencer,
+  ReasonTag,
   Shipment,
   TeamMember,
 } from './types'
@@ -20,6 +21,7 @@ import type {
 const STORAGE_KEY = 'breevo-influencer-admin:v1'
 
 export interface Database {
+  reasonTags: ReasonTag[]
   influencers: Influencer[]
   dncAuditLog: DncAuditEntry[]
   collabs: Collab[]
@@ -34,6 +36,7 @@ const TEAM_MEMBERS: TeamMember[] = [
 ]
 
 const emptyDb = (): Database => ({
+  reasonTags: [],
   influencers: [],
   dncAuditLog: [],
   collabs: [],
@@ -65,6 +68,12 @@ function migrate(db: Database): Database {
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
     marketDate: collab.marketDate ?? null,
+    cancelReasons:
+      collab.cancelReasons ??
+      // 사유가 하나였던 시절의 기록을 배열로 옮긴다.
+      ((collab as unknown as { cancelReason?: string | null }).cancelReason
+        ? [(collab as unknown as { cancelReason: string }).cancelReason]
+        : []),
   }))
   db.influencers = db.influencers.map((influencer) => ({
     ...influencer,
@@ -76,11 +85,23 @@ function migrate(db: Database): Database {
 function read(): Database {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return emptyDb()
-    return migrate({ ...emptyDb(), ...(JSON.parse(raw) as Partial<Database>) })
+    if (!raw) return withDefaultTags(emptyDb())
+    return withDefaultTags(migrate({ ...emptyDb(), ...(JSON.parse(raw) as Partial<Database>) }))
   } catch {
-    return emptyDb()
+    return withDefaultTags(emptyDb())
   }
+}
+
+/** 사유 태그가 비어 있으면 기본값으로 채운다. */
+function withDefaultTags(db: Database): Database {
+  if (db.reasonTags.length > 0) return db
+  db.reasonTags = DEFAULT_REASON_TAGS.map((label, index) => ({
+    id: `tag-default-${index}`,
+    label,
+    createdBy: null,
+    createdAt: new Date(0).toISOString(),
+  }))
+  return db
 }
 
 function write(db: Database) {
@@ -211,7 +232,7 @@ export const mockAdapter: DataRepository = {
       heldAt: null,
       recontactAt: null,
       isCancelled: false,
-      cancelReason: null,
+      cancelReasons: [],
       cancelReasonDetail: '',
       cancelledAt: null,
       createdAt: now(),
@@ -243,11 +264,11 @@ export const mockAdapter: DataRepository = {
     return tick(collab)
   },
 
-  async cancelCollab(id: string, reason: DncReason, reasonDetail: string) {
+  async cancelCollab(id: string, reasons: string[], reasonDetail: string) {
     const db = read()
     const collab = requireCollab(db, id)
     collab.isCancelled = true
-    collab.cancelReason = reason
+    collab.cancelReasons = reasons
     collab.cancelReasonDetail = reasonDetail
     collab.cancelledAt = now()
     collab.updatedAt = now()
@@ -289,6 +310,29 @@ export const mockAdapter: DataRepository = {
     const db = read()
     db.collabs = db.collabs.filter((c) => c.id !== id)
     db.shipments = db.shipments.map((s) => (s.collabId === id ? { ...s, collabId: null } : s))
+    write(db)
+    return tick(undefined)
+  },
+
+  async listReasonTags() {
+    const db = read()
+    return tick([...db.reasonTags].sort((a, b) => a.label.localeCompare(b.label, 'ko')))
+  },
+
+  async createReasonTag(label: string, actorId: string) {
+    const db = read()
+    const trimmed = label.trim()
+    const existing = db.reasonTags.find((tag) => tag.label === trimmed)
+    if (existing) return tick(existing)
+    const tag: ReasonTag = { id: uid(), label: trimmed, createdBy: actorId, createdAt: now() }
+    db.reasonTags.push(tag)
+    write(db)
+    return tick(tag)
+  },
+
+  async deleteReasonTag(id: string) {
+    const db = read()
+    db.reasonTags = db.reasonTags.filter((tag) => tag.id !== id)
     write(db)
     return tick(undefined)
   },

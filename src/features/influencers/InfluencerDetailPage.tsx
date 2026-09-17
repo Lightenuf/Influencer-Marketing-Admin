@@ -117,7 +117,7 @@ export default function InfluencerDetailPage() {
                       <p className="mt-0.5 text-xs text-slate-400">
                         {formatDate(collab.startDate)} ~ {formatDate(collab.endDate)}
                         {collab.isCancelled && (
-                          <span className="ml-2 text-rose-500">취소됨 · {collab.cancelReason}</span>
+                          <span className="ml-2 text-rose-500">취소됨 · {collab.cancelReasons.join(', ')}</span>
                         )}
                       </p>
                     </div>

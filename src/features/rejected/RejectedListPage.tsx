@@ -59,9 +59,16 @@ export default function RejectedListPage() {
                       </p>
                     )}
                   </div>
-                  <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
-                    {collab.cancelReason}
-                  </span>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {collab.cancelReasons.map((reason) => (
+                      <span
+                        key={reason}
+                        className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700"
+                      >
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 {influencer?.doNotContact && (

@@ -7,7 +7,7 @@ import type {
   InfluencerInput,
   ShipmentInput,
 } from '@/data/repository'
-import type { CollabStage, DncReason } from '@/data/types'
+import type { CollabStage } from '@/data/types'
 
 export const keys = {
   members: ['members'] as const,
@@ -16,6 +16,7 @@ export const keys = {
   dncAudit: (id?: string) => ['dncAudit', id ?? 'all'] as const,
   collabs: ['collabs'] as const,
   shipments: ['shipments'] as const,
+  reasonTags: ['reasonTags'] as const,
   notes: (id: string) => ['notes', id] as const,
 }
 
@@ -127,8 +128,8 @@ export function useMoveCollabStage() {
 export function useCancelCollab() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, reason, detail }: { id: string; reason: DncReason; detail: string }) =>
-      repository.cancelCollab(id, reason, detail),
+    mutationFn: ({ id, reasons, detail }: { id: string; reasons: string[]; detail: string }) =>
+      repository.cancelCollab(id, reasons, detail),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
   })
 }
@@ -158,6 +159,25 @@ export function useDeleteCollab() {
       client.invalidateQueries({ queryKey: keys.collabs })
       client.invalidateQueries({ queryKey: keys.shipments })
     },
+  })
+}
+
+export const useReasonTags = () =>
+  useQuery({ queryKey: keys.reasonTags, queryFn: () => repository.listReasonTags() })
+
+export function useCreateReasonTag(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (label: string) => repository.createReasonTag(label, actorId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.reasonTags }),
+  })
+}
+
+export function useDeleteReasonTag() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => repository.deleteReasonTag(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.reasonTags }),
   })
 }
 

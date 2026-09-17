@@ -12,8 +12,8 @@ import type {
   CollabStage,
   CommunicationLog,
   DncAuditEntry,
-  DncReason,
   Influencer,
+  ReasonTag,
   Shipment,
   TeamMember,
 } from './types'
@@ -104,7 +104,8 @@ const toCollab = (row: Row): Collab => ({
   heldAt: row.held_at,
   recontactAt: row.recontact_at,
   isCancelled: row.is_cancelled,
-  cancelReason: row.cancel_reason,
+  // 사유가 하나였던 시절의 기록도 배열로 보여준다.
+  cancelReasons: row.cancel_reasons ?? (row.cancel_reason ? [row.cancel_reason] : []),
   cancelReasonDetail: row.cancel_reason_detail,
   cancelledAt: row.cancelled_at,
   createdAt: row.created_at,
@@ -283,14 +284,14 @@ export const supabaseAdapter: DataRepository = {
     return toCollab(row)
   },
 
-  async cancelCollab(id: string, reason: DncReason, reasonDetail: string) {
+  async cancelCollab(id: string, reasons: string[], reasonDetail: string) {
     const db = requireSupabase()
     const row = unwrap(
       await db
         .from('collabs')
         .update({
           is_cancelled: true,
-          cancel_reason: reason,
+          cancel_reasons: reasons,
           cancel_reason_detail: reasonDetail,
           cancelled_at: new Date().toISOString(),
         })
@@ -349,6 +350,37 @@ export const supabaseAdapter: DataRepository = {
   async deleteCollab(id) {
     const db = requireSupabase()
     const { error } = await db.from('collabs').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async listReasonTags() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(await db.from('reason_tags').select('*').order('label'))
+    return rows.map(
+      (row): ReasonTag => ({
+        id: row.id,
+        label: row.label,
+        createdBy: row.created_by ?? null,
+        createdAt: row.created_at,
+      }),
+    )
+  },
+
+  async createReasonTag(label: string, actorId: string) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('reason_tags')
+        .upsert({ label: label.trim(), created_by: actorId }, { onConflict: 'label' })
+        .select()
+        .single(),
+    )
+    return { id: row.id, label: row.label, createdBy: row.created_by ?? null, createdAt: row.created_at }
+  },
+
+  async deleteReasonTag(id: string) {
+    const db = requireSupabase()
+    const { error } = await db.from('reason_tags').delete().eq('id', id)
     if (error) throw new Error(error.message)
   },
 

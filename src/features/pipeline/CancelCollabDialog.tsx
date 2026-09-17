@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useCurrentUser } from '@/auth/AuthProvider'
-import { Button, Field, Modal, Select, Textarea } from '@/components/ui'
-import { DNC_REASONS, type Collab, type DncReason } from '@/data/types'
+import TagPicker from '@/components/TagPicker'
+import { Button, Field, Modal, Textarea } from '@/components/ui'
+import type { Collab } from '@/data/types'
 import {
   useCancelCollab,
   useChangeDnc,
@@ -25,7 +26,7 @@ export default function CancelCollabDialog({
   const { data: influencers = [] } = useInfluencers()
 
   const [mode, setMode] = useState<'choose' | 'reject'>('choose')
-  const [reason, setReason] = useState<DncReason | ''>('')
+  const [reasons, setReasons] = useState<string[]>([])
   const [detail, setDetail] = useState('')
   const [alsoBlock, setAlsoBlock] = useState(false)
 
@@ -46,7 +47,7 @@ export default function CancelCollabDialog({
 
   const close = () => {
     setMode('choose')
-    setReason('')
+    setReasons([])
     setDetail('')
     setAlsoBlock(false)
     onClose()
@@ -58,14 +59,14 @@ export default function CancelCollabDialog({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!reason) return
-    await cancelCollab.mutateAsync({ id: collab.id, reason, detail: detail.trim() })
+    if (reasons.length === 0) return
+    await cancelCollab.mutateAsync({ id: collab.id, reasons, detail: detail.trim() })
     if (alsoBlock && !alreadyBlocked) {
       await changeDnc.mutateAsync({
         influencerId: collab.influencerId,
         action: 'set',
-        reason,
-        reasonDetail: detail.trim() || `${collab.title} 협업 취소로 인한 등록`,
+        reason: reasons.join(', '),
+        reasonDetail: detail.trim() || '협업 거절로 인한 등록',
       })
     }
     close()
@@ -127,22 +128,8 @@ export default function CancelCollabDialog({
   return (
     <Modal open={open} onClose={close} title="거절 처리" description={heading}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="거절 사유" required>
-          <Select
-            value={reason}
-            onChange={(e) => setReason(e.target.value as DncReason)}
-            required
-            autoFocus
-          >
-            <option value="" disabled>
-              선택해주세요
-            </option>
-            {DNC_REASONS.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </Select>
+        <Field label="거절 사유" required hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다">
+          <TagPicker selected={reasons} onChange={setReasons} />
         </Field>
 
         <Field label="상세 메모">
@@ -177,7 +164,7 @@ export default function CancelCollabDialog({
           <Button
             type="submit"
             variant="danger"
-            disabled={!reason || cancelCollab.isPending || changeDnc.isPending}
+            disabled={reasons.length === 0 || cancelCollab.isPending || changeDnc.isPending}
           >
             거절 처리
           </Button>
