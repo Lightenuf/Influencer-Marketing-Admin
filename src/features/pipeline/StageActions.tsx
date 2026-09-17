@@ -97,12 +97,9 @@ function AcceptChoice({
 export default function StageActions({
   collab,
   stage,
-  onReject,
 }: {
   collab: Collab
   stage: CollabStage
-  /** '불만족'을 눌렀을 때 — 사유를 남기고 연락 금지로 보내는 창을 연다. */
-  onReject: () => void
 }) {
   const update = useUpdateCollab()
   const moveStage = useMoveCollabStage()
@@ -171,10 +168,7 @@ export default function StageActions({
           </button>
           <button
             type="button"
-            onClick={() => {
-              patch({ testFeedback: '부정' })
-              onReject()
-            }}
+            onClick={() => patch({ testFeedback: '부정' })}
             className={clsx(
               chip,
               'flex-1',
@@ -194,7 +188,7 @@ export default function StageActions({
         )}
 
         {collab.testFeedback === '부정' && (
-          <p className="text-[11px] text-rose-600">불만족 — 취소 처리가 필요합니다</p>
+          <p className="text-[11px] text-rose-600">불만족 — 취소 또는 보류 처리가 필요합니다</p>
         )}
 
         <AcceptChoice

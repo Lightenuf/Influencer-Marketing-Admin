@@ -97,11 +97,7 @@ export default function PipelinePage() {
                           </div>
                         )}
 
-                        <StageActions
-                          collab={collab}
-                          stage={stage}
-                          onReject={() => setCancelTarget(collab)}
-                        />
+                        <StageActions collab={collab} stage={stage} />
 
                         <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
                           <p className={clsx(isStale && 'font-semibold text-amber-600')}>
