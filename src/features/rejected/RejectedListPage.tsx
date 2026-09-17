@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { DncBadge } from '@/components/badges'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner, Textarea } from '@/components/ui'
 import type { Influencer } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
@@ -21,14 +20,17 @@ export default function RejectedListPage() {
   const [keyword, setKeyword] = useState('')
   const [pasted, setPasted] = useState('')
 
-  const rejected = (collabs ?? [])
-    .filter((collab) => collab.isCancelled)
-    .sort((a, b) => (b.cancelledAt ?? '').localeCompare(a.cancelledAt ?? ''))
-
   const blocked = useMemo(
     () => influencers.filter((influencer) => influencer.doNotContact),
     [influencers],
   )
+
+  // 연락 금지로 등록한 분은 아래 영역에서 관리하므로 위 목록에서는 뺀다.
+  // 금지를 풀면 자동으로 다시 올라온다.
+  const rejected = (collabs ?? [])
+    .filter((collab) => collab.isCancelled)
+    .filter((collab) => !influencers.find((i) => i.id === collab.influencerId)?.doNotContact)
+    .sort((a, b) => (b.cancelledAt ?? '').localeCompare(a.cancelledAt ?? ''))
 
   const filteredBlocked = useMemo(() => {
     const query = normalize(keyword)
@@ -77,16 +79,22 @@ export default function RejectedListPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">거절 명단</h1>
         <p className="mt-1 text-sm text-slate-500">
-          거절 의사를 밝혀 협업이 무산된 분들입니다. 총 {formatNumber(rejected.length)}건 · 그중
-          연락 금지 <span className="font-medium text-rose-600">{formatNumber(blocked.length)}명</span>
+          거절 의사를 밝혀 협업이 무산된 분들입니다. {formatNumber(rejected.length)}건 · 연락 금지로
+          등록한{' '}
+          <span className="font-medium text-rose-600">{formatNumber(blocked.length)}명</span>은 아래
+          영역에서 관리합니다.
         </p>
       </div>
 
       {rejected.length === 0 ? (
         <Card>
           <EmptyState
-            title="거절된 건이 없습니다"
-            description="파이프라인 카드의 '취소 → 거절'을 누르면 여기로 옮겨집니다."
+            title={blocked.length > 0 ? '연락 금지 대상만 남았습니다' : '거절된 건이 없습니다'}
+            description={
+              blocked.length > 0
+                ? '거절한 분들이 모두 연락 금지로 등록되어 아래 영역에서 관리되고 있습니다.'
+                : "파이프라인 카드의 '취소 → 거절'을 누르면 여기로 옮겨집니다."
+            }
           />
         </Card>
       ) : (
@@ -121,12 +129,6 @@ export default function RejectedListPage() {
                   </div>
                 </div>
 
-                {influencer?.doNotContact && (
-                  <div className="mt-2">
-                    <DncBadge compact />
-                  </div>
-                )}
-
                 {collab.cancelReasonDetail && (
                   <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">
                     {collab.cancelReasonDetail}
@@ -147,7 +149,7 @@ export default function RejectedListPage() {
                         setDncTarget({ influencer, reasons: collab.cancelReasons })
                       }
                     >
-                      {influencer.doNotContact ? '연락 금지 해제' : '연락 금지 등록'}
+                      연락 금지 등록
                     </Button>
                   </div>
                 )}
