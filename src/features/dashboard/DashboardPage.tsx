@@ -1,11 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CollabTypeBadge, StageBadge } from '@/components/badges'
 import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '@/components/ui'
 import { isMockMode } from '@/data'
 import { COLLAB_STAGES, INFLUENCER_STATUSES } from '@/data/types'
-import { useCollabs, useDemoData, useInfluencers, useShipments } from '@/hooks/queries'
+import { useCollabs, useDemoData, useInfluencers } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
 
 const STALE_DAYS = 15
@@ -50,39 +50,55 @@ function StatCard({
   )
 }
 
+const PERIODS = [
+  { key: 'week', label: '주', description: '최근 7일' },
+  { key: 'month', label: '월', description: '최근 1개월' },
+  { key: 'year', label: '연', description: '최근 1년' },
+] as const
+type Period = (typeof PERIODS)[number]['key']
+
 export default function DashboardPage() {
   const { data: influencers, isLoading } = useInfluencers()
   const { data: collabs = [] } = useCollabs()
-  const { data: shipments = [] } = useShipments()
   const demo = useDemoData()
+  const [period, setPeriod] = useState<Period>('month')
 
+  /**
+   * 기간 내에 '등록한 인플루언서'를 한 묶음으로 보고, 그들이 어디까지 갔는지 센다.
+   * 같은 묶음을 계속 따라가므로 단계가 뒤로 갈수록 수가 줄고, 비율이 100%를 넘지 않는다.
+   */
   const stats = useMemo(() => {
-    const all = influencers ?? []
-    const blocked = all.filter((i) => i.doNotContact)
-    const activeCollabs = collabs.filter((c) => !c.isCancelled)
-    const cancelled = collabs.filter((c) => c.isCancelled)
+    const since = new Date()
+    if (period === 'week') since.setDate(since.getDate() - 7)
+    if (period === 'month') since.setMonth(since.getMonth() - 1)
+    if (period === 'year') since.setFullYear(since.getFullYear() - 1)
+    const from = since.toISOString()
 
-    const sampledIds = new Set(
-      shipments.filter((s) => s.collabType === '샘플').map((s) => s.influencerId),
-    )
-    const convertedIds = new Set(
-      collabs
-        .filter((c) => c.collabType !== '샘플' && sampledIds.has(c.influencerId))
-        .map((c) => c.influencerId),
-    )
+    const cohort = (influencers ?? []).filter((influencer) => influencer.createdAt >= from)
+    const cohortIds = new Set(cohort.map((influencer) => influencer.id))
+    const cohortCollabs = collabs.filter((collab) => cohortIds.has(collab.influencerId))
+
+    const replied = new Set(cohortCollabs.map((collab) => collab.influencerId)).size
+    const seeded = new Set(
+      cohortCollabs.filter((collab) => collab.sampleShipDate).map((collab) => collab.influencerId),
+    ).size
+    const confirmed = new Set(
+      cohortCollabs.filter((collab) => collab.marketDate).map((collab) => collab.influencerId),
+    ).size
+
+    const rate = (value: number) => (cohort.length ? Math.round((value / cohort.length) * 100) : 0)
 
     return {
-      total: all.length,
-      blocked: blocked.length,
-      contactable: all.length - blocked.length,
-      activeCollabs: activeCollabs.length,
-      cancelRate: collabs.length ? Math.round((cancelled.length / collabs.length) * 100) : 0,
-      conversionRate: sampledIds.size
-        ? Math.round((convertedIds.size / sampledIds.size) * 100)
-        : 0,
-      sampledCount: sampledIds.size,
+      from,
+      total: cohort.length,
+      replied,
+      seeded,
+      confirmed,
+      replyRate: rate(replied),
+      seedRate: rate(seeded),
+      confirmRate: rate(confirmed),
     }
-  }, [influencers, collabs, shipments])
+  }, [influencers, collabs, period])
 
   const statusData = useMemo(
     () =>
@@ -162,24 +178,49 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+          {PERIODS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setPeriod(item.key)}
+              className={
+                period === item.key
+                  ? 'rounded-md bg-violet-600 px-4 py-1.5 text-sm font-medium text-white'
+                  : 'rounded-md px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50'
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-400">
+          {PERIODS.find((item) => item.key === period)?.description} 동안 등록한 인플루언서 기준 ·{' '}
+          {formatDate(stats.from)}부터
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="전체 인플루언서"
           value={`${formatNumber(stats.total)}명`}
-          sub={`연락 가능 ${formatNumber(stats.contactable)}명`}
+          sub="기간 내 등록"
         />
         <StatCard
-          label="연락 금지"
-          value={`${formatNumber(stats.blocked)}명`}
-          sub="제안 발송 시 제외"
-          tone="danger"
+          label="회수율"
+          value={`${stats.replyRate}%`}
+          sub={`회신 ${formatNumber(stats.replied)}명`}
         />
-        <StatCard label="진행중 협업" value={`${formatNumber(stats.activeCollabs)}건`} />
-        <StatCard label="협업 취소율" value={`${stats.cancelRate}%`} sub={`전체 ${collabs.length}건 기준`} />
         <StatCard
-          label="샘플 → 협업 전환율"
-          value={`${stats.conversionRate}%`}
-          sub={`샘플 발송 ${stats.sampledCount}명 기준`}
+          label="씨딩율"
+          value={`${stats.seedRate}%`}
+          sub={`씨딩 ${formatNumber(stats.seeded)}명`}
+        />
+        <StatCard
+          label="확정율"
+          value={`${stats.confirmRate}%`}
+          sub={`마켓 일정 확정 ${formatNumber(stats.confirmed)}명`}
           tone="success"
         />
       </div>
