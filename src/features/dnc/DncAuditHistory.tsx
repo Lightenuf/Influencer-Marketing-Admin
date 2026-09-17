@@ -25,8 +25,12 @@ export default function DncAuditHistory({ influencerId }: { influencerId: string
           <div className="min-w-0">
             <p className="text-slate-800">
               <b>{entry.action === 'set' ? '연락 금지 등록' : '연락 금지 해제'}</b>
-              <span className="mx-1.5 text-slate-300">·</span>
-              {entry.reason}
+              {entry.reason && (
+                <>
+                  <span className="mx-1.5 text-slate-300">·</span>
+                  {entry.reason}
+                </>
+              )}
             </p>
             {entry.reasonDetail && (
               <p className="mt-0.5 break-words text-slate-500">{entry.reasonDetail}</p>

@@ -27,8 +27,10 @@ export default function DncChangeDialog({
   const isUnsetting = influencer.doNotContact
   // 거절하면서 이미 사유를 고른 경우에는 같은 사유를 그대로 쓰고, 메모만 받는다.
   const inherited = !isUnsetting && (presetReasons?.length ?? 0) > 0 ? presetReasons! : null
-  const effectiveReasons = inherited ?? reasons
-  const canSubmit = inherited ? detail.trim() !== '' : effectiveReasons.length > 0
+  // 해제할 때도 사유를 따로 고르지 않고 메모로 남긴다.
+  const memoOnly = isUnsetting || inherited !== null
+  const effectiveReasons = isUnsetting ? [] : (inherited ?? reasons)
+  const canSubmit = memoOnly ? detail.trim() !== '' : effectiveReasons.length > 0
 
   const close = () => {
     setReasons([])
@@ -65,7 +67,7 @@ export default function DncChangeDialog({
       }
     >
       <form onSubmit={submit} className="space-y-4">
-        {inherited ? (
+        {inherited && (
           <Field label="금지 사유" hint="거절할 때 고른 사유를 그대로 씁니다">
             <div className="flex flex-wrap gap-1.5 rounded-lg bg-slate-50 px-3 py-2.5">
               {inherited.map((reason) => (
@@ -78,9 +80,11 @@ export default function DncChangeDialog({
               ))}
             </div>
           </Field>
-        ) : (
+        )}
+
+        {!memoOnly && (
           <Field
-            label={isUnsetting ? '해제 사유' : '금지 사유'}
+            label="금지 사유"
             required
             hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다"
           >
@@ -90,15 +94,23 @@ export default function DncChangeDialog({
 
         <Field
           label="상세 메모"
-          required={Boolean(inherited)}
-          hint="나중에 '왜 막았는지' 확인할 수 있도록 통화·DM 내용 등을 남겨주세요."
+          required={memoOnly}
+          hint={
+            isUnsetting
+              ? "나중에 '왜 풀었는지' 확인할 수 있도록 남겨주세요."
+              : "나중에 '왜 막았는지' 확인할 수 있도록 통화·DM 내용 등을 남겨주세요."
+          }
         >
           <Textarea
             rows={3}
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
-            placeholder="예) 9/12 DM 회신 — 건기식 카테고리는 협업하지 않는다고 함"
-            autoFocus={Boolean(inherited)}
+            placeholder={
+              isUnsetting
+                ? '예) 9/20 통화 — 다음 시즌에 다시 논의하기로 함'
+                : '예) 9/12 DM 회신 — 건기식 카테고리는 협업하지 않는다고 함'
+            }
+            autoFocus={memoOnly}
           />
         </Field>
 
