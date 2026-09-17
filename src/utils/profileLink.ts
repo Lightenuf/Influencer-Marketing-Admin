@@ -72,12 +72,25 @@ function toCount(raw: string): number | null {
 }
 
 /**
+ * 인스타 소개글에 흔한 장식 글꼴(𝚐𝚖𝚊𝚒𝚕, ｇｍａｉｌ, ⓖⓜⓐⓘⓛ 등)을 보통 글자로 되돌린다.
+ * 값을 알아보기 위한 변환일 뿐이며, 메모에 남길 원문은 이 함수를 거치지 않는다.
+ */
+function toPlainText(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/[​-‍﻿︎️]/g, '')
+    .replace(/ /g, ' ')
+}
+
+/**
  * 붙여넣은 글에서 이메일 주소를 찾는다.
  * 인스타 소개글에 적어둔 협업 문의 주소(@ + 도메인)를 잡기 위한 것으로,
  * 아이디(@handle)는 도메인이 없어 걸리지 않는다.
  */
 export function findEmail(text: string): string | null {
-  const match = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/)
+  const match = toPlainText(text).match(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/,
+  )
   return match ? match[0] : null
 }
 
@@ -94,7 +107,9 @@ export interface ParsedProfileText {
  * 한국어/영어 화면을 모두 본다. 인터넷 접속은 하지 않는다.
  */
 export function parseProfileText(text: string): ParsedProfileText {
-  const t = text.replace(/ /g, ' ')
+  // 원문은 메모에 그대로 남기고, 값을 읽을 때만 장식 글꼴을 되돌린 사본을 쓴다.
+  const original = text.replace(/\u00a0/g, ' ')
+  const t = toPlainText(text)
 
   const grab = (patterns: RegExp[]) => {
     for (const re of patterns) {
@@ -127,18 +142,20 @@ export function parseProfileText(text: string): ParsedProfileText {
     handle = line ? line.replace(/^@/, '') : null
   }
 
-  // 숫자 줄과 아이디를 걷어낸 첫 문장을 소개글로 본다.
+  // 숫자 줄과 아이디를 걷어낸 첫 문장을 소개글로 본다. (줄 자체는 원문 그대로 남긴다)
   const bio =
-    t
+    original
       .split('\n')
       .map((l) => l.trim())
-      .filter(
-        (l) =>
+      .filter((l) => {
+        const plain = toPlainText(l)
+        return (
           l &&
-          !/팔로워|팔로우|게시물|followers?|following|posts?/i.test(l) &&
-          l !== handle &&
-          l !== `@${handle}`,
-      )
+          !/팔로워|팔로우|게시물|followers?|following|posts?/i.test(plain) &&
+          plain !== handle &&
+          plain !== `@${handle}`
+        )
+      })
       .slice(0, 6)
       .join('\n') || null
 
