@@ -92,7 +92,9 @@ const toCollab = (row: Row): Collab => ({
   sampleShipDate: row.sample_ship_date,
   contentDueDate: row.content_due_date,
   fee: row.fee,
+  seedingAccepted: row.seeding_accepted ?? null,
   testFeedback: row.test_feedback,
+  meetingAccepted: row.meeting_accepted ?? null,
   lastContactedAt: row.last_contacted_at,
   meetingAt: row.meeting_at,
   marketDate: row.market_date,
@@ -120,7 +122,9 @@ const collabColumns = (input: Partial<CollabInput>): Row => {
   if (input.sampleShipDate !== undefined) row.sample_ship_date = input.sampleShipDate
   if (input.contentDueDate !== undefined) row.content_due_date = input.contentDueDate
   if (input.fee !== undefined) row.fee = input.fee
+  if (input.seedingAccepted !== undefined) row.seeding_accepted = input.seedingAccepted
   if (input.testFeedback !== undefined) row.test_feedback = input.testFeedback
+  if (input.meetingAccepted !== undefined) row.meeting_accepted = input.meetingAccepted
   if (input.lastContactedAt !== undefined) row.last_contacted_at = input.lastContactedAt
   if (input.meetingAt !== undefined) row.meeting_at = input.meetingAt
   if (input.marketDate !== undefined) row.market_date = input.marketDate

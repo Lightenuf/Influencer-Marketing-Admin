@@ -47,6 +47,53 @@ function DateRow({
   )
 }
 
+/** 수락 / 거절 두 갈래를 고르는 줄. 아직 안 고른 상태(null)를 구분한다. */
+function AcceptChoice({
+  label,
+  value,
+  onAccept,
+  onDecline,
+}: {
+  label: string
+  value: boolean | null
+  onAccept: () => void
+  onDecline: () => void
+}) {
+  return (
+    <div>
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <div className="mt-0.5 flex gap-1">
+        <button
+          type="button"
+          onClick={onAccept}
+          className={clsx(
+            chip,
+            'flex-1',
+            value === true
+              ? 'bg-emerald-100 text-emerald-700'
+              : chipOff + ' hover:bg-emerald-100 hover:text-emerald-700',
+          )}
+        >
+          수락
+        </button>
+        <button
+          type="button"
+          onClick={onDecline}
+          className={clsx(
+            chip,
+            'flex-1',
+            value === false
+              ? 'bg-rose-100 text-rose-700'
+              : chipOff + ' hover:bg-rose-100 hover:text-rose-700',
+          )}
+        >
+          거절
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function StageActions({
   collab,
   stage,
@@ -64,43 +111,54 @@ export default function StageActions({
 
   if (collab.isCancelled) return null
 
-  // ── 회신완료: 회신을 받은 날짜만 보여준다 ──
+  // ── 회신완료: 씨딩을 수락했는지, 수락했다면 배송 날짜 ──
   if (stage === '회신완료') {
     return (
-      <p className="mt-2 text-[11px] text-slate-500">
-        회신 확인 {formatDate(collab.createdAt)}
-      </p>
+      <div className="mt-2 space-y-1.5">
+        <p className="text-[11px] text-slate-500">회신 확인 {formatDate(collab.createdAt)}</p>
+
+        <AcceptChoice
+          label="씨딩 수락 여부"
+          value={collab.seedingAccepted}
+          onAccept={() => patch({ seedingAccepted: true })}
+          onDecline={() => patch({ seedingAccepted: false })}
+        />
+
+        {collab.seedingAccepted === true && (
+          <DateRow
+            label="배송 날짜"
+            value={collab.sampleShipDate}
+            onChange={(v) => {
+              if (!v) return
+              // 배송 날짜가 정해졌다는 건 곧 '테스트중' — 한 번에 넘긴다.
+              patch({ sampleShipDate: v })
+              moveStage.mutate({ id: collab.id, stage: '테스트중' })
+            }}
+          />
+        )}
+
+        {collab.seedingAccepted === false && (
+          <p className="text-[11px] text-rose-600">씨딩 거절 — 취소 또는 보류 처리가 필요합니다</p>
+        )}
+      </div>
     )
   }
 
-  // ── 테스트중: 음료를 보냈는지 + 받아본 반응 ──
+  // ── 테스트중: 받아본 반응 + 미팅 수락 여부 ──
   if (stage === '테스트중') {
-    // 발송일은 화면에 보여주지 않지만, '4일 경과' 알림을 세기 위해 저장해 둔다.
-    const shipped = Boolean(collab.sampleShipDate)
     const sinceShip = collab.sampleShipDate ? daysSince(collab.sampleShipDate) : null
     const needsCheck =
-      shipped && collab.testFeedback === null && sinceShip !== null && sinceShip >= TEST_CHECK_DAYS
+      collab.testFeedback === null && sinceShip !== null && sinceShip >= TEST_CHECK_DAYS
     return (
       <div className="mt-2 space-y-1.5">
-        <button
-          type="button"
-          onClick={() => patch({ sampleShipDate: shipped ? null : today() })}
-          className={clsx(
-            chip,
-            'w-full',
-            shipped ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : chipOff,
-          )}
-        >
-          {shipped ? '✓ 음료 보냄' : '음료 보내기 전'}
-        </button>
+        {collab.sampleShipDate && (
+          <p className="text-[11px] text-slate-500">배송 {formatDate(collab.sampleShipDate)}</p>
+        )}
 
         <div className="flex gap-1">
           <button
             type="button"
-            onClick={() => {
-              patch({ testFeedback: '긍정' })
-              moveStage.mutate({ id: collab.id, stage: '미팅 조율중' })
-            }}
+            onClick={() => patch({ testFeedback: '긍정' })}
             className={clsx(
               chip,
               'flex-1',
@@ -137,6 +195,20 @@ export default function StageActions({
 
         {collab.testFeedback === '부정' && (
           <p className="text-[11px] text-rose-600">불만족 — 취소 처리가 필요합니다</p>
+        )}
+
+        <AcceptChoice
+          label="미팅 수락 여부"
+          value={collab.meetingAccepted}
+          onAccept={() => {
+            patch({ meetingAccepted: true })
+            moveStage.mutate({ id: collab.id, stage: '미팅 조율중' })
+          }}
+          onDecline={() => patch({ meetingAccepted: false })}
+        />
+
+        {collab.meetingAccepted === false && (
+          <p className="text-[11px] text-rose-600">미팅 거절 — 취소 또는 보류 처리가 필요합니다</p>
         )}
       </div>
     )

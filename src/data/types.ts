@@ -132,8 +132,12 @@ export interface Collab {
   sampleShipDate: string | null
   contentDueDate: string | null
   fee: number
-  /** 테스트중 — 음료를 받아본 반응. '긍정'이면 미팅 조율중으로 넘어간다. */
+  /** 회신완료 — 씨딩(음료 받아보기) 수락 여부. null이면 아직 확인 전 */
+  seedingAccepted: boolean | null
+  /** 테스트중 — 음료를 받아본 반응 */
   testFeedback: TestFeedback | null
+  /** 테스트중 — 미팅 수락 여부. 수락하면 미팅 조율중으로 넘어간다. null이면 아직 확인 전 */
+  meetingAccepted: boolean | null
   /** 미팅 조율중 — 마지막으로 연락한 날 */
   lastContactedAt: string | null
   /** 미팅 확정 — 미팅 날짜 */
