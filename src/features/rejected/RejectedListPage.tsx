@@ -87,7 +87,7 @@ export default function RejectedListPage() {
                   거절 {formatDate(collab.cancelledAt)} · {collab.stage} 단계에서
                 </p>
 
-                {influencer && !influencer.doNotContact && (
+                {influencer && (
                   <div className="mt-3">
                     <Button
                       size="sm"
@@ -95,7 +95,7 @@ export default function RejectedListPage() {
                       className="w-full"
                       onClick={() => setDncTarget(influencer)}
                     >
-                      연락 금지 등록
+                      {influencer.doNotContact ? '연락 금지 해제' : '연락 금지 등록'}
                     </Button>
                   </div>
                 )}
