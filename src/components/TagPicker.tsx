@@ -16,10 +16,12 @@ export default function TagPicker({
   placeholder?: string
 }) {
   const user = useCurrentUser()
-  const { data: tags = [] } = useReasonTags()
+  const { data: tags = [], isError: listFailed, error: listError } = useReasonTags()
   const createTag = useCreateReasonTag(user.id)
   const deleteTag = useDeleteReasonTag()
   const [query, setQuery] = useState('')
+
+  const failure = listFailed ? listError : (createTag.error ?? deleteTag.error)
 
   const keyword = query.trim()
   const candidates = tags.filter(
@@ -116,6 +118,14 @@ export default function TagPicker({
           </p>
         )}
       </div>
+
+      {failure && (
+        <p className="mt-1.5 rounded-md bg-rose-50 px-2 py-1.5 text-xs leading-relaxed text-rose-700">
+          사유 태그를 불러오거나 저장하지 못했습니다. 데이터베이스에 사유 태그 표(reason_tags)가
+          아직 없을 수 있습니다 — 관리자에게 0009 설정을 실행했는지 확인해주세요.
+          <span className="mt-0.5 block text-[11px] text-rose-500">{failure.message}</span>
+        </p>
+      )}
     </div>
   )
 }
