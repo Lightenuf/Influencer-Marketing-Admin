@@ -4,16 +4,27 @@ import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { useCurrentUser } from '@/auth/AuthProvider'
-import { Button, Card, CardHeader, Field, Input, Select, secondaryLinkButtonClass, Spinner, Textarea } from '@/components/ui'
+import { DncBadge, StatusBadge } from '@/components/badges'
+import { Button, Card, CardHeader, Field, Input, Modal, Select, secondaryLinkButtonClass, Spinner, Textarea } from '@/components/ui'
 import {
   CATEGORIES,
   INFLUENCER_STATUSES,
   REVENUE_BANDS,
   SNS_PLATFORM_LABELS,
   SNS_PLATFORMS,
+  type Influencer,
 } from '@/data/types'
-import { useCreateInfluencer, useInfluencer, useUpdateInfluencer } from '@/hooks/queries'
+import {
+  useCreateInfluencer,
+  useInfluencer,
+  useInfluencers,
+  useUpdateInfluencer,
+} from '@/hooks/queries'
+import { formatDate, formatFollowers } from '@/utils/format'
 import { parseProfileLink, parseProfileText } from '@/utils/profileLink'
+
+/** 같은 아이디인지 비교할 때 쓰는 형태로 정리한다. @, 대소문자, 앞뒤 공백은 무시한다. */
+const normalizeHandle = (value: string) => value.trim().toLowerCase().replace(/^@/, '')
 
 const schema = z.object({
   name: z.string().trim().min(1, '이름을 입력해주세요.'),
@@ -60,8 +71,11 @@ export default function InfluencerFormPage() {
   const [filledFields, setFilledFields] = useState<string[]>([])
 
   const { data: existing, isLoading } = useInfluencer(id ?? '')
+  const { data: allInfluencers = [] } = useInfluencers()
   const createInfluencer = useCreateInfluencer(user.id)
   const updateInfluencer = useUpdateInfluencer()
+
+  const [duplicate, setDuplicate] = useState<{ found: Influencer; values: FormValues } | null>(null)
 
   const {
     register,
@@ -149,14 +163,28 @@ export default function InfluencerFormPage() {
     setValue('categories', next, { shouldDirty: true })
   }
 
-  const onSubmit = handleSubmit(async (values) => {
+  const save = async (values: FormValues) => {
+    // 화면 곳곳에서 @를 붙여 보여주므로, 저장할 때는 아이디만 남긴다.
+    const payload = { ...values, snsHandle: values.snsHandle.replace(/^@+/, '') }
     if (isEdit && id) {
-      await updateInfluencer.mutateAsync({ id, patch: values })
+      await updateInfluencer.mutateAsync({ id, patch: payload })
       navigate(`/influencers/${id}`)
     } else {
-      const created = await createInfluencer.mutateAsync(values)
+      const created = await createInfluencer.mutateAsync(payload)
       navigate(`/influencers/${created.id}`)
     }
+  }
+
+  const onSubmit = handleSubmit(async (values) => {
+    const handle = normalizeHandle(values.snsHandle)
+    const found = allInfluencers.find(
+      (influencer) => influencer.id !== id && normalizeHandle(influencer.snsHandle) === handle,
+    )
+    if (found) {
+      setDuplicate({ found, values })
+      return
+    }
+    await save(values)
   })
 
   if (isEdit && isLoading) return <Spinner />
@@ -302,6 +330,81 @@ export default function InfluencerFormPage() {
           </Button>
         </div>
       </form>
+
+      <DuplicateDialog
+        duplicate={duplicate}
+        onClose={() => setDuplicate(null)}
+        onProceed={async () => {
+          if (!duplicate) return
+          const values = duplicate.values
+          setDuplicate(null)
+          await save(values)
+        }}
+      />
     </div>
+  )
+}
+
+/** 같은 아이디가 이미 있을 때 등록을 멈추고 알려주는 창. */
+function DuplicateDialog({
+  duplicate,
+  onClose,
+  onProceed,
+}: {
+  duplicate: { found: Influencer; values: FormValues } | null
+  onClose: () => void
+  onProceed: () => void
+}) {
+  const navigate = useNavigate()
+  if (!duplicate) return null
+
+  const { found, values } = duplicate
+  // 플랫폼까지 같으면 같은 사람이 확실하므로 등록을 막고,
+  // 아이디만 같고 플랫폼이 다르면 동명이인일 수 있어 판단을 사용자에게 남긴다.
+  const samePlatform = found.snsPlatform === values.snsPlatform
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={samePlatform ? '이미 등록된 인플루언서입니다' : '같은 아이디가 이미 있습니다'}
+      description={
+        samePlatform
+          ? `@${found.snsHandle} 은(는) 이미 목록에 있습니다. 중복으로 등록되지 않았습니다.`
+          : `@${found.snsHandle} 이(가) 다른 플랫폼(${SNS_PLATFORM_LABELS[found.snsPlatform]})으로 등록되어 있습니다. 같은 분이라면 기존 정보를 수정해주세요.`
+      }
+    >
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-slate-900">{found.name}</span>
+          <StatusBadge status={found.status} />
+          {found.doNotContact && <DncBadge compact />}
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          {SNS_PLATFORM_LABELS[found.snsPlatform]} @{found.snsHandle} · 팔로워{' '}
+          {formatFollowers(found.followerCount)}
+        </p>
+        <p className="mt-0.5 text-xs text-slate-400">등록일 {formatDate(found.createdAt)}</p>
+      </div>
+
+      {found.doNotContact && (
+        <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700">
+          ⛔ 연락 금지로 등록된 크리에이터입니다. 사유: {found.dncReason} — 제안을 보내기 전에 연락
+          금지 목록을 먼저 확인해주세요.
+        </p>
+      )}
+
+      <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          닫기
+        </Button>
+        {!samePlatform && (
+          <Button variant="secondary" onClick={onProceed}>
+            다른 사람입니다 · 계속 등록
+          </Button>
+        )}
+        <Button onClick={() => navigate(`/influencers/${found.id}`)}>기존 프로필 보기</Button>
+      </div>
+    </Modal>
   )
 }
