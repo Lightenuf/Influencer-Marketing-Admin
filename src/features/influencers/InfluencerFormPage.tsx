@@ -21,6 +21,7 @@ import {
   useUpdateInfluencer,
 } from '@/hooks/queries'
 import { formatDate, formatFollowers } from '@/utils/format'
+import BulkUploadForm from '@/features/influencers/BulkUploadForm'
 import { findEmail, parseProfileLink, parseProfileText } from '@/utils/profileLink'
 
 /** 같은 아이디인지 비교할 때 쓰는 형태로 정리한다. @, 대소문자, 앞뒤 공백은 무시한다. */
@@ -76,6 +77,7 @@ export default function InfluencerFormPage() {
   const updateInfluencer = useUpdateInfluencer()
 
   const [duplicate, setDuplicate] = useState<{ found: Influencer; values: FormValues } | null>(null)
+  const [mode, setMode] = useState<'manual' | 'bulk'>('manual')
 
   const {
     register,
@@ -202,6 +204,28 @@ export default function InfluencerFormPage() {
         {isEdit ? '인플루언서 정보 수정' : '인플루언서 등록'}
       </h1>
 
+      {!isEdit && (
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+          {(['manual', 'bulk'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              className={
+                mode === value
+                  ? 'rounded-md bg-violet-600 px-4 py-1.5 text-sm font-medium text-white'
+                  : 'rounded-md px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50'
+              }
+            >
+              {value === 'manual' ? '수동 입력' : '대량 업로드'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!isEdit && mode === 'bulk' && <BulkUploadForm />}
+
+      {(isEdit || mode === 'manual') && (
       <form onSubmit={onSubmit}>
         {!isEdit && (
           <Card className="mb-4">
@@ -337,6 +361,7 @@ export default function InfluencerFormPage() {
           </Button>
         </div>
       </form>
+      )}
 
       <DuplicateDialog
         duplicate={duplicate}
