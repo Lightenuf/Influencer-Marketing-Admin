@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { Button } from '@/components/ui'
 import { isMockMode } from '@/data'
@@ -22,10 +22,10 @@ export default function AppShell() {
   return (
     <div className="flex min-h-full">
       <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="px-5 py-5">
+        <Link to="/dashboard" className="block px-5 py-5 transition-colors hover:bg-slate-50" title="대시보드로 이동">
           <p className="text-xs font-semibold tracking-widest text-violet-600">BREEVO</p>
           <p className="mt-0.5 text-sm font-bold text-slate-900">인플루언서 관리</p>
-        </div>
+        </Link>
 
         <nav className="flex-1 space-y-0.5 px-3">
           {navItems.map((item) => (
