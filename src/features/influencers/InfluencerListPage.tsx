@@ -5,17 +5,15 @@ import { DncBadge, StatusBadge } from '@/components/badges'
 import { Button, Card, EmptyState, Input, linkButtonClass, Select, Spinner } from '@/components/ui'
 import { isMockMode } from '@/data'
 import {
-  CATEGORIES,
   COLLAB_STAGES,
   INFLUENCER_STATUSES,
   SNS_PLATFORM_LABELS,
-  SNS_PLATFORMS,
   type Influencer,
 } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
 import { useCollabs, useCreateCollab, useDemoData, useInfluencers } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
-import { formatDate, formatFollowers, formatNumber } from '@/utils/format'
+import { formatDate, formatNumber } from '@/utils/format'
 
 type ContactFilter = 'all' | 'contactable' | 'blocked'
 
@@ -27,8 +25,6 @@ export default function InfluencerListPage() {
 
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
-  const [platform, setPlatform] = useState('')
-  const [category, setCategory] = useState('')
   const [contactFilter, setContactFilter] = useState<ContactFilter>('all')
   const [dncTarget, setDncTarget] = useState<Influencer | null>(null)
 
@@ -38,13 +34,11 @@ export default function InfluencerListPage() {
       if (query && !`${influencer.name} ${influencer.snsHandle}`.toLowerCase().includes(query))
         return false
       if (status && influencer.status !== status) return false
-      if (platform && influencer.snsPlatform !== platform) return false
-      if (category && !influencer.categories.includes(category)) return false
       if (contactFilter === 'contactable' && influencer.doNotContact) return false
       if (contactFilter === 'blocked' && !influencer.doNotContact) return false
       return true
     })
-  }, [influencers, keyword, status, platform, category, contactFilter])
+  }, [influencers, keyword, status, contactFilter])
 
   /** 파이프라인에 이미 올라와 있는 사람은 다시 올리지 않는다 (한 사람당 카드 한 장). */
   const collabByInfluencer = useMemo(
@@ -96,8 +90,6 @@ export default function InfluencerListPage() {
   const resetFilters = () => {
     setKeyword('')
     setStatus('')
-    setPlatform('')
-    setCategory('')
     setContactFilter('all')
   }
 
@@ -125,7 +117,7 @@ export default function InfluencerListPage() {
       </div>
 
       <Card className="p-4">
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-3">
           <Input
             placeholder="이름 · 계정 검색"
             value={keyword}
@@ -134,22 +126,6 @@ export default function InfluencerListPage() {
           <Select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">상태 전체</option>
             {INFLUENCER_STATUSES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </Select>
-          <Select value={platform} onChange={(e) => setPlatform(e.target.value)}>
-            <option value="">플랫폼 전체</option>
-            {SNS_PLATFORMS.map((item) => (
-              <option key={item} value={item}>
-                {SNS_PLATFORM_LABELS[item]}
-              </option>
-            ))}
-          </Select>
-          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="">카테고리 전체</option>
-            {CATEGORIES.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -215,10 +191,6 @@ export default function InfluencerListPage() {
               <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
                 <tr>
                   <th className="px-5 py-2.5 text-left font-medium">이름 / 계정</th>
-                  <th className="px-3 py-2.5 text-left font-medium">플랫폼</th>
-                  <th className="px-3 py-2.5 text-right font-medium">팔로워</th>
-                  <th className="px-3 py-2.5 text-left font-medium">카테고리</th>
-                  <th className="px-3 py-2.5 text-left font-medium">평균 매출</th>
                   <th className="px-3 py-2.5 text-left font-medium">상태</th>
                   <th className="px-3 py-2.5 text-left font-medium">등록일</th>
                   <th className="px-3 py-2.5 text-right font-medium">회신 받음</th>
@@ -236,8 +208,9 @@ export default function InfluencerListPage() {
                   >
                     <td className="px-5 py-3">
                       <Link
-                        to={`/influencers/${influencer.id}`}
+                        to={`/influencers/${influencer.id}/edit`}
                         className="font-medium text-slate-900 hover:text-violet-600"
+                        title="정보 입력·수정"
                       >
                         {influencer.name}
                       </Link>
@@ -246,16 +219,6 @@ export default function InfluencerListPage() {
                         {influencer.doNotContact && <DncBadge compact />}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-slate-600">
-                      {SNS_PLATFORM_LABELS[influencer.snsPlatform]}
-                    </td>
-                    <td className="tabular px-3 py-3 text-right text-slate-600">
-                      {formatFollowers(influencer.followerCount)}
-                    </td>
-                    <td className="px-3 py-3 text-slate-600">
-                      {influencer.categories.join(', ') || '-'}
-                    </td>
-                    <td className="px-3 py-3 text-slate-600">{influencer.avgRevenueBand}</td>
                     <td className="px-3 py-3">
                       <StatusBadge status={influencer.status} />
                     </td>

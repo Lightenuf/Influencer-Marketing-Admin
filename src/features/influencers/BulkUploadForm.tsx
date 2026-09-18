@@ -98,6 +98,14 @@ export default function BulkUploadForm() {
         <CardHeader
           title="인스타그램 아이디 붙여넣기"
           description="한 줄에 하나씩 넣어주세요. 프로필 링크를 붙여넣어도 아이디만 골라냅니다."
+          action={
+            <Link
+              to="/influencers/new?mode=manual"
+              className="text-sm text-violet-600 hover:underline"
+            >
+              한 명씩 자세히 등록
+            </Link>
+          }
         />
         <div className="p-5">
           <Textarea
