@@ -17,6 +17,15 @@ import { formatDate, formatNumber } from '@/utils/format'
 
 type ContactFilter = 'all' | 'contactable' | 'blocked'
 
+/**
+ * 대량 등록은 아이디만 넣으므로, 그 뒤에 사람이 채운 흔적이 하나라도 있으면 '입력 완료'로 본다.
+ * (팔로워 수·이메일·카테고리 중 하나)
+ */
+const hasProfile = (influencer: Influencer) =>
+  influencer.followerCount > 0 ||
+  influencer.contactEmail.trim() !== '' ||
+  influencer.categories.length > 0
+
 export default function InfluencerListPage() {
   const { data: influencers, isLoading } = useInfluencers()
   const { data: collabs = [] } = useCollabs()
@@ -194,6 +203,7 @@ export default function InfluencerListPage() {
                   <th className="px-3 py-2.5 text-left font-medium">상태</th>
                   <th className="px-3 py-2.5 text-left font-medium">등록일</th>
                   <th className="px-3 py-2.5 text-right font-medium">회신 받음</th>
+                  <th className="px-3 py-2.5 text-right font-medium">정보 입력</th>
                   <th className="px-5 py-2.5 text-right font-medium">연락 금지</th>
                 </tr>
               </thead>
@@ -252,6 +262,29 @@ export default function InfluencerListPage() {
                           </Button>
                         )
                       })()}
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {hasProfile(influencer) ? (
+                        <Link
+                          to={`/influencers/${influencer.id}/edit`}
+                          className="text-xs font-medium text-emerald-600 hover:underline"
+                        >
+                          ✓ 입력 완료
+                        </Link>
+                      ) : (
+                        <Link
+                          to={`/influencers/${influencer.id}/edit`}
+                          className={clsx(
+                            'rounded-lg px-2.5 py-1.5 text-xs font-medium',
+                            // 회신까지 왔는데 정보가 비어 있으면 눈에 띄게 한다.
+                            collabByInfluencer.has(influencer.id)
+                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                              : 'border border-slate-300 text-slate-600 hover:bg-slate-50',
+                          )}
+                        >
+                          정보 입력
+                        </Link>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <Button
