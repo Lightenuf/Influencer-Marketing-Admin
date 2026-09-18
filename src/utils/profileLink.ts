@@ -57,6 +57,28 @@ export function parseProfileLink(raw: string): ParsedProfile | null {
   return null
 }
 
+/**
+ * 저장해 둔 프로필 주소를 쓰고, 없으면 플랫폼과 아이디로 만들어 준다.
+ * 아이디만 있고 주소가 비어 있는 예전 기록도 링크로 열 수 있게 하기 위함.
+ */
+export function profileUrl(platform: SnsPlatform, handle: string, url: string): string | null {
+  if (url.trim()) return url.trim()
+  const id = handle.trim().replace(/^@/, '')
+  if (!id) return null
+  switch (platform) {
+    case 'instagram':
+      return `https://www.instagram.com/${id}/`
+    case 'youtube':
+      return `https://www.youtube.com/@${id}`
+    case 'tiktok':
+      return `https://www.tiktok.com/@${id}`
+    case 'blog':
+      return `https://blog.naver.com/${id}`
+    default:
+      return null
+  }
+}
+
 /** '44.6만' · '446K' · '3,385' → 숫자 */
 function toCount(raw: string): number | null {
   const s = raw.replace(/,/g, '').trim()

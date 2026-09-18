@@ -208,7 +208,7 @@ export default function DashboardPage() {
           sub="기간 내 등록"
         />
         <StatCard
-          label="회수율"
+          label="회신율"
           value={`${stats.replyRate}%`}
           sub={`회신 ${formatNumber(stats.replied)}명`}
         />

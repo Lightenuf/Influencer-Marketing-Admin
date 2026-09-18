@@ -9,6 +9,7 @@ import CollabFormDialog from '@/features/pipeline/CollabFormDialog'
 import StageActions from '@/features/pipeline/StageActions'
 import { useCollabs, useInfluencers, useMoveCollabStage } from '@/hooks/queries'
 import { daysSince } from '@/utils/format'
+import { profileUrl } from '@/utils/profileLink'
 
 const STALE_DAYS = 15
 const FIRST_STAGE = COLLAB_STAGES[0]
@@ -86,9 +87,28 @@ export default function PipelinePage() {
                           {influencer?.name ?? '삭제된 크리에이터'}
                         </Link>
 
-                        {influencer?.snsHandle && (
-                          <p className="mt-0.5 text-[11px] text-slate-400">@{influencer.snsHandle}</p>
-                        )}
+                        {influencer?.snsHandle &&
+                          (() => {
+                            const url = profileUrl(
+                              influencer.snsPlatform,
+                              influencer.snsHandle,
+                              influencer.snsUrl,
+                            )
+                            const handle = `@${influencer.snsHandle}`
+                            return url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={`${url} 새 창으로 열기`}
+                                className="mt-0.5 block text-[11px] text-slate-400 hover:text-violet-600 hover:underline"
+                              >
+                                {handle}
+                              </a>
+                            ) : (
+                              <p className="mt-0.5 text-[11px] text-slate-400">{handle}</p>
+                            )
+                          })()}
 
                         {influencer?.doNotContact && (
                           <div className="mt-1.5">
