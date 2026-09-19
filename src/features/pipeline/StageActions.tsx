@@ -161,7 +161,7 @@ export default function StageActions({
                 : chipOff + ' hover:bg-violet-100 hover:text-violet-700',
             )}
           >
-            만족
+            통과
           </button>
           <button
             type="button"
@@ -174,7 +174,7 @@ export default function StageActions({
                 : chipOff + ' hover:bg-rose-100 hover:text-rose-700',
             )}
           >
-            불만족
+            탈락
           </button>
         </div>
 
@@ -185,7 +185,7 @@ export default function StageActions({
         )}
 
         {collab.testFeedback === '부정' && (
-          <p className="text-[11px] text-rose-600">불만족 — 취소 또는 보류 처리가 필요합니다</p>
+          <p className="text-[11px] text-rose-600">탈락 — 취소 또는 보류 처리가 필요합니다</p>
         )}
 
         <AcceptChoice
