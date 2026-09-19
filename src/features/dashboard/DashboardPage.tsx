@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { CollabTypeBadge, StageBadge } from '@/components/badges'
 import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '@/components/ui'
 import { isMockMode } from '@/data'
@@ -10,6 +20,9 @@ import { daysSince, formatDate, formatNumber } from '@/utils/format'
 
 const STALE_DAYS = 15
 const LAST_STAGE = COLLAB_STAGES[COLLAB_STAGES.length - 1]
+
+/** 거절은 진행 중인 막대와 구분되도록 옅은 붉은색으로 얹는다. */
+const REJECTED_COLOR = '#fecdd3'
 
 /** 단계가 뒤로 갈수록 진해지게 해서, 어디까지 왔는지 색으로도 읽히게 한다. */
 const STAGE_COLORS: Record<string, string> = {
@@ -100,14 +113,27 @@ export default function DashboardPage() {
     }
   }, [influencers, collabs, period])
 
-  // 지금 파이프라인에 올라와 있는 카드만 센다 (거절·보류 제외).
-  const stageData = useMemo(
+  /**
+   * 기간(기본 한 달) 안에 회신이 온 카드를 지금 단계별로 센다.
+   * 거절한 분들도 회신은 왔던 분이므로 '회신완료' 막대에 함께 쌓아 보여준다.
+   */
+  const stageData = useMemo(() => {
+    const inPeriod = collabs.filter((collab) => collab.createdAt >= stats.from)
+    const rejected = inPeriod.filter((collab) => collab.isCancelled).length
+    return COLLAB_STAGES.map((stage) => ({
+      stage,
+      진행: inPeriod.filter((collab) => collab.stage === stage && !collab.isCancelled).length,
+      거절: stage === COLLAB_STAGES[0] ? rejected : 0,
+    }))
+  }, [collabs, stats.from])
+
+  const stageTotals = useMemo(
     () =>
-      COLLAB_STAGES.map((stage) => ({
-        stage,
-        count: collabs.filter((collab) => collab.stage === stage && !collab.isCancelled).length,
-      })),
-    [collabs],
+      stageData.reduce(
+        (sum, item) => ({ 진행: sum.진행 + item.진행, 거절: sum.거절 + item.거절 }),
+        { 진행: 0, 거절: 0 },
+      ),
+    [stageData],
   )
 
   const stalled = useMemo(
@@ -230,7 +256,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader
             title="파이프라인 단계별 현황"
-            description={`지금 진행 중인 ${formatNumber(stageData.reduce((sum, item) => sum + item.count, 0))}건`}
+            description={`${PERIODS.find((item) => item.key === period)?.description}에 회신 온 ${formatNumber(stageTotals.진행 + stageTotals.거절)}건 · 그중 거절 ${formatNumber(stageTotals.거절)}건`}
           />
           <div className="h-64 p-4">
             <ResponsiveContainer width="100%" height="100%">
@@ -239,11 +265,19 @@ export default function DashboardPage() {
                 <XAxis dataKey="stage" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                 <Tooltip cursor={{ fill: '#f8fafc' }} />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                <Legend
+                  verticalAlign="top"
+                  align="right"
+                  height={24}
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: 12 }}
+                />
+                <Bar dataKey="진행" stackId="stage" fill="#8b5cf6">
                   {stageData.map((entry) => (
                     <Cell key={entry.stage} fill={STAGE_COLORS[entry.stage]} />
                   ))}
                 </Bar>
+                <Bar dataKey="거절" stackId="stage" fill={REJECTED_COLOR} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
