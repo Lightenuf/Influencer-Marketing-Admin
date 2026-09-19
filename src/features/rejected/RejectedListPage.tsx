@@ -5,9 +5,27 @@ import type { Influencer } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
 import { useCollabs, useInfluencers, useTeamMembers } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
+import { profileUrl } from '@/utils/profileLink'
 import { formatDate, formatDateTime, formatNumber } from '@/utils/format'
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/^@/, '')
+
+/** 아이디를 누르면 새 창으로 해당 SNS 프로필을 연다. */
+function ProfileHandle({ influencer }: { influencer: Influencer }) {
+  const url = profileUrl(influencer.snsPlatform, influencer.snsHandle, influencer.snsUrl)
+  if (!url) return <>@{influencer.snsHandle}</>
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      title={`${url} 새 창으로 열기`}
+      className="hover:text-violet-600 hover:underline"
+    >
+      @{influencer.snsHandle}
+    </a>
+  )
+}
 
 export default function RejectedListPage() {
   const { data: collabs, isLoading } = useCollabs()
@@ -95,7 +113,8 @@ export default function RejectedListPage() {
                     </Link>
                     {influencer && (
                       <p className="truncate text-xs text-slate-400">
-                        @{influencer.snsHandle} · 팔로워 {formatNumber(influencer.followerCount)}
+                        <ProfileHandle influencer={influencer} /> · 팔로워{' '}
+                        {formatNumber(influencer.followerCount)}
                       </p>
                     )}
                   </div>
@@ -198,7 +217,9 @@ export default function RejectedListPage() {
                       >
                         {influencer.name}
                       </Link>
-                      <div className="text-xs text-slate-400">@{influencer.snsHandle}</div>
+                      <div className="text-xs text-slate-400">
+                        <ProfileHandle influencer={influencer} />
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-slate-700">{influencer.dncReason}</td>
                     <td className="px-3 py-3 text-slate-600">{nameOf(influencer.dncSetBy)}</td>
