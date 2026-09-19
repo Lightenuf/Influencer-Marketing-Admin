@@ -14,6 +14,7 @@ import DncChangeDialog from '@/features/dnc/DncChangeDialog'
 import { useCollabs, useCreateCollab, useDemoData, useInfluencers } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
 import { formatDate, formatNumber } from '@/utils/format'
+import { profileUrl } from '@/utils/profileLink'
 
 type ContactFilter = 'all' | 'contactable' | 'blocked'
 
@@ -225,7 +226,26 @@ export default function InfluencerListPage() {
                         {influencer.name}
                       </Link>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-slate-400">@{influencer.snsHandle}</span>
+                        {(() => {
+                          const url = profileUrl(
+                            influencer.snsPlatform,
+                            influencer.snsHandle,
+                            influencer.snsUrl,
+                          )
+                          return url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`${url} 새 창으로 열기`}
+                              className="text-xs text-slate-400 hover:text-violet-600 hover:underline"
+                            >
+                              @{influencer.snsHandle}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-400">@{influencer.snsHandle}</span>
+                          )
+                        })()}
                         {influencer.doNotContact && <DncBadge compact />}
                       </div>
                     </td>
