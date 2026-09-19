@@ -9,6 +9,7 @@ const navItems = [
   { to: '/dashboard', label: '대시보드', icon: '📊' },
   { to: '/influencers', label: '인플루언서', icon: '👥' },
   { to: '/pipeline', label: '협업 파이프라인', icon: '🗂️' },
+  { to: '/performance', label: '마켓 성과', icon: '💰' },
   { to: '/rejected', label: '거절 명단', icon: '🚫' },
   { to: '/shipments', label: '출고 관리', icon: '📦' },
   { to: '/calendar', label: '캘린더', icon: '🗓️' },

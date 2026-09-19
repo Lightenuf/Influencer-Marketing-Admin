@@ -80,6 +80,7 @@ export const COLLAB_STAGES = [
   '테스트 통과',
   '미팅 확정',
   '마켓 대기중',
+  '마켓 완료',
 ] as const
 export type CollabStage = (typeof COLLAB_STAGES)[number]
 
@@ -152,6 +153,14 @@ export interface Collab {
   meetingAt: string | null
   /** 마켓 대기중 — 마켓 여는 날짜 */
   marketDate: string | null
+  /** 마켓 완료 — 그 마켓으로 일으킨 매출(원) */
+  marketRevenue: number
+  /** 마켓 완료 — 판매 수량 */
+  marketUnits: number
+  /** 마켓 완료 — 정산까지 끝났는지 */
+  isSettled: boolean
+  /** 잘 터진 콘텐츠 링크 모음 — 다음 협업 때 참고한다 */
+  contentLinks: string[]
   /** 보류 — 거절은 아니지만 지금은 진행할 수 없는 상태. 나중에 다시 연락한다. */
   isOnHold: boolean
   holdReason: HoldReason | null

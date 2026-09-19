@@ -69,6 +69,10 @@ function migrate(db: Database): Database {
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
     marketDate: collab.marketDate ?? null,
+    marketRevenue: collab.marketRevenue ?? 0,
+    marketUnits: collab.marketUnits ?? 0,
+    isSettled: collab.isSettled ?? false,
+    contentLinks: collab.contentLinks ?? [],
     cancelReasons:
       collab.cancelReasons ??
       // 사유가 하나였던 시절의 기록을 배열로 옮긴다.

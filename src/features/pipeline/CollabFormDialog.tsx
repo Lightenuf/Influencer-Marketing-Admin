@@ -90,6 +90,10 @@ export default function CollabFormDialog({
         lastContactedAt: null,
         meetingAt: null,
         marketDate: null,
+        marketRevenue: 0,
+        marketUnits: 0,
+        isSettled: false,
+        contentLinks: [],
       },
       { onSuccess: onClose },
     )

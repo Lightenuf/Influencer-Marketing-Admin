@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import type { Collab, CollabStage } from '@/data/types'
 import { useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
-import { daysSince, formatDate } from '@/utils/format'
+import { daysSince, formatDate, formatNumber } from '@/utils/format'
 
 /**
  * 음료를 보내고 이 일수가 지나도 반응 표시가 없으면 확인 알림을 띄운다.
@@ -98,9 +98,12 @@ function AcceptChoice({
 export default function StageActions({
   collab,
   stage,
+  onCompleteMarket,
 }: {
   collab: Collab
   stage: CollabStage
+  /** 마켓 성과를 남기는 창을 연다 */
+  onCompleteMarket: () => void
 }) {
   const update = useUpdateCollab()
   const moveStage = useMoveCollabStage()
@@ -263,7 +266,7 @@ export default function StageActions({
     )
   }
 
-  // ── 마켓 대기중: 마켓 여는 날짜 ──
+  // ── 마켓 대기중: 마켓 여는 날짜 + 끝나면 성과 남기기 ──
   if (stage === '마켓 대기중') {
     const left = collab.marketDate ? daysUntil(collab.marketDate) : null
     return (
@@ -283,6 +286,39 @@ export default function StageActions({
             {left > 0 ? `마켓 D-${left}` : left === 0 ? '오늘 마켓' : `마켓일이 ${-left}일 지났습니다`}
           </p>
         )}
+
+        <button
+          type="button"
+          onClick={onCompleteMarket}
+          className={clsx(chip, 'w-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200')}
+        >
+          마켓 완료 처리
+        </button>
+      </div>
+    )
+  }
+
+  // ── 마켓 완료: 남긴 성과를 보여준다 ──
+  if (stage === '마켓 완료') {
+    return (
+      <div className="mt-2 space-y-1">
+        <p className="text-sm font-semibold text-slate-900">
+          {formatNumber(collab.marketRevenue)}원
+        </p>
+        <p className="text-[11px] text-slate-500">
+          {formatNumber(collab.marketUnits)}개 · {formatDate(collab.marketDate)}
+          {collab.isSettled ? ' · 정산 완료' : ' · 정산 전'}
+        </p>
+        {collab.contentLinks.length > 0 && (
+          <p className="text-[11px] text-slate-400">콘텐츠 {collab.contentLinks.length}개</p>
+        )}
+        <button
+          type="button"
+          onClick={onCompleteMarket}
+          className={clsx(chip, 'w-full', chipOff)}
+        >
+          성과 수정
+        </button>
       </div>
     )
   }

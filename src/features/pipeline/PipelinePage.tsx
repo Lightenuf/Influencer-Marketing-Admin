@@ -6,6 +6,7 @@ import { Button, Card, EmptyState, Spinner } from '@/components/ui'
 import { COLLAB_STAGES, type Collab, type CollabStage } from '@/data/types'
 import CancelCollabDialog from '@/features/pipeline/CancelCollabDialog'
 import CollabFormDialog from '@/features/pipeline/CollabFormDialog'
+import MarketResultDialog from '@/features/pipeline/MarketResultDialog'
 import StageActions from '@/features/pipeline/StageActions'
 import { useCollabs, useInfluencers, useMoveCollabStage } from '@/hooks/queries'
 import { daysSince } from '@/utils/format'
@@ -22,6 +23,7 @@ export default function PipelinePage() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Collab | null>(null)
+  const [marketTarget, setMarketTarget] = useState<Collab | null>(null)
 
   const influencerOf = (id: string) => influencers.find((i) => i.id === id)
 
@@ -116,7 +118,11 @@ export default function PipelinePage() {
                           </div>
                         )}
 
-                        <StageActions collab={collab} stage={stage} />
+                        <StageActions
+                          collab={collab}
+                          stage={stage}
+                          onCompleteMarket={() => setMarketTarget(collab)}
+                        />
 
                         <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
                           <p className={clsx(isStale && 'font-semibold text-amber-600')}>
@@ -169,6 +175,11 @@ export default function PipelinePage() {
         collab={cancelTarget}
         open={cancelTarget !== null}
         onClose={() => setCancelTarget(null)}
+      />
+      <MarketResultDialog
+        collab={marketTarget}
+        open={marketTarget !== null}
+        onClose={() => setMarketTarget(null)}
       />
     </div>
   )

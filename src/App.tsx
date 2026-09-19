@@ -9,6 +9,7 @@ import RejectedListPage from '@/features/rejected/RejectedListPage'
 import InfluencerDetailPage from '@/features/influencers/InfluencerDetailPage'
 import InfluencerFormPage from '@/features/influencers/InfluencerFormPage'
 import InfluencerListPage from '@/features/influencers/InfluencerListPage'
+import PerformancePage from '@/features/performance/PerformancePage'
 import PipelinePage from '@/features/pipeline/PipelinePage'
 import ShipmentsPage from '@/features/shipments/ShipmentsPage'
 
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/influencers/:id" element={<InfluencerDetailPage />} />
           <Route path="/influencers/:id/edit" element={<InfluencerFormPage />} />
           <Route path="/pipeline" element={<PipelinePage />} />
+          <Route path="/performance" element={<PerformancePage />} />
           <Route path="/rejected" element={<RejectedListPage />} />
           {/* 예전 주소로 들어오면 거절 명단으로 보낸다 */}
           <Route path="/do-not-contact" element={<Navigate to="/rejected" replace />} />

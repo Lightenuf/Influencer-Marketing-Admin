@@ -22,6 +22,7 @@ const stageTone: Record<CollabStage, string> = {
   '테스트 통과': 'bg-sky-100 text-sky-700',
   '미팅 확정': 'bg-violet-100 text-violet-700',
   '마켓 대기중': 'bg-emerald-100 text-emerald-700',
+  '마켓 완료': 'bg-emerald-600 text-white',
 }
 
 export function StageBadge({ stage }: { stage: CollabStage }) {
