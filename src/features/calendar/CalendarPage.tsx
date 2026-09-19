@@ -2,9 +2,9 @@ import clsx from 'clsx'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Spinner } from '@/components/ui'
-import { useCollabs, useInfluencers, useShipments } from '@/hooks/queries'
+import { useCollabs, useInfluencers } from '@/hooks/queries'
 
-type EventKind = '마켓' | '미팅' | '샘플 발송' | '출고' | '협업 시작' | '협업 종료' | '콘텐츠 마감'
+type EventKind = '마켓' | '미팅' | '샘플 발송' | '협업 시작' | '협업 종료' | '콘텐츠 마감'
 
 interface CalendarEvent {
   date: string
@@ -17,7 +17,6 @@ const kindTone: Record<EventKind, string> = {
   마켓: 'bg-emerald-100 text-emerald-700',
   미팅: 'bg-violet-100 text-violet-700',
   '샘플 발송': 'bg-teal-100 text-teal-700',
-  출고: 'bg-sky-100 text-sky-700',
   // 아래 셋은 지금 흐름에서는 쓰지 않지만, 예전에 입력해 둔 기록을 위해 남긴다.
   '협업 시작': 'bg-slate-200 text-slate-600',
   '협업 종료': 'bg-slate-200 text-slate-600',
@@ -30,7 +29,6 @@ const toKey = (date: Date) =>
 
 export default function CalendarPage() {
   const { data: collabs, isLoading } = useCollabs()
-  const { data: shipments = [] } = useShipments()
   const { data: influencers = [] } = useInfluencers()
   const navigate = useNavigate()
   const [cursor, setCursor] = useState(() => new Date())
@@ -51,17 +49,8 @@ export default function CalendarPage() {
       push(collab.endDate, '협업 종료')
       push(collab.contentDueDate, '콘텐츠 마감')
     }
-    for (const shipment of shipments) {
-      if (!shipment.shippedAt) continue
-      list.push({
-        date: shipment.shippedAt.slice(0, 10),
-        kind: '출고',
-        label: nameOf(shipment.influencerId),
-        influencerId: shipment.influencerId,
-      })
-    }
     return list
-  }, [collabs, shipments, influencers])
+  }, [collabs, influencers])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()

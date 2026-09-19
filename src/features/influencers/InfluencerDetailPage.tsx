@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CollabTypeBadge, DncBadge, ShipmentStatusBadge, StageBadge, StatusBadge } from '@/components/badges'
+import { CollabTypeBadge, DncBadge, StageBadge, StatusBadge } from '@/components/badges'
 import {
   Button,
   Card,
@@ -17,7 +17,6 @@ import {
   useCollabs,
   useDeleteInfluencer,
   useInfluencer,
-  useShipments,
   useTeamMembers,
 } from '@/hooks/queries'
 import { formatDate, formatDateTime, formatNumber } from '@/utils/format'
@@ -36,7 +35,6 @@ export default function InfluencerDetailPage() {
   const navigate = useNavigate()
   const { data: influencer, isLoading } = useInfluencer(id)
   const { data: collabs = [] } = useCollabs()
-  const { data: shipments = [] } = useShipments()
   const { data: members = [] } = useTeamMembers()
   const deleteInfluencer = useDeleteInfluencer()
   const [dncOpen, setDncOpen] = useState(false)
@@ -47,7 +45,6 @@ export default function InfluencerDetailPage() {
   }
 
   const myCollabs = collabs.filter((c) => c.influencerId === influencer.id)
-  const myShipments = shipments.filter((s) => s.influencerId === influencer.id)
   const nameOf = (userId: string | null) =>
     members.find((m) => m.id === userId)?.displayName ?? '알 수 없음'
 
@@ -125,33 +122,6 @@ export default function InfluencerDetailPage() {
                       <CollabTypeBadge type={collab.collabType} />
                       <StageBadge stage={collab.stage} />
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader title="출고 내역" description={`총 ${myShipments.length}건`} />
-            {myShipments.length === 0 ? (
-              <EmptyState title="출고 기록이 없습니다." />
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {myShipments.map((shipment) => (
-                  <li
-                    key={shipment.id}
-                    className="flex items-center justify-between gap-3 px-5 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-slate-800">
-                        {shipment.productName} × {shipment.quantity}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        요청 {formatDate(shipment.requestedAt)}
-                        {shipment.trackingNumber && ` · 송장 ${shipment.trackingNumber}`}
-                      </p>
-                    </div>
-                    <ShipmentStatusBadge status={shipment.status} />
                   </li>
                 ))}
               </ul>
