@@ -72,17 +72,26 @@ export default function RejectedListPage() {
     null,
   )
   const [keyword, setKeyword] = useState('')
+  // null이면 전체 기간을 본다.
+  const [month, setMonth] = useState<Date | null>(() => new Date())
 
   const blocked = useMemo(
     () => influencers.filter((influencer) => influencer.doNotContact),
     [influencers],
   )
 
+  const monthKey = month
+    ? `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+    : null
+
   // 연락 금지로 등록한 분은 아래 영역에서 관리하므로 위 목록에서는 뺀다.
   // 금지를 풀면 자동으로 다시 올라온다.
   const rejected = (collabs ?? [])
     .filter((collab) => collab.isCancelled)
     .filter((collab) => !influencers.find((i) => i.id === collab.influencerId)?.doNotContact)
+    .filter(
+      (collab) => !monthKey || (collab.cancelledAt ?? collab.createdAt).slice(0, 7) === monthKey,
+    )
     .sort((a, b) => (b.cancelledAt ?? '').localeCompare(a.cancelledAt ?? ''))
 
   const filteredBlocked = useMemo(() => {
@@ -92,6 +101,12 @@ export default function RejectedListPage() {
       `${influencer.name} ${influencer.snsHandle}`.toLowerCase().includes(query),
     )
   }, [blocked, keyword])
+
+  const shiftMonth = (delta: number) =>
+    setMonth((current) => {
+      const base = current ?? new Date()
+      return new Date(base.getFullYear(), base.getMonth() + delta, 1)
+    })
 
   const nameOf = (userId: string | null) =>
     members.find((m) => m.id === userId)?.displayName ?? '알 수 없음'
@@ -115,20 +130,58 @@ export default function RejectedListPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">거절 명단</h1>
         <p className="mt-1 text-sm text-slate-500">
-          거절 의사를 밝혀 협업이 무산된 분들입니다. {formatNumber(rejected.length)}건 · 연락 금지로
-          등록한{' '}
+          거절 의사를 밝혀 협업이 무산된 분들입니다. 연락 금지로 등록한{' '}
           <span className="font-medium text-rose-600">{formatNumber(blocked.length)}명</span>은 아래
           영역에서 관리합니다.
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+          <button
+            type="button"
+            aria-label="이전 달"
+            onClick={() => shiftMonth(-1)}
+            className="rounded-md px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
+          >
+            ‹
+          </button>
+          <span className="min-w-28 px-2 text-center text-sm font-medium text-slate-800">
+            {month ? `${month.getFullYear()}년 ${month.getMonth() + 1}월` : '전체 기간'}
+          </span>
+          <button
+            type="button"
+            aria-label="다음 달"
+            onClick={() => shiftMonth(1)}
+            className="rounded-md px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
+          >
+            ›
+          </button>
+        </div>
+
+        <Button variant="secondary" size="sm" onClick={() => setMonth(new Date())}>
+          이번 달
+        </Button>
+        <Button
+          variant={month === null ? 'primary' : 'secondary'}
+          size="sm"
+          onClick={() => setMonth(month === null ? new Date() : null)}
+        >
+          전체 기간
+        </Button>
+
+        <span className="text-sm text-slate-500">
+          {formatNumber(rejected.length)}건
+        </span>
+      </div>
+
       {rejected.length === 0 ? (
         <Card>
           <EmptyState
-            title={blocked.length > 0 ? '연락 금지 대상만 남았습니다' : '거절된 건이 없습니다'}
+            title={monthKey ? '이 달에 거절한 건이 없습니다' : '거절된 건이 없습니다'}
             description={
-              blocked.length > 0
-                ? '거절한 분들이 모두 연락 금지로 등록되어 아래 영역에서 관리되고 있습니다.'
+              monthKey
+                ? '다른 달을 보거나 전체 기간으로 확인해보세요.'
                 : "파이프라인 카드의 '취소 → 거절'을 누르면 여기로 옮겨집니다."
             }
           />
