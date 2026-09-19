@@ -53,6 +53,7 @@ const LEGACY_STAGES: Record<string, CollabStage> = {
   협의중: '테스트중',
   진행중: '미팅 확정',
   종료: '마켓 대기중',
+  '미팅 조율중': '테스트 통과',
 }
 
 function migrate(db: Database): Database {

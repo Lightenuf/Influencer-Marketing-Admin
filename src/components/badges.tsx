@@ -19,7 +19,7 @@ export function StatusBadge({ status }: { status: InfluencerStatus }) {
 const stageTone: Record<CollabStage, string> = {
   회신완료: 'bg-slate-100 text-slate-600',
   테스트중: 'bg-amber-100 text-amber-700',
-  '미팅 조율중': 'bg-sky-100 text-sky-700',
+  '테스트 통과': 'bg-sky-100 text-sky-700',
   '미팅 확정': 'bg-violet-100 text-violet-700',
   '마켓 대기중': 'bg-emerald-100 text-emerald-700',
 }

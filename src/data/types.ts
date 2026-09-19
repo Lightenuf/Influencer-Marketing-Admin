@@ -77,7 +77,7 @@ export type TestFeedback = (typeof TEST_FEEDBACKS)[number]
 export const COLLAB_STAGES = [
   '회신완료',
   '테스트중',
-  '미팅 조율중',
+  '테스트 통과',
   '미팅 확정',
   '마켓 대기중',
 ] as const
@@ -144,9 +144,9 @@ export interface Collab {
   seedingAccepted: boolean | null
   /** 테스트중 — 음료를 받아본 반응 */
   testFeedback: TestFeedback | null
-  /** 테스트중 — 미팅 수락 여부. 수락하면 미팅 조율중으로 넘어간다. null이면 아직 확인 전 */
+  /** 테스트중 — 미팅 수락 여부. 수락하면 '테스트 통과'로 넘어간다. null이면 아직 확인 전 */
   meetingAccepted: boolean | null
-  /** 미팅 조율중 — 마지막으로 연락한 날 */
+  /** (예전 '미팅 조율중'에서 쓰던 값 — 지금은 화면에서 쓰지 않는다) */
   lastContactedAt: string | null
   /** 미팅 확정 — 미팅 날짜 */
   meetingAt: string | null

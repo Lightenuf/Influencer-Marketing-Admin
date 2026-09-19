@@ -3,9 +3,6 @@ import type { Collab, CollabStage } from '@/data/types'
 import { useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
 import { daysSince, formatDate } from '@/utils/format'
 
-/** 연락한 지 이 일수가 지나면 '재연락' 표시가 뜬다. */
-const RECONTACT_DAYS = 3
-
 /**
  * 음료를 보내고 이 일수가 지나도 반응 표시가 없으면 확인 알림을 띄운다.
  * 배송 1~2일 + 체험 기간을 감안한 값.
@@ -196,7 +193,7 @@ export default function StageActions({
           value={collab.meetingAccepted}
           onAccept={() => {
             patch({ meetingAccepted: true })
-            moveStage.mutate({ id: collab.id, stage: '미팅 조율중' })
+            moveStage.mutate({ id: collab.id, stage: '테스트 통과' })
           }}
           onDecline={() => patch({ meetingAccepted: false })}
         />
@@ -208,32 +205,10 @@ export default function StageActions({
     )
   }
 
-  // ── 미팅 조율중: 연락을 보냈는지, 답이 없으면 재연락 알림 ──
-  if (stage === '미팅 조율중') {
-    const contacted = Boolean(collab.lastContactedAt)
-    const waited = collab.lastContactedAt ? daysSince(collab.lastContactedAt) : null
-    const needsRecontact = waited !== null && waited >= RECONTACT_DAYS
+  // ── 테스트 통과: 미팅 날짜만 잡는다 ──
+  if (stage === '테스트 통과') {
     return (
-      <div className="mt-2 space-y-1.5">
-        <button
-          type="button"
-          title={contacted ? '다시 누르면 오늘 날짜로 갱신됩니다' : undefined}
-          onClick={() => patch({ lastContactedAt: today() })}
-          className={clsx(
-            chip,
-            'w-full',
-            contacted ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : chipOff,
-          )}
-        >
-          {contacted ? '✓ 연락함' : '연락 전'}
-        </button>
-
-        {needsRecontact && (
-          <p className="text-[11px] font-medium text-amber-600">
-            재연락 필요 — 연락한 지 {waited}일
-          </p>
-        )}
-
+      <div className="mt-2">
         <DateRow
           label="미팅 날짜가 잡히면 입력"
           value={collab.meetingAt}
