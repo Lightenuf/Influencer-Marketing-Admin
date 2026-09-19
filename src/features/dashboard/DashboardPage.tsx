@@ -4,20 +4,20 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { CollabTypeBadge, StageBadge } from '@/components/badges'
 import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '@/components/ui'
 import { isMockMode } from '@/data'
-import { COLLAB_STAGES, INFLUENCER_STATUSES } from '@/data/types'
+import { COLLAB_STAGES } from '@/data/types'
 import { useCollabs, useDemoData, useInfluencers } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
 
 const STALE_DAYS = 15
 const LAST_STAGE = COLLAB_STAGES[COLLAB_STAGES.length - 1]
 
-const STATUS_COLORS: Record<string, string> = {
-  제안중: '#94a3b8',
-  협의중: '#f59e0b',
-  진행중: '#7c3aed',
-  완료: '#10b981',
-  취소: '#cbd5e1',
-  재협업대상: '#0ea5e9',
+/** 단계가 뒤로 갈수록 진해지게 해서, 어디까지 왔는지 색으로도 읽히게 한다. */
+const STAGE_COLORS: Record<string, string> = {
+  회신완료: '#c4b5fd',
+  테스트중: '#a78bfa',
+  '테스트 통과': '#8b5cf6',
+  '미팅 확정': '#7c3aed',
+  '마켓 대기중': '#5b21b6',
 }
 
 function StatCard({
@@ -100,13 +100,14 @@ export default function DashboardPage() {
     }
   }, [influencers, collabs, period])
 
-  const statusData = useMemo(
+  // 지금 파이프라인에 올라와 있는 카드만 센다 (거절·보류 제외).
+  const stageData = useMemo(
     () =>
-      INFLUENCER_STATUSES.map((status) => ({
-        status,
-        count: (influencers ?? []).filter((i) => i.status === status).length,
+      COLLAB_STAGES.map((stage) => ({
+        stage,
+        count: collabs.filter((collab) => collab.stage === stage && !collab.isCancelled).length,
       })),
-    [influencers],
+    [collabs],
   )
 
   const stalled = useMemo(
@@ -227,17 +228,20 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="상태별 인플루언서 분포" />
+          <CardHeader
+            title="파이프라인 단계별 현황"
+            description={`지금 진행 중인 ${formatNumber(stageData.reduce((sum, item) => sum + item.count, 0))}건`}
+          />
           <div className="h-64 p-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statusData} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+              <BarChart data={stageData} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="status" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} />
+                <XAxis dataKey="stage" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                 <Tooltip cursor={{ fill: '#f8fafc' }} />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                  {statusData.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status]} />
+                  {stageData.map((entry) => (
+                    <Cell key={entry.stage} fill={STAGE_COLORS[entry.stage]} />
                   ))}
                 </Bar>
               </BarChart>
