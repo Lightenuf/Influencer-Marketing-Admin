@@ -44,25 +44,28 @@ function DateRow({
   )
 }
 
-/** 수락 / 거절 두 갈래를 고르는 줄. 아직 안 고른 상태(null)를 구분한다. */
+/**
+ * 수락 / 거절 두 갈래를 고르는 줄. 아직 안 고른 상태(null)를 구분한다.
+ * 고른 것을 다시 누르면 선택이 풀린다 — 잘못 눌렀을 때 되돌리기 위함.
+ */
 function AcceptChoice({
   label,
   value,
-  onAccept,
-  onDecline,
+  onChange,
 }: {
   label: string
   value: boolean | null
-  onAccept: () => void
-  onDecline: () => void
+  onChange: (next: boolean | null) => void
 }) {
+  const pick = (next: boolean) => onChange(value === next ? null : next)
   return (
     <div>
       <span className="text-[11px] text-slate-500">{label}</span>
       <div className="mt-0.5 flex gap-1">
         <button
           type="button"
-          onClick={onAccept}
+          title={value === true ? '다시 누르면 선택이 풀립니다' : undefined}
+          onClick={() => pick(true)}
           className={clsx(
             chip,
             'flex-1',
@@ -75,7 +78,8 @@ function AcceptChoice({
         </button>
         <button
           type="button"
-          onClick={onDecline}
+          title={value === false ? '다시 누르면 선택이 풀립니다' : undefined}
+          onClick={() => pick(false)}
           className={clsx(
             chip,
             'flex-1',
@@ -114,8 +118,7 @@ export default function StageActions({
         <AcceptChoice
           label="씨딩 수락 여부"
           value={collab.seedingAccepted}
-          onAccept={() => patch({ seedingAccepted: true })}
-          onDecline={() => patch({ seedingAccepted: false })}
+          onChange={(next) => patch({ seedingAccepted: next })}
         />
 
         {collab.seedingAccepted === true && (
@@ -152,7 +155,10 @@ export default function StageActions({
         <div className="flex gap-1">
           <button
             type="button"
-            onClick={() => patch({ testFeedback: '긍정' })}
+            title={collab.testFeedback === '긍정' ? '다시 누르면 선택이 풀립니다' : undefined}
+            onClick={() =>
+              patch({ testFeedback: collab.testFeedback === '긍정' ? null : '긍정' })
+            }
             className={clsx(
               chip,
               'flex-1',
@@ -165,7 +171,10 @@ export default function StageActions({
           </button>
           <button
             type="button"
-            onClick={() => patch({ testFeedback: '부정' })}
+            title={collab.testFeedback === '부정' ? '다시 누르면 선택이 풀립니다' : undefined}
+            onClick={() =>
+              patch({ testFeedback: collab.testFeedback === '부정' ? null : '부정' })
+            }
             className={clsx(
               chip,
               'flex-1',
@@ -191,11 +200,10 @@ export default function StageActions({
         <AcceptChoice
           label="미팅 수락 여부"
           value={collab.meetingAccepted}
-          onAccept={() => {
-            patch({ meetingAccepted: true })
-            moveStage.mutate({ id: collab.id, stage: '테스트 통과' })
+          onChange={(next) => {
+            patch({ meetingAccepted: next })
+            if (next === true) moveStage.mutate({ id: collab.id, stage: '테스트 통과' })
           }}
-          onDecline={() => patch({ meetingAccepted: false })}
         />
 
         {collab.meetingAccepted === false && (
