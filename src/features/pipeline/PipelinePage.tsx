@@ -59,14 +59,17 @@ export default function PipelinePage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="flex snap-x gap-3 overflow-x-auto pb-2">
           {COLLAB_STAGES.map((stage) => {
             // 거절한 건은 '거절 명단'으로 빠지므로 보드에는 진행 중인 것만 남는다.
             const items = (collabs ?? []).filter(
               (collab) => collab.stage === stage && !collab.isCancelled,
             )
             return (
-              <div key={stage} className="rounded-xl bg-slate-200/60 p-2">
+              <div
+                key={stage}
+                className="w-64 shrink-0 snap-start rounded-xl bg-slate-200/60 p-2"
+              >
                 <div className="flex items-center justify-between px-2 py-1.5">
                   <span className="text-sm font-semibold text-slate-700">{stage}</span>
                   <span className="text-xs text-slate-500">{items.length}</span>
