@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner } from '@/components/ui'
-import type { Influencer } from '@/data/types'
+import type { Collab, Influencer } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
 import { useCollabs, useInfluencers, useSetCancelDate, useTeamMembers } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
@@ -9,6 +9,42 @@ import { profileUrl } from '@/utils/profileLink'
 import { formatDateTime, formatNumber } from '@/utils/format'
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/^@/, '')
+
+/**
+ * 거절일 고치기.
+ * 달력을 넘길 때마다 저장하면 목록이 다시 그려지며 달력이 닫혀버리므로,
+ * 고르는 동안에는 화면에만 담아두고 입력을 마쳤을 때 한 번 저장한다.
+ */
+function CancelDateInput({ collab }: { collab: Collab }) {
+  const saved = collab.cancelledAt?.slice(0, 10) ?? ''
+  const setCancelDate = useSetCancelDate()
+  const [draft, setDraft] = useState(saved)
+
+  useEffect(() => setDraft(saved), [saved])
+
+  const commit = () => {
+    if (draft && draft !== saved) setCancelDate.mutate({ id: collab.id, date: draft })
+    else if (!draft) setDraft(saved)
+  }
+
+  return (
+    <label className="flex items-center gap-1">
+      거절일
+      <input
+        type="date"
+        value={draft}
+        max={new Date().toISOString().slice(0, 10)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+        }}
+        title="어드민을 만들기 전에 있었던 거절이면 실제 날짜로 고쳐주세요"
+        className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-600 focus:border-violet-400 focus:outline-none"
+      />
+    </label>
+  )
+}
 
 /** 아이디를 누르면 새 창으로 해당 SNS 프로필을 연다. */
 function ProfileHandle({ influencer }: { influencer: Influencer }) {
@@ -31,7 +67,6 @@ export default function RejectedListPage() {
   const { data: collabs, isLoading } = useCollabs()
   const { data: influencers = [] } = useInfluencers()
   const { data: members = [] } = useTeamMembers()
-  const setCancelDate = useSetCancelDate()
 
   const [dncTarget, setDncTarget] = useState<{ influencer: Influencer; reasons?: string[] } | null>(
     null,
@@ -138,19 +173,7 @@ export default function RejectedListPage() {
                 )}
 
                 <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
-                  <label className="flex items-center gap-1">
-                    거절일
-                    <input
-                      type="date"
-                      value={collab.cancelledAt?.slice(0, 10) ?? ''}
-                      max={new Date().toISOString().slice(0, 10)}
-                      onChange={(e) =>
-                        e.target.value && setCancelDate.mutate({ id: collab.id, date: e.target.value })
-                      }
-                      title="어드민을 만들기 전에 있었던 거절이면 실제 날짜로 고쳐주세요"
-                      className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-600 focus:border-violet-400 focus:outline-none"
-                    />
-                  </label>
+                  <CancelDateInput collab={collab} />
                   <span>· {collab.stage} 단계에서</span>
                 </div>
 
