@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import { CollabTypeBadge, StageBadge } from '@/components/badges'
 import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '@/components/ui'
+import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import { isMockMode } from '@/data'
 import { COLLAB_STAGES } from '@/data/types'
 import { useCollabs, useDemoData, useInfluencers } from '@/hooks/queries'
@@ -75,6 +76,8 @@ export default function DashboardPage() {
   const { data: collabs = [] } = useCollabs()
   const demo = useDemoData()
   const [period, setPeriod] = useState<Period>('month')
+  // 차트는 위의 기간 버튼과 별개로, 달을 골라서 본다.
+  const [chartMonth, setChartMonth] = useState<Date | null>(() => new Date())
 
   /**
    * 기간 내에 '등록한 인플루언서'를 한 묶음으로 보고, 그들이 어디까지 갔는지 센다.
@@ -114,21 +117,24 @@ export default function DashboardPage() {
   }, [influencers, collabs, period])
 
   /**
-   * 기간(기본 한 달) 안에 회신이 온 카드를 지금 단계별로 센다.
+   * 고른 달에 회신이 온 카드를 지금 단계별로 센다.
    * 거절은 '거절한 날' 기준으로 세어 '회신완료' 막대에 함께 쌓는다.
    * (예전에 거절한 분을 뒤늦게 입력해도, 거절일을 고치면 그달로 옮겨간다)
    */
   const stageData = useMemo(() => {
-    const inPeriod = collabs.filter((collab) => collab.createdAt >= stats.from)
+    const key = monthKeyOf(chartMonth)
+    const inMonth = collabs.filter((collab) => !key || collab.createdAt.slice(0, 7) === key)
     const rejected = collabs.filter(
-      (collab) => collab.isCancelled && (collab.cancelledAt ?? collab.createdAt) >= stats.from,
+      (collab) =>
+        collab.isCancelled &&
+        (!key || (collab.cancelledAt ?? collab.createdAt).slice(0, 7) === key),
     ).length
     return COLLAB_STAGES.map((stage) => ({
       stage,
-      진행: inPeriod.filter((collab) => collab.stage === stage && !collab.isCancelled).length,
+      진행: inMonth.filter((collab) => collab.stage === stage && !collab.isCancelled).length,
       거절: stage === COLLAB_STAGES[0] ? rejected : 0,
     }))
-  }, [collabs, stats.from])
+  }, [collabs, chartMonth])
 
   const stageTotals = useMemo(
     () =>
@@ -259,8 +265,11 @@ export default function DashboardPage() {
         <Card>
           <CardHeader
             title="파이프라인 단계별 현황"
-            description={`${PERIODS.find((item) => item.key === period)?.description} 기준 · 회신 ${formatNumber(stageTotals.진행)}건 · 거절 ${formatNumber(stageTotals.거절)}건`}
+            description={`회신 ${formatNumber(stageTotals.진행)}건 · 거절 ${formatNumber(stageTotals.거절)}건`}
           />
+          <div className="px-5 pb-1">
+            <MonthPicker value={chartMonth} onChange={setChartMonth} compact />
+          </div>
           <div className="h-64 p-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stageData} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>

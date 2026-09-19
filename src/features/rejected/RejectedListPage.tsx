@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner } from '@/components/ui'
 import type { Collab, Influencer } from '@/data/types'
+import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
 import { useCollabs, useInfluencers, useSetCancelDate, useTeamMembers } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
@@ -80,9 +81,7 @@ export default function RejectedListPage() {
     [influencers],
   )
 
-  const monthKey = month
-    ? `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
-    : null
+  const monthKey = monthKeyOf(month)
 
   // 연락 금지로 등록한 분은 아래 영역에서 관리하므로 위 목록에서는 뺀다.
   // 금지를 풀면 자동으로 다시 올라온다.
@@ -101,12 +100,6 @@ export default function RejectedListPage() {
       `${influencer.name} ${influencer.snsHandle}`.toLowerCase().includes(query),
     )
   }, [blocked, keyword])
-
-  const shiftMonth = (delta: number) =>
-    setMonth((current) => {
-      const base = current ?? new Date()
-      return new Date(base.getFullYear(), base.getMonth() + delta, 1)
-    })
 
   const nameOf = (userId: string | null) =>
     members.find((m) => m.id === userId)?.displayName ?? '알 수 없음'
@@ -137,39 +130,7 @@ export default function RejectedListPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
-          <button
-            type="button"
-            aria-label="이전 달"
-            onClick={() => shiftMonth(-1)}
-            className="rounded-md px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
-          >
-            ‹
-          </button>
-          <span className="min-w-28 px-2 text-center text-sm font-medium text-slate-800">
-            {month ? `${month.getFullYear()}년 ${month.getMonth() + 1}월` : '전체 기간'}
-          </span>
-          <button
-            type="button"
-            aria-label="다음 달"
-            onClick={() => shiftMonth(1)}
-            className="rounded-md px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
-          >
-            ›
-          </button>
-        </div>
-
-        <Button variant="secondary" size="sm" onClick={() => setMonth(new Date())}>
-          이번 달
-        </Button>
-        <Button
-          variant={month === null ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={() => setMonth(month === null ? new Date() : null)}
-        >
-          전체 기간
-        </Button>
-
+        <MonthPicker value={month} onChange={setMonth} />
         <span className="text-sm text-slate-500">
           {formatNumber(rejected.length)}건
         </span>
