@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Card, Spinner } from '@/components/ui'
 import { useCollabs, useInfluencers, useShipments } from '@/hooks/queries'
 
-type EventKind = '협업 시작' | '협업 종료' | '샘플 발송' | '콘텐츠 마감' | '출고'
+type EventKind = '마켓' | '미팅' | '샘플 발송' | '출고' | '협업 시작' | '협업 종료' | '콘텐츠 마감'
 
 interface CalendarEvent {
   date: string
@@ -14,11 +14,14 @@ interface CalendarEvent {
 }
 
 const kindTone: Record<EventKind, string> = {
-  '협업 시작': 'bg-violet-100 text-violet-700',
-  '협업 종료': 'bg-slate-200 text-slate-600',
+  마켓: 'bg-emerald-100 text-emerald-700',
+  미팅: 'bg-violet-100 text-violet-700',
   '샘플 발송': 'bg-teal-100 text-teal-700',
-  '콘텐츠 마감': 'bg-amber-100 text-amber-700',
   출고: 'bg-sky-100 text-sky-700',
+  // 아래 셋은 지금 흐름에서는 쓰지 않지만, 예전에 입력해 둔 기록을 위해 남긴다.
+  '협업 시작': 'bg-slate-200 text-slate-600',
+  '협업 종료': 'bg-slate-200 text-slate-600',
+  '콘텐츠 마감': 'bg-amber-100 text-amber-700',
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -41,9 +44,11 @@ export default function CalendarPage() {
       const push = (date: string | null, kind: EventKind) => {
         if (date) list.push({ date: date.slice(0, 10), kind, label: name, influencerId: collab.influencerId })
       }
+      push(collab.marketDate, '마켓')
+      push(collab.meetingAt, '미팅')
+      push(collab.sampleShipDate, '샘플 발송')
       push(collab.startDate, '협업 시작')
       push(collab.endDate, '협업 종료')
-      push(collab.sampleShipDate, '샘플 발송')
       push(collab.contentDueDate, '콘텐츠 마감')
     }
     for (const shipment of shipments) {
@@ -88,7 +93,7 @@ export default function CalendarPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">캘린더</h1>
         <p className="mt-1 text-sm text-slate-500">
-          협업 기간, 샘플 발송일, 콘텐츠 마감일을 한눈에 확인하세요.
+          마켓 예정일, 미팅 날짜, 샘플 배송일을 한눈에 확인하세요.
         </p>
       </div>
 
