@@ -347,6 +347,19 @@ export const supabaseAdapter: DataRepository = {
     return toCollab(row)
   },
 
+  async setCancelDate(id: string, date: string) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('collabs')
+        .update({ cancelled_at: new Date(`${date}T12:00:00`).toISOString() })
+        .eq('id', id)
+        .select()
+        .single(),
+    )
+    return toCollab(row)
+  },
+
   async deleteCollab(id) {
     const db = requireSupabase()
     const { error } = await db.from('collabs').delete().eq('id', id)

@@ -307,6 +307,16 @@ export const mockAdapter: DataRepository = {
     return tick(collab)
   },
 
+  async setCancelDate(id: string, date: string) {
+    const db = read()
+    const collab = requireCollab(db, id)
+    // 날짜만 받아 그날 정오로 저장한다 (시간대 때문에 날짜가 하루 밀리지 않도록).
+    collab.cancelledAt = new Date(`${date}T12:00:00`).toISOString()
+    collab.updatedAt = now()
+    write(db)
+    return tick(collab)
+  },
+
   async deleteCollab(id) {
     const db = read()
     db.collabs = db.collabs.filter((c) => c.id !== id)

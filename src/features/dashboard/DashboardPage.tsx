@@ -115,11 +115,14 @@ export default function DashboardPage() {
 
   /**
    * 기간(기본 한 달) 안에 회신이 온 카드를 지금 단계별로 센다.
-   * 거절한 분들도 회신은 왔던 분이므로 '회신완료' 막대에 함께 쌓아 보여준다.
+   * 거절은 '거절한 날' 기준으로 세어 '회신완료' 막대에 함께 쌓는다.
+   * (예전에 거절한 분을 뒤늦게 입력해도, 거절일을 고치면 그달로 옮겨간다)
    */
   const stageData = useMemo(() => {
     const inPeriod = collabs.filter((collab) => collab.createdAt >= stats.from)
-    const rejected = inPeriod.filter((collab) => collab.isCancelled).length
+    const rejected = collabs.filter(
+      (collab) => collab.isCancelled && (collab.cancelledAt ?? collab.createdAt) >= stats.from,
+    ).length
     return COLLAB_STAGES.map((stage) => ({
       stage,
       진행: inPeriod.filter((collab) => collab.stage === stage && !collab.isCancelled).length,
@@ -256,7 +259,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader
             title="파이프라인 단계별 현황"
-            description={`${PERIODS.find((item) => item.key === period)?.description}에 회신 온 ${formatNumber(stageTotals.진행 + stageTotals.거절)}건 · 그중 거절 ${formatNumber(stageTotals.거절)}건`}
+            description={`${PERIODS.find((item) => item.key === period)?.description} 기준 · 회신 ${formatNumber(stageTotals.진행)}건 · 거절 ${formatNumber(stageTotals.거절)}건`}
           />
           <div className="h-64 p-4">
             <ResponsiveContainer width="100%" height="100%">

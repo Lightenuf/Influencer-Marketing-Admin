@@ -77,6 +77,8 @@ export interface DataRepository {
   updateCollab(id: string, patch: Partial<CollabInput>): Promise<Collab>
   moveCollabStage(id: string, stage: CollabStage): Promise<Collab>
   cancelCollab(id: string, reasons: string[], reasonDetail: string): Promise<Collab>
+  /** 거절 시점을 고친다 — 어드민을 만들기 전에 있었던 거절을 실제 날짜로 옮길 때 쓴다. */
+  setCancelDate(id: string, date: string): Promise<Collab>
   /**
    * 보류로 옮기거나, 이미 보류 중인 건의 정보를 고친다.
    * 넘긴 항목만 바뀐다 — 날짜만 고치려고 사유·메모를 다시 보낼 필요가 없다.

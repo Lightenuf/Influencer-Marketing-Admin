@@ -151,6 +151,14 @@ export function useResumeCollab() {
   })
 }
 
+export function useSetCancelDate() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, date }: { id: string; date: string }) => repository.setCancelDate(id, date),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
+  })
+}
+
 export function useDeleteCollab() {
   const client = useQueryClient()
   return useMutation({
