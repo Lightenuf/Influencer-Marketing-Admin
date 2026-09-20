@@ -111,15 +111,22 @@ export default function DashboardPage() {
       new Set(cohortCollabs.filter(predicate).map((collab) => collab.influencerId))
 
     const contacted = cohort.length
+    // 회신 = 협업 카드가 만들어진 사람. 이후 거절한 분도 회신은 온 것이므로 포함한다.
     const replied = peopleWhere(() => true)
-    const seeded = peopleWhere((collab) => collab.sampleShipDate !== null)
-    const tested = peopleWhere((collab) => reached(collab, '테스트중'))
+    // 샘플을 보낸 것과 테스트 단계에 들어간 것은 같은 일이다.
+    // 배송일이 비어 있어도 테스트 단계에 있으면 씨딩한 것으로 본다.
+    const seeded = peopleWhere(
+      (collab) => collab.sampleShipDate !== null || reached(collab, '테스트중'),
+    )
     const passed = peopleWhere((collab) => reached(collab, '테스트 통과'))
     const meeting = peopleWhere((collab) => reached(collab, '미팅 확정'))
     const market = peopleWhere((collab) => reached(collab, '마켓 대기중'))
 
-    // 씨딩 기록 없이 테스트 단계에 있는 사람 — 배송일 입력이 빠진 것일 수 있다.
-    const testedWithoutSeed = [...tested].filter((id) => !seeded.has(id)).length
+    // 씨딩으로 세긴 했지만 배송일이 비어 있는 사람 — 캘린더와 기록에서 빠진다.
+    const seededWithoutDate = [...seeded].filter(
+      (id) =>
+        !cohortCollabs.some((collab) => collab.influencerId === id && collab.sampleShipDate),
+    ).length
 
     const rate = (value: number, base: number) => (base ? Math.round((value / base) * 100) : 0)
 
@@ -128,18 +135,15 @@ export default function DashboardPage() {
       contacted,
       replied: replied.size,
       seeded: seeded.size,
-      tested: tested.size,
       passed: passed.size,
       meeting: meeting.size,
       market: market.size,
-      testedWithoutSeed,
+      seededWithoutDate,
       replyRate: rate(replied.size, contacted),
       seedRate: rate(seeded.size, replied.size),
-      testEntryRate: rate(tested.size, seeded.size),
-      passRate: rate(passed.size, tested.size),
-      meetingRate: rate(meeting.size, passed.size),
-      confirmRate: rate(market.size, meeting.size),
-      finalRate: rate(market.size, contacted),
+      passRate: rate(passed.size, replied.size),
+      meetingRate: rate(meeting.size, replied.size),
+      confirmRate: rate(market.size, replied.size),
     }
   }, [influencers, collabs, period])
 
@@ -264,7 +268,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <StatCard
           label="전체 컨택"
           value={`${formatNumber(stats.contacted)}명`}
@@ -274,57 +278,44 @@ export default function DashboardPage() {
           label="회신율"
           basis="전체 컨택"
           value={`${stats.replyRate}%`}
-          sub={`회신 ${formatNumber(stats.replied)}명 / ${formatNumber(stats.contacted)}명`}
+          sub={`회신 ${formatNumber(stats.replied)}명 / 컨택 ${formatNumber(stats.contacted)}명`}
         />
         <StatCard
-          label="씨딩전환율"
+          label="씨딩율"
           basis="회신"
           value={`${stats.seedRate}%`}
-          sub={`씨딩 ${formatNumber(stats.seeded)}명 / ${formatNumber(stats.replied)}명`}
-        />
-        <StatCard
-          label="테스트진입율"
-          basis="씨딩"
-          value={`${stats.testEntryRate}%`}
-          sub={`테스트 ${formatNumber(stats.tested)}명 / ${formatNumber(stats.seeded)}명`}
+          sub={`씨딩 ${formatNumber(stats.seeded)}명 / 회신 ${formatNumber(stats.replied)}명`}
         />
         <StatCard
           label="테스트통과율"
-          basis="테스트 진행"
+          basis="회신"
           value={`${stats.passRate}%`}
-          sub={`통과 ${formatNumber(stats.passed)}명 / ${formatNumber(stats.tested)}명`}
+          sub={`통과 ${formatNumber(stats.passed)}명 / 회신 ${formatNumber(stats.replied)}명`}
         />
         <StatCard
           label="미팅전환율"
-          basis="테스트 통과"
+          basis="회신"
           value={`${stats.meetingRate}%`}
-          sub={`미팅 확정 ${formatNumber(stats.meeting)}명 / ${formatNumber(stats.passed)}명`}
+          sub={`미팅 확정 ${formatNumber(stats.meeting)}명 / 회신 ${formatNumber(stats.replied)}명`}
         />
         <StatCard
           label="확정율"
-          basis="미팅 확정"
+          basis="회신"
           value={`${stats.confirmRate}%`}
-          sub={`마켓 확정 ${formatNumber(stats.market)}명 / ${formatNumber(stats.meeting)}명`}
-        />
-        <StatCard
-          label="최종전환율"
-          basis="전체 컨택"
-          value={`${stats.finalRate}%`}
-          sub={`마켓 확정 ${formatNumber(stats.market)}명 / ${formatNumber(stats.contacted)}명`}
+          sub={`마켓 확정 ${formatNumber(stats.market)}명 / 회신 ${formatNumber(stats.replied)}명`}
           tone="success"
         />
       </div>
 
-      {stats.testedWithoutSeed > 0 && (
+      {stats.seededWithoutDate > 0 && (
         <Card className="border-amber-200 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
-            <b>씨딩 기록 없이 테스트 단계로 간 {formatNumber(stats.testedWithoutSeed)}명</b>이
-            있습니다. 그래서 테스트진입율이 100%를 넘을 수 있습니다.
+            <b>배송 날짜가 비어 있는 씨딩 {formatNumber(stats.seededWithoutDate)}명</b>이 있습니다.
           </p>
           <p className="mt-1 text-xs leading-relaxed text-amber-700">
-            회신완료 카드에 <b>배송 날짜</b>를 넣으면 자동으로 테스트중으로 넘어가지만, 카드의
-            화살표로 옮기면 날짜가 비어 있어도 넘어갑니다. 샘플은 보냈는데 날짜만 빠진 것이라면
-            파이프라인에서 채워주세요.{' '}
+            테스트 단계에 있으니 씨딩으로 셌지만, 배송일이 없어 캘린더와 기록에서는 빠집니다.
+            회신완료 카드에 배송 날짜를 넣으면 자동으로 테스트중으로 넘어가는데, 카드의 화살표로
+            옮기면 날짜가 비어도 넘어가기 때문입니다.{' '}
             <Link to="/pipeline" className="font-medium underline">
               협업 파이프라인 열기
             </Link>
