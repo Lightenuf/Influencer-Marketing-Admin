@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner } from '@/components/ui'
 import type { Collab, Influencer } from '@/data/types'
+import { LATER_CONTACT_REASONS } from '@/data/types'
 import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
 import { useCollabs, useInfluencers, useSetCancelDate, useTeamMembers } from '@/hooks/queries'
@@ -64,6 +65,73 @@ function ProfileHandle({ influencer }: { influencer: Influencer }) {
   )
 }
 
+/** 거절 건 한 장. 거절 명단과 추후 연락 영역이 같은 모양을 쓴다. */
+function RejectedCard({
+  collab,
+  influencer,
+  onBlock,
+  tone,
+}: {
+  collab: Collab
+  influencer: Influencer | undefined
+  onBlock: () => void
+  tone: 'rejected' | 'later'
+}) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Link
+            to={`/influencers/${collab.influencerId}`}
+            className="block truncate text-sm font-medium text-slate-900 hover:text-violet-600"
+          >
+            {influencer?.name ?? '삭제된 크리에이터'}
+          </Link>
+          {influencer && (
+            <p className="truncate text-xs text-slate-400">
+              <ProfileHandle influencer={influencer} /> · 팔로워{' '}
+              {formatNumber(influencer.followerCount)}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          {collab.cancelReasons.map((reason) => (
+            <span
+              key={reason}
+              className={
+                tone === 'later' && LATER_CONTACT_REASONS.includes(reason)
+                  ? 'rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700'
+                  : 'rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700'
+              }
+            >
+              {reason}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {collab.cancelReasonDetail && (
+        <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">
+          {collab.cancelReasonDetail}
+        </p>
+      )}
+
+      <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
+        <CancelDateInput collab={collab} />
+        <span>· {collab.stage} 단계에서</span>
+      </div>
+
+      {influencer && (
+        <div className="mt-3">
+          <Button size="sm" variant="secondary" className="w-full" onClick={onBlock}>
+            연락 금지 등록
+          </Button>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export default function RejectedListPage() {
   const { data: collabs, isLoading } = useCollabs()
   const { data: influencers = [] } = useInfluencers()
@@ -83,15 +151,26 @@ export default function RejectedListPage() {
 
   const monthKey = monthKeyOf(month)
 
-  // 연락 금지로 등록한 분은 아래 영역에서 관리하므로 위 목록에서는 뺀다.
+  // 연락 금지로 등록한 분은 맨 아래 영역에서 관리하므로 위 목록에서는 뺀다.
   // 금지를 풀면 자동으로 다시 올라온다.
-  const rejected = (collabs ?? [])
+  const byDateDesc = (a: Collab, b: Collab) =>
+    (b.cancelledAt ?? '').localeCompare(a.cancelledAt ?? '')
+
+  const allRejected = (collabs ?? [])
     .filter((collab) => collab.isCancelled)
     .filter((collab) => !influencers.find((i) => i.id === collab.influencerId)?.doNotContact)
+
+  // 시기만 안 맞았던 분들 — 달을 가리지 않고 전부 모아둬야 다시 제안할 때 꺼내 쓴다.
+  const laterContact = allRejected
+    .filter((collab) => collab.cancelReasons.some((r) => LATER_CONTACT_REASONS.includes(r)))
+    .sort(byDateDesc)
+
+  const rejected = allRejected
+    .filter((collab) => !collab.cancelReasons.some((r) => LATER_CONTACT_REASONS.includes(r)))
     .filter(
       (collab) => !monthKey || (collab.cancelledAt ?? collab.createdAt).slice(0, 7) === monthKey,
     )
-    .sort((a, b) => (b.cancelledAt ?? '').localeCompare(a.cancelledAt ?? ''))
+    .sort(byDateDesc)
 
   const filteredBlocked = useMemo(() => {
     const query = normalize(keyword)
@@ -123,9 +202,11 @@ export default function RejectedListPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">거절 명단</h1>
         <p className="mt-1 text-sm text-slate-500">
-          거절 의사를 밝혀 협업이 무산된 분들입니다. 연락 금지로 등록한{' '}
-          <span className="font-medium text-rose-600">{formatNumber(blocked.length)}명</span>은 아래
-          영역에서 관리합니다.
+          거절 의사를 밝혀 협업이 무산된 분들입니다.{' '}
+          <span className="font-medium text-amber-600">{formatNumber(laterContact.length)}명</span>은
+          시기만 안 맞았던 분이라 아래 '추후 연락'에, 연락 금지로 등록한{' '}
+          <span className="font-medium text-rose-600">{formatNumber(blocked.length)}명</span>은 맨
+          아래 영역에서 관리합니다.
         </p>
       </div>
 
@@ -149,65 +230,53 @@ export default function RejectedListPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {rejected.map((collab) => {
-            const influencer = influencers.find((i) => i.id === collab.influencerId)
-            return (
-              <Card key={collab.id} className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <Link
-                      to={`/influencers/${collab.influencerId}`}
-                      className="block truncate text-sm font-medium text-slate-900 hover:text-violet-600"
-                    >
-                      {influencer?.name ?? '삭제된 크리에이터'}
-                    </Link>
-                    {influencer && (
-                      <p className="truncate text-xs text-slate-400">
-                        <ProfileHandle influencer={influencer} /> · 팔로워{' '}
-                        {formatNumber(influencer.followerCount)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    {collab.cancelReasons.map((reason) => (
-                      <span
-                        key={reason}
-                        className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700"
-                      >
-                        {reason}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+          {rejected.map((collab) => (
+            <RejectedCard
+              key={collab.id}
+              collab={collab}
+              influencer={influencers.find((i) => i.id === collab.influencerId)}
+              tone="rejected"
+              onBlock={() => {
+                const influencer = influencers.find((i) => i.id === collab.influencerId)
+                if (influencer) setDncTarget({ influencer, reasons: collab.cancelReasons })
+              }}
+            />
+          ))}
+        </div>
+      )}
 
-                {collab.cancelReasonDetail && (
-                  <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">
-                    {collab.cancelReasonDetail}
-                  </p>
-                )}
+      {/* ── 추후 연락 ─────────────────────────────── */}
+      <div className="border-t border-slate-200 pt-6">
+        <h2 className="text-lg font-bold text-slate-900">
+          추후 연락 <span className="text-amber-600">{formatNumber(laterContact.length)}명</span>
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          {LATER_CONTACT_REASONS.join(' · ')}로 거절하신 분들입니다. 거절이라기보다 시기 문제였던
+          분들이라, 다음 마켓을 준비할 때 다시 제안해볼 수 있습니다. 달과 상관없이 전부 보여줍니다.
+        </p>
+      </div>
 
-                <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
-                  <CancelDateInput collab={collab} />
-                  <span>· {collab.stage} 단계에서</span>
-                </div>
-
-                {influencer && (
-                  <div className="mt-3">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() =>
-                        setDncTarget({ influencer, reasons: collab.cancelReasons })
-                      }
-                    >
-                      연락 금지 등록
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            )
-          })}
+      {laterContact.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="추후 연락할 분이 없습니다"
+            description={`거절 사유에 '${LATER_CONTACT_REASONS.join("' · '")}'를 넣으면 이곳에 모입니다.`}
+          />
+        </Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {laterContact.map((collab) => (
+            <RejectedCard
+              key={collab.id}
+              collab={collab}
+              influencer={influencers.find((i) => i.id === collab.influencerId)}
+              tone="later"
+              onBlock={() => {
+                const influencer = influencers.find((i) => i.id === collab.influencerId)
+                if (influencer) setDncTarget({ influencer, reasons: collab.cancelReasons })
+              }}
+            />
+          ))}
         </div>
       )}
 

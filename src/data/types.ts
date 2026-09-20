@@ -51,6 +51,12 @@ export const DEFAULT_REASON_TAGS = [
   '기타',
 ] as const
 
+/**
+ * 이 사유로 거절한 분은 시기가 맞으면 다시 제안해볼 수 있다.
+ * 거절 명단에서 '추후 연락'으로 따로 모아, 연락 금지와 헷갈리지 않게 한다.
+ */
+export const LATER_CONTACT_REASONS: readonly string[] = ['일정 불가']
+
 /** 팀원이 직접 만들고 지우는 거절·연락 금지 사유 태그 */
 export interface ReasonTag {
   id: string
