@@ -25,6 +25,8 @@ interface Candidate {
   handle: string
   followerCount: number | null
   bio: string
+  /** 공구를 한다고 본 근거 — 소개글 링크 안의 일정표, 게시물 캡션 등 */
+  evidence: string
 }
 
 /**
@@ -36,6 +38,10 @@ function parseCandidates(text: string): Candidate[] {
   const list: Candidate[] = []
 
   for (const rawLine of text.split('\n')) {
+    // 네 칸 이상이면 마지막 칸을 근거로 본다: @아이디 | 팔로워 | 소개글 | 근거
+    const cells = rawLine.split('|').map((cell) => cell.trim())
+    const evidence = cells.length >= 4 ? cells.slice(3).filter(Boolean).join(' · ') : ''
+
     const line = rawLine.replace(/[|\t]/g, ' ').trim()
     if (!line || /^[-\s|]+$/.test(line)) continue
 
@@ -62,12 +68,12 @@ function parseCandidates(text: string): Candidate[] {
       followerText = best?.text ?? null
     }
 
-    const bio = (followerText ? rest.replace(followerText, ' ') : rest)
-      .replace(/\s{2,}/g, ' ')
-      .trim()
+    let bio = followerText ? rest.replace(followerText, ' ') : rest
+    if (evidence) bio = bio.replace(evidence, ' ')
+    bio = bio.replace(/\s{2,}/g, ' ').trim()
 
     seen.add(key)
-    list.push({ handle, followerCount, bio })
+    list.push({ handle, followerCount, bio, evidence })
   }
   return list
 }
@@ -128,22 +134,36 @@ export default function DiscoveryPage() {
         `1. ${window.location.origin}${import.meta.env.BASE_URL}discovery 를 연다.`,
         '   로그인 화면이 뜨면 나에게 알려주고 멈춰줘.',
         '',
-        `2. 인스타그램에서 다음 키워드로 검색한다: ${keywords.join(', ')}`,
-        `   검색 결과 게시물의 작성자 프로필에 들어가, 아래 조건을 모두 만족하는 계정을 ${count}명 모은다.`,
-        `   - 팔로워 ${formatNumber(minimum)}명 이상`,
-        `   - 프로필 소개글에 ${PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')} 중 하나가 있거나, 날짜(9/15 · 10월 5일 같은)가 적혀 있을 것`,
+        `2. 인스타그램에서 다음 키워드를 찾는다: ${keywords.join(', ')}`,
+        '   해시태그 검색만으로는 놓치는 글이 많으니, 해시태그 · 계정 이름 · 게시물 본문 검색을',
+        '   함께 쓴다. 브랜드를 해시태그 없이 멘션만 한 글도 대상이다.',
         '',
-        '   프로필을 여는 속도는 사람이 보는 정도로 유지하고,',
+        `3. 찾은 게시물의 작성자 프로필에 들어가, 아래 두 가지를 모두 만족하는 계정을 ${count}명 모은다.`,
+        `   (가) 팔로워 ${formatNumber(minimum)}명 이상`,
+        '   (나) 본인 계정에서 공동구매를 한다는 신호가 아래 셋 중 한 곳에만 있어도 된다',
+        `       - 프로필 소개글에 ${PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')} 또는 날짜(9/15 · 10월 5일 같은)`,
+        '       - 소개글에 걸린 링크(인포크·리틀리·링크트리 등)를 열어보면 공구 일정이 있음',
+        '       - 그 사람 게시물 캡션에 공구 일정이 적혀 있음 (예: 9/17~9/23 오픈)',
+        '',
+        '   소개글만 보고 판단하지 말고, 소개글에 신호가 없으면 링크를 꼭 열어본다.',
+        '   다른 사람 공구를 소개하는 글은 제외하고, 본인이 여는 공구인지 확인한다.',
+        '   프로필과 링크를 여는 속도는 사람이 보는 정도로 유지하고,',
         '   보안 확인이나 로그인 화면이 뜨면 즉시 멈추고 알려줘.',
         '',
-        '3. 모은 결과를 한 줄에 한 명씩 이 형식으로 정리한다.',
-        '   @아이디 | 팔로워수 | 소개글 한 줄',
+        '4. 모은 결과를 한 줄에 한 명씩 이 형식으로 정리한다. 칸은 | 로 나눈다.',
+        '   @아이디 | 팔로워수 | 소개글 한 줄 | 공구를 한다고 본 근거',
+        '',
+        '   근거는 어디서 봤는지까지 적는다. 예)',
+        '   @sample_kr | 4.2만 | 두 아이 엄마 · 건강식 기록 | 인포크 링크에 10/2 공구 일정',
+        '   @sample2_kr | 1.8만 | 홈카페 | 게시물 캡션에 9/17~9/23 마켓 오픈',
+        '',
         '   이미 연락한 계정인지는 어드민이 걸러내니, 찾은 것은 그대로 다 적는다.',
         '',
-        "4. 어드민 발굴 화면의 '발굴 요청' 카드 안 붙여넣기 칸에 3번 결과를 붙여넣고",
+        "5. 어드민 발굴 화면의 '발굴 요청' 카드 안 붙여넣기 칸에 4번 결과를 붙여넣고",
         "   '결과 저장' 버튼을 누른다.",
         '',
-        "5. 몇 명을 찾았고 그중 '발굴 대상'이 몇 명인지 알려줘.",
+        "6. 몇 명을 찾았고 그중 '발굴 대상'이 몇 명인지 알려줘.",
+        '   조건에 못 미쳐 뺀 사람이 있으면 왜 뺐는지도 한 줄로 알려줘.',
         '   컨택 리스트로 옮기는 건 내가 직접 할 테니 옮기지는 말아줘.',
       ].join('\n'),
     [keywords, count, minimum],
@@ -179,9 +199,10 @@ export default function DiscoveryPage() {
 
     return parseCandidates(raw).map((candidate) => {
       const existing = registered.get(candidate.handle.toLowerCase())
-      const matchesProfile =
-        PROFILE_KEYWORDS.some((word) => candidate.bio.includes(word)) ||
-        DATE_PATTERN.test(candidate.bio)
+      // 소개글·링크 페이지·게시물 캡션 중 어디에 있든 공구를 한다는 신호로 본다.
+      const hasSignal = (text: string) =>
+        PROFILE_KEYWORDS.some((word) => text.includes(word)) || DATE_PATTERN.test(text)
+      const matchesProfile = hasSignal(candidate.bio) || hasSignal(candidate.evidence)
       const enoughFollowers = (candidate.followerCount ?? 0) >= minimum
 
       let verdict: Verdict = '발굴 대상'
@@ -211,7 +232,7 @@ export default function DiscoveryPage() {
     setProgress({ done: 0, total: selected.length })
     const tag = searchedWith.length > 0 ? `발굴 키워드: ${searchedWith.join(', ')}` : ''
     for (const [index, row] of selected.entries()) {
-      const { handle, followerCount, bio } = row.candidate
+      const { handle, followerCount, bio, evidence } = row.candidate
       await createInfluencer.mutateAsync({
         name: handle,
         snsPlatform: 'instagram',
@@ -225,7 +246,7 @@ export default function DiscoveryPage() {
         contactPhone: '',
         contactEtc: '',
         status: '제안중',
-        memo: [bio, tag].filter(Boolean).join('\n'),
+        memo: [bio, evidence && `공구 근거: ${evidence}`, tag].filter(Boolean).join('\n'),
       })
       setProgress({ done: index + 1, total: selected.length })
     }
@@ -463,6 +484,7 @@ export default function DiscoveryPage() {
                     <th className="px-5 py-2.5 text-left font-medium">선택</th>
                     <th className="px-3 py-2.5 text-left font-medium">이름 / 계정</th>
                     <th className="px-3 py-2.5 text-right font-medium">팔로워수</th>
+                    <th className="px-3 py-2.5 text-left font-medium">공구 근거</th>
                     <th className="px-3 py-2.5 text-left font-medium">상태</th>
                     <th className="px-3 py-2.5 text-left font-medium">검색일</th>
                     <th className="px-5 py-2.5 text-left font-medium">검색어</th>
@@ -515,6 +537,9 @@ export default function DiscoveryPage() {
                           ? '-'
                           : formatFollowers(candidate.followerCount)}
                       </td>
+                      <td className="max-w-xs px-3 py-3 text-xs text-slate-600">
+                        {candidate.evidence || <span className="text-slate-300">-</span>}
+                      </td>
                       <td className="px-3 py-3">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${verdictTone[verdict]}`}
@@ -551,10 +576,11 @@ export default function DiscoveryPage() {
       )}
 
       <p className="rounded-lg bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-500">
-        <b>기본 조건</b> — 프로필 소개글에{' '}
-        {PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')} 중 하나가 있거나, 날짜(9/15 ·
-        10월 5일 등)가 적혀 있어야 발굴 대상으로 봅니다. 여기에 위에서 정한 최소 팔로워수를 함께
-        확인합니다. 이미 컨택 리스트에 있거나 거절·연락 금지한 분은 자동으로 걸러집니다.
+        <b>기본 조건</b> — 본인 계정에서 공동구매를 한다는 신호가{' '}
+        <b>소개글 · 소개글에 걸린 링크(인포크·리틀리 등) · 게시물 캡션</b> 중 한 곳에만 있어도
+        발굴 대상으로 봅니다. 신호는 {PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')}{' '}
+        또는 날짜(9/15 · 10월 5일 등)입니다. 여기에 위에서 정한 최소 팔로워수를 함께 확인합니다.
+        이미 컨택 리스트에 있거나 거절·연락 금지한 분은 자동으로 걸러집니다.
       </p>
     </div>
   )
