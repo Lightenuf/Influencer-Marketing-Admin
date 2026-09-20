@@ -168,7 +168,7 @@ export default function DiscoveryPage() {
         <h1 className="text-xl font-bold text-slate-900">인플루언서 발굴</h1>
         <p className="mt-1 text-sm text-slate-500">
           검색해서 모은 후보를 붙여넣으면 조건에 맞는지 가려내고, 이미 접촉했거나 거절한 분은
-          걸러냅니다. 고른 사람만 인플루언서 목록에 한 번에 등록합니다.
+          걸러냅니다. 고른 사람만 컨택 리스트로 한 번에 옮깁니다.
         </p>
       </div>
 

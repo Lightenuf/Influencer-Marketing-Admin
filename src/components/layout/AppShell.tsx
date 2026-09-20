@@ -8,7 +8,7 @@ import { useInfluencers } from '@/hooks/queries'
 const navItems = [
   { to: '/dashboard', label: '대시보드', icon: '📊' },
   { to: '/discovery', label: '인플루언서 발굴', icon: '🔍' },
-  { to: '/influencers', label: '인플루언서', icon: '👥' },
+  { to: '/influencers', label: '컨택 리스트', icon: '👥' },
   { to: '/pipeline', label: '협업 파이프라인', icon: '🗂️' },
   { to: '/performance', label: '마켓 성과', icon: '💰' },
   { to: '/rejected', label: '거절 명단', icon: '🚫' },

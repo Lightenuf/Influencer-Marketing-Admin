@@ -114,7 +114,7 @@ export default function InfluencerListPage() {
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">인플루언서</h1>
+          <h1 className="text-xl font-bold text-slate-900">컨택 리스트</h1>
           <p className="mt-1 text-sm text-slate-500">
             전체 {formatNumber(total)}명 · 연락 가능 {formatNumber(total - blocked)}명 · 연락 금지{' '}
             <span className="font-medium text-rose-600">{formatNumber(blocked)}명</span>

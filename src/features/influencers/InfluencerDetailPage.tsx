@@ -56,7 +56,7 @@ export default function InfluencerDetailPage() {
   return (
     <div className="space-y-4">
       <Link to="/influencers" className="text-sm text-slate-500 hover:text-slate-700">
-        ← 인플루언서 목록
+        ← 컨택 리스트
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
