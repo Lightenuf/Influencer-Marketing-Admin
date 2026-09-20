@@ -5,6 +5,7 @@ import SignupPage from '@/auth/SignupPage'
 import AppShell from '@/components/layout/AppShell'
 import CalendarPage from '@/features/calendar/CalendarPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
+import DiscoveryPage from '@/features/discovery/DiscoveryPage'
 import RejectedListPage from '@/features/rejected/RejectedListPage'
 import InfluencerDetailPage from '@/features/influencers/InfluencerDetailPage'
 import InfluencerFormPage from '@/features/influencers/InfluencerFormPage'
@@ -21,6 +22,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/discovery" element={<DiscoveryPage />} />
           <Route path="/influencers" element={<InfluencerListPage />} />
           <Route path="/influencers/new" element={<InfluencerFormPage />} />
           <Route path="/influencers/:id" element={<InfluencerDetailPage />} />

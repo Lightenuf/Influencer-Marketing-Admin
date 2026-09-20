@@ -80,7 +80,7 @@ export function profileUrl(platform: SnsPlatform, handle: string, url: string): 
 }
 
 /** '44.6만' · '446K' · '3,385' → 숫자 */
-function toCount(raw: string): number | null {
+export function toCount(raw: string): number | null {
   const s = raw.replace(/,/g, '').trim()
   const m = s.match(/^([\d.]+)\s*(만|천|억|[KkMmBb])?$/)
   if (!m) return null
