@@ -119,37 +119,52 @@ export default function DiscoveryPage() {
     setKeywordDraft('')
   }
 
-  /** 크롬 자동화에 그대로 넘길 수 있는 지시문 */
+  /** 크롬이 연결된 Claude 창에 그대로 붙여넣는 지시문. 결과를 어드민에 쓰는 것까지 시킨다. */
   const instruction = useMemo(
     () =>
       [
-        `인스타그램에서 다음 키워드로 검색해줘: ${keywords.join(', ')}`,
-        `각 키워드의 게시물 작성자 프로필에 들어가서, 아래 조건에 맞는 계정을 ${count}명 찾아줘.`,
+        '브리보 인플루언서 어드민의 발굴 대기열을 처리해줘.',
         '',
-        '조건',
-        `- 팔로워 ${formatNumber(minimum)}명 이상`,
-        `- 프로필 소개글에 ${PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')} 중 하나가 있거나, 날짜(9/15 · 10월 5일 같은)가 적혀 있을 것`,
+        `1. ${window.location.origin}${import.meta.env.BASE_URL}discovery 를 연다.`,
+        '   로그인 화면이 뜨면 나에게 알려주고 멈춰줘.',
         '',
-        '결과는 한 줄에 한 명씩 이렇게 적어줘:',
-        '@아이디 | 팔로워수 | 소개글 한 줄',
+        `2. 인스타그램에서 다음 키워드로 검색한다: ${keywords.join(', ')}`,
+        `   검색 결과 게시물의 작성자 프로필에 들어가, 아래 조건을 모두 만족하는 계정을 ${count}명 모은다.`,
+        `   - 팔로워 ${formatNumber(minimum)}명 이상`,
+        `   - 프로필 소개글에 ${PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')} 중 하나가 있거나, 날짜(9/15 · 10월 5일 같은)가 적혀 있을 것`,
         '',
-        '이미 연락한 계정인지는 내가 확인하니 그대로 다 적어줘.',
+        '   프로필을 여는 속도는 사람이 보는 정도로 유지하고,',
+        '   보안 확인이나 로그인 화면이 뜨면 즉시 멈추고 알려줘.',
+        '',
+        '3. 모은 결과를 한 줄에 한 명씩 이 형식으로 정리한다.',
+        '   @아이디 | 팔로워수 | 소개글 한 줄',
+        '   이미 연락한 계정인지는 어드민이 걸러내니, 찾은 것은 그대로 다 적는다.',
+        '',
+        "4. 어드민 발굴 화면의 '발굴 요청' 카드 안 붙여넣기 칸에 3번 결과를 붙여넣고",
+        "   '결과 저장' 버튼을 누른다.",
+        '',
+        "5. 몇 명을 찾았고 그중 '발굴 대상'이 몇 명인지 알려줘.",
+        '   컨택 리스트로 옮기는 건 내가 직접 할 테니 옮기지는 말아줘.',
       ].join('\n'),
     [keywords, count, minimum],
   )
 
-  const startSearch = async () => {
-    await createRequest.mutateAsync({ keywords, minFollowers: minimum, wanted: count })
-    setPicked(new Set())
-    setManualResult('')
-    // 자동화가 못 도는 상황에 대비해 지시문도 복사해 둔다.
+  const copyInstruction = async () => {
     try {
       await navigator.clipboard.writeText(instruction)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {
+      // 브라우저가 복사를 막으면 아래 지시문을 직접 긁어 쓰면 된다.
       setCopied(false)
     }
+  }
+
+  const startSearch = async () => {
+    await createRequest.mutateAsync({ keywords, minFollowers: minimum, wanted: count })
+    setPicked(new Set())
+    setManualResult('')
+    await copyInstruction()
   }
 
   const rejectedIds = useMemo(
@@ -299,7 +314,7 @@ export default function DiscoveryPage() {
             {/* 라벨 높이(1.625rem)만큼 내려 입력칸과 같은 줄에 선다 */}
             <div className="md:mt-[1.625rem]">
               <Button onClick={startSearch} disabled={keywords.length < 2 || count === 0}>
-                {copied ? '✓ 복사했습니다' : '인플루언서 발굴'}
+                인플루언서 발굴
               </Button>
             </div>
           </div>
@@ -310,12 +325,18 @@ export default function DiscoveryPage() {
 
           {current && current.status === '대기' && (
             <div className="rounded-lg bg-violet-50 p-4">
-              <p className="text-xs leading-relaxed text-violet-800">
-                <b>발굴 요청을 남겼습니다.</b> 크롬 자동화가 이 요청을 집어가 검색과 프로필 확인을
-                하고 결과를 여기에 채웁니다. 이 화면은 열어두기만 하면 15초마다 자동으로
-                확인합니다.
-                {copied && ' (지시문도 클립보드에 복사해 뒀습니다)'}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs leading-relaxed text-violet-800">
+                  <b>발굴 요청을 남겼습니다. 아직 검색은 시작되지 않았습니다.</b>
+                  <br />
+                  아래 지시문을 <b>크롬이 연결된 Claude 창에 붙여넣어야</b> 검색이 시작됩니다.
+                  {copied && ' (버튼을 누를 때 이미 복사해 뒀습니다)'} 자동화가 결과를 저장하면 이
+                  화면은 15초마다 스스로 확인해 표를 띄웁니다.
+                </p>
+                <Button size="sm" variant="secondary" onClick={copyInstruction}>
+                  {copied ? '✓ 복사함' : '지시문 복사'}
+                </Button>
+              </div>
               <pre className="mt-2 max-h-40 overflow-auto rounded-md bg-white p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-slate-700">
                 {instruction}
               </pre>
