@@ -37,18 +37,24 @@ const STAGE_COLORS: Record<string, string> = {
 
 function StatCard({
   label,
+  basis,
   value,
   sub,
   tone = 'default',
 }: {
   label: string
+  /** 무엇으로 나눈 값인지 — 카드마다 분모가 달라 헷갈리지 않게 함께 적는다. */
+  basis?: string
   value: string
   sub?: string
   tone?: 'default' | 'danger' | 'success'
 }) {
   return (
     <Card className="p-5">
-      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-sm text-slate-500">
+        {label}
+        {basis && <span className="ml-1 text-xs text-slate-400">({basis} 대비)</span>}
+      </p>
       <p
         className={
           tone === 'danger'
@@ -96,39 +102,44 @@ export default function DashboardPage() {
     const cohortCollabs = collabs.filter((collab) => cohortIds.has(collab.influencerId))
 
     // 단계는 앞뒤 순서가 있으므로, '그 단계까지 갔던 적이 있는가'로 센다.
+    // (거절된 건도 어디까지 갔었는지는 단계에 남아 있다)
     const reached = (collab: Collab, stage: CollabStage) =>
       COLLAB_STAGES.indexOf(collab.stage) >= COLLAB_STAGES.indexOf(stage)
 
-    const replied = new Set(cohortCollabs.map((collab) => collab.influencerId)).size
-    const seeded = new Set(
-      cohortCollabs.filter((collab) => collab.sampleShipDate).map((collab) => collab.influencerId),
-    ).size
-    const confirmed = new Set(
-      cohortCollabs.filter((collab) => collab.marketDate).map((collab) => collab.influencerId),
-    ).size
+    // 한 사람이 협업 카드를 여러 장 가질 수 있으므로 사람 단위로 센다.
+    const peopleWhere = (predicate: (collab: Collab) => boolean) =>
+      new Set(cohortCollabs.filter(predicate).map((collab) => collab.influencerId))
 
-    // 테스트 통과율만은 전체가 아니라 '테스트에 들어간 사람' 대비로 본다.
-    const tested = new Set(
-      cohortCollabs.filter((collab) => reached(collab, '테스트중')).map((c) => c.influencerId),
-    ).size
-    const passed = new Set(
-      cohortCollabs.filter((collab) => reached(collab, '테스트 통과')).map((c) => c.influencerId),
-    ).size
+    const contacted = cohort.length
+    const replied = peopleWhere(() => true)
+    const seeded = peopleWhere((collab) => collab.sampleShipDate !== null)
+    const tested = peopleWhere((collab) => reached(collab, '테스트중'))
+    const passed = peopleWhere((collab) => reached(collab, '테스트 통과'))
+    const meeting = peopleWhere((collab) => reached(collab, '미팅 확정'))
+    const market = peopleWhere((collab) => reached(collab, '마켓 대기중'))
 
-    const rate = (value: number) => (cohort.length ? Math.round((value / cohort.length) * 100) : 0)
+    // 씨딩 기록 없이 테스트 단계에 있는 사람 — 배송일 입력이 빠진 것일 수 있다.
+    const testedWithoutSeed = [...tested].filter((id) => !seeded.has(id)).length
+
+    const rate = (value: number, base: number) => (base ? Math.round((value / base) * 100) : 0)
 
     return {
       from,
-      total: cohort.length,
-      replied,
-      seeded,
-      confirmed,
-      tested,
-      passed,
-      replyRate: rate(replied),
-      seedRate: rate(seeded),
-      confirmRate: rate(confirmed),
-      passRate: tested ? Math.round((passed / tested) * 100) : 0,
+      contacted,
+      replied: replied.size,
+      seeded: seeded.size,
+      tested: tested.size,
+      passed: passed.size,
+      meeting: meeting.size,
+      market: market.size,
+      testedWithoutSeed,
+      replyRate: rate(replied.size, contacted),
+      seedRate: rate(seeded.size, replied.size),
+      testEntryRate: rate(tested.size, seeded.size),
+      passRate: rate(passed.size, tested.size),
+      meetingRate: rate(meeting.size, passed.size),
+      confirmRate: rate(market.size, meeting.size),
+      finalRate: rate(market.size, contacted),
     }
   }, [influencers, collabs, period])
 
@@ -253,34 +264,73 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="전체 인플루언서"
-          value={`${formatNumber(stats.total)}명`}
-          sub="기간 내 등록"
+          label="전체 컨택"
+          value={`${formatNumber(stats.contacted)}명`}
+          sub="기간 내 등록한 인플루언서"
         />
         <StatCard
           label="회신율"
+          basis="전체 컨택"
           value={`${stats.replyRate}%`}
-          sub={`회신 ${formatNumber(stats.replied)}명`}
+          sub={`회신 ${formatNumber(stats.replied)}명 / ${formatNumber(stats.contacted)}명`}
         />
         <StatCard
-          label="씨딩율"
+          label="씨딩전환율"
+          basis="회신"
           value={`${stats.seedRate}%`}
-          sub={`씨딩 ${formatNumber(stats.seeded)}명`}
+          sub={`씨딩 ${formatNumber(stats.seeded)}명 / ${formatNumber(stats.replied)}명`}
         />
         <StatCard
-          label="테스트 통과율"
+          label="테스트진입율"
+          basis="씨딩"
+          value={`${stats.testEntryRate}%`}
+          sub={`테스트 ${formatNumber(stats.tested)}명 / ${formatNumber(stats.seeded)}명`}
+        />
+        <StatCard
+          label="테스트통과율"
+          basis="테스트 진행"
           value={`${stats.passRate}%`}
-          sub={`테스트 ${formatNumber(stats.tested)}명 중 ${formatNumber(stats.passed)}명 통과`}
+          sub={`통과 ${formatNumber(stats.passed)}명 / ${formatNumber(stats.tested)}명`}
+        />
+        <StatCard
+          label="미팅전환율"
+          basis="테스트 통과"
+          value={`${stats.meetingRate}%`}
+          sub={`미팅 확정 ${formatNumber(stats.meeting)}명 / ${formatNumber(stats.passed)}명`}
         />
         <StatCard
           label="확정율"
+          basis="미팅 확정"
           value={`${stats.confirmRate}%`}
-          sub={`마켓 일정 확정 ${formatNumber(stats.confirmed)}명`}
+          sub={`마켓 확정 ${formatNumber(stats.market)}명 / ${formatNumber(stats.meeting)}명`}
+        />
+        <StatCard
+          label="최종전환율"
+          basis="전체 컨택"
+          value={`${stats.finalRate}%`}
+          sub={`마켓 확정 ${formatNumber(stats.market)}명 / ${formatNumber(stats.contacted)}명`}
           tone="success"
         />
       </div>
+
+      {stats.testedWithoutSeed > 0 && (
+        <Card className="border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">
+            <b>씨딩 기록 없이 테스트 단계로 간 {formatNumber(stats.testedWithoutSeed)}명</b>이
+            있습니다. 그래서 테스트진입율이 100%를 넘을 수 있습니다.
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-700">
+            회신완료 카드에 <b>배송 날짜</b>를 넣으면 자동으로 테스트중으로 넘어가지만, 카드의
+            화살표로 옮기면 날짜가 비어 있어도 넘어갑니다. 샘플은 보냈는데 날짜만 빠진 것이라면
+            파이프라인에서 채워주세요.{' '}
+            <Link to="/pipeline" className="font-medium underline">
+              협업 파이프라인 열기
+            </Link>
+          </p>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
