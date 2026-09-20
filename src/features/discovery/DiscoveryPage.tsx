@@ -341,7 +341,7 @@ export default function DiscoveryPage() {
             {/* 라벨 높이(1.625rem)만큼 내려 입력칸과 같은 줄에 선다 */}
             <div className="md:mt-[1.625rem]">
               <Button onClick={startSearch} disabled={keywords.length === 0 || count === 0}>
-                인플루언서 발굴
+                발굴 요청서 작성
               </Button>
             </div>
           </div>
