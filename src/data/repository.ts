@@ -21,6 +21,7 @@ export type InfluencerInput = Omit<
   | 'dncReason'
   | 'dncSetBy'
   | 'dncSetAt'
+  | 'contactedDates'
 >
 
 export type CollabInput = Omit<
@@ -68,6 +69,11 @@ export interface DataRepository {
   createInfluencer(input: InfluencerInput, actorId: string): Promise<Influencer>
   updateInfluencer(id: string, patch: Partial<InfluencerInput>): Promise<Influencer>
   deleteInfluencer(id: string): Promise<void>
+
+  /** 메시지를 보낸 날을 한 건 기록한다 */
+  logContact(id: string, date: string): Promise<Influencer>
+  /** 마지막 발송 기록 한 건을 지운다 — 잘못 눌렀을 때 되돌리기 */
+  undoContact(id: string): Promise<Influencer>
 
   /** 연락 금지 설정/해제. 항상 감사 로그를 함께 남긴다. */
   changeDnc(change: DncChange, actorId: string): Promise<Influencer>

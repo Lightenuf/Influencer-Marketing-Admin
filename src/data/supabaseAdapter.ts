@@ -44,6 +44,7 @@ const toInfluencer = (row: Row): Influencer => ({
   contactEtc: row.contact_etc,
   status: row.status,
   memo: row.memo,
+  contactedDates: row.contacted_dates ?? [],
   doNotContact: row.do_not_contact,
   dncReason: row.dnc_reason,
   dncSetBy: row.dnc_set_by,
@@ -244,6 +245,34 @@ export const supabaseAdapter: DataRepository = {
       await db.from('influencers').update(influencerColumns(patch)).eq('id', id).select().single(),
     )
     return toInfluencer(row)
+  },
+
+  async logContact(id, date) {
+    const db = requireSupabase()
+    const current = await this.getInfluencer(id)
+    if (!current) throw new Error('인플루언서를 찾을 수 없습니다.')
+    const { data, error } = await db
+      .from('influencers')
+      .update({ contacted_dates: [...current.contactedDates, date].sort() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return toInfluencer(data as Row)
+  },
+
+  async undoContact(id) {
+    const db = requireSupabase()
+    const current = await this.getInfluencer(id)
+    if (!current) throw new Error('인플루언서를 찾을 수 없습니다.')
+    const { data, error } = await db
+      .from('influencers')
+      .update({ contacted_dates: current.contactedDates.slice(0, -1) })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return toInfluencer(data as Row)
   },
 
   async deleteInfluencer(id) {

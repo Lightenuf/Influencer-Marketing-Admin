@@ -11,7 +11,14 @@ import {
   type Influencer,
 } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
-import { useCollabs, useCreateCollab, useDemoData, useInfluencers } from '@/hooks/queries'
+import {
+  useCollabs,
+  useCreateCollab,
+  useDemoData,
+  useInfluencers,
+  useLogContact,
+  useUndoContact,
+} from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
 import { formatDate, formatNumber } from '@/utils/format'
 import { profileUrl } from '@/utils/profileLink'
@@ -26,6 +33,53 @@ const hasProfile = (influencer: Influencer) =>
   influencer.followerCount > 0 ||
   influencer.contactEmail.trim() !== '' ||
   influencer.categories.length > 0
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+/** 메시지를 보낸 날과 횟수. 버튼 한 번이 한 건이고, 잘못 눌렀으면 바로 되돌린다. */
+function ContactLog({ influencer }: { influencer: Influencer }) {
+  const log = useLogContact()
+  const undo = useUndoContact()
+  const dates = influencer.contactedDates
+  const last = dates[dates.length - 1]
+
+  return (
+    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+      {last ? (
+        <span className="text-xs text-slate-500">
+          {formatDate(last)}
+          <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-600">
+            {dates.length}회
+          </span>
+          <button
+            type="button"
+            title="마지막 발송 기록 지우기"
+            onClick={() => undo.mutate(influencer.id)}
+            disabled={undo.isPending}
+            className="ml-1 text-slate-300 hover:text-rose-500"
+          >
+            ×
+          </button>
+        </span>
+      ) : (
+        <span className="text-xs text-slate-300">기록 없음</span>
+      )}
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={log.isPending || influencer.doNotContact}
+        title={
+          influencer.doNotContact
+            ? '연락 금지 대상입니다.'
+            : '오늘 메시지를 보낸 것으로 기록합니다'
+        }
+        onClick={() => log.mutate({ id: influencer.id, date: today() })}
+      >
+        발송
+      </Button>
+    </div>
+  )
+}
 
 export default function InfluencerListPage() {
   const { data: influencers, isLoading } = useInfluencers()
@@ -97,6 +151,10 @@ export default function InfluencerListPage() {
         이메일: i.contactEmail,
         연락처: i.contactPhone,
         등록일: formatDate(i.createdAt),
+        최근발송일: i.contactedDates.length
+          ? formatDate(i.contactedDates[i.contactedDates.length - 1])
+          : '',
+        발송횟수: i.contactedDates.length,
       })),
     )
   }
@@ -207,6 +265,7 @@ export default function InfluencerListPage() {
                   <th className="px-5 py-2.5 text-left font-medium">이름 / 계정</th>
                   <th className="px-3 py-2.5 text-left font-medium">상태</th>
                   <th className="px-3 py-2.5 text-left font-medium">등록일</th>
+                  <th className="px-3 py-2.5 text-right font-medium">메시지 발송</th>
                   <th className="px-3 py-2.5 text-right font-medium">회신 받음</th>
                   <th className="px-3 py-2.5 text-right font-medium">정보 입력</th>
                   <th className="px-5 py-2.5 text-right font-medium">연락 금지</th>
@@ -257,6 +316,9 @@ export default function InfluencerListPage() {
                       <StatusBadge status={influencer.status} />
                     </td>
                     <td className="px-3 py-3 text-slate-500">{formatDate(influencer.createdAt)}</td>
+                    <td className="px-3 py-3">
+                      <ContactLog influencer={influencer} />
+                    </td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
                       {(() => {
                         const collab = collabByInfluencer.get(influencer.id)

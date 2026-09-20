@@ -104,6 +104,10 @@ export function buildDemoDatabase(): Database {
     contactEtc: '',
     status: seed.status,
     memo: seed.memo ?? '',
+    // 예시 화면에서도 발송 기록이 보이도록 사람마다 다르게 채워둔다.
+    contactedDates: Array.from({ length: (index % 3) + 1 }, (_, n) =>
+      daysAgo(30 - index * 2 - n * 7).slice(0, 10),
+    ),
     doNotContact: false,
     dncReason: null,
     dncSetBy: null,

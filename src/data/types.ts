@@ -115,6 +115,11 @@ export interface Influencer {
   contactEtc: string
   status: InfluencerStatus
   memo: string
+  /**
+   * 메시지를 보낸 날들(YYYY-MM-DD). 최근 발송일과 발송 횟수를 여기서 읽는다.
+   * 같은 날 두 번 보냈으면 두 번 쌓인다.
+   */
+  contactedDates: string[]
   /** 조회 성능용 캐시값. 진실의 원천은 dncAuditLog 이다. */
   doNotContact: boolean
   dncReason: string | null

@@ -86,6 +86,7 @@ function migrate(db: Database): Database {
   db.influencers = db.influencers.map((influencer) => ({
     ...influencer,
     followingCount: influencer.followingCount ?? 0,
+    contactedDates: influencer.contactedDates ?? [],
   }))
   return db
 }
@@ -155,6 +156,7 @@ export const mockAdapter: DataRepository = {
     const influencer: Influencer = {
       ...input,
       id: uid(),
+      contactedDates: [],
       doNotContact: false,
       dncReason: null,
       dncSetBy: null,
@@ -172,6 +174,24 @@ export const mockAdapter: DataRepository = {
     const db = read()
     const influencer = requireInfluencer(db, id)
     Object.assign(influencer, patch, { updatedAt: now() })
+    write(db)
+    return tick(influencer)
+  },
+
+  async logContact(id, date) {
+    const db = read()
+    const influencer = requireInfluencer(db, id)
+    influencer.contactedDates = [...influencer.contactedDates, date].sort()
+    influencer.updatedAt = now()
+    write(db)
+    return tick(influencer)
+  },
+
+  async undoContact(id) {
+    const db = read()
+    const influencer = requireInfluencer(db, id)
+    influencer.contactedDates = influencer.contactedDates.slice(0, -1)
+    influencer.updatedAt = now()
     write(db)
     return tick(influencer)
   },

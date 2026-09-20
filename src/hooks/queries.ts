@@ -62,6 +62,31 @@ export function useCreateInfluencer(actorId: string) {
   })
 }
 
+/** 메시지 발송 기록 — 컨택 리스트에서 바로 누른다 */
+export function useLogContact() {
+  const client = useQueryClient()
+  const invalidate = useInvalidateInfluencers()
+  return useMutation({
+    mutationFn: ({ id, date }: { id: string; date: string }) => repository.logContact(id, date),
+    onSuccess: (influencer) => {
+      client.invalidateQueries({ queryKey: keys.influencer(influencer.id) })
+      invalidate()
+    },
+  })
+}
+
+export function useUndoContact() {
+  const client = useQueryClient()
+  const invalidate = useInvalidateInfluencers()
+  return useMutation({
+    mutationFn: (id: string) => repository.undoContact(id),
+    onSuccess: (influencer) => {
+      client.invalidateQueries({ queryKey: keys.influencer(influencer.id) })
+      invalidate()
+    },
+  })
+}
+
 export function useUpdateInfluencer() {
   const client = useQueryClient()
   const invalidate = useInvalidateInfluencers()
