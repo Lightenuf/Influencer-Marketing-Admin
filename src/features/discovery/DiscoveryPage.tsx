@@ -274,7 +274,10 @@ export default function DiscoveryPage() {
       <Card>
         <CardHeader title="검색 조건" />
         <div className="space-y-4 p-5">
-          <Field label="검색 키워드" hint="두 개 이상 넣어주세요. Enter 또는 쉼표로 구분됩니다.">
+          <Field
+            label="검색 키워드"
+            hint="Enter 또는 쉼표로 구분됩니다. 하나만 넣어도 됩니다."
+          >
             <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-300 bg-white p-2 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
               {keywords.map((word) => (
                 <span
@@ -337,14 +340,20 @@ export default function DiscoveryPage() {
             </Field>
             {/* 라벨 높이(1.625rem)만큼 내려 입력칸과 같은 줄에 선다 */}
             <div className="md:mt-[1.625rem]">
-              <Button onClick={startSearch} disabled={keywords.length < 2 || count === 0}>
+              <Button onClick={startSearch} disabled={keywords.length === 0 || count === 0}>
                 인플루언서 발굴
               </Button>
             </div>
           </div>
 
-          {keywords.length < 2 && (
-            <p className="text-xs text-amber-600">검색 키워드를 두 개 이상 넣어주세요.</p>
+          {keywords.length === 0 && (
+            <p className="text-xs text-amber-600">검색 키워드를 하나 이상 넣어주세요.</p>
+          )}
+          {keywords.length === 1 && (
+            <p className="text-xs text-slate-400">
+              비슷한 브랜드를 두세 개 함께 넣으면 후보가 더 모입니다. 키워드는 각각 따로
+              검색합니다.
+            </p>
           )}
 
           {current && current.status === '대기' && (
