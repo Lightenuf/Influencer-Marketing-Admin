@@ -11,6 +11,7 @@ import type {
   Collab,
   CollabStage,
   CommunicationLog,
+  DiscoveryRequest,
   DncAuditEntry,
   Influencer,
   ReasonTag,
@@ -21,6 +22,7 @@ import type {
 const STORAGE_KEY = 'breevo-influencer-admin:v1'
 
 export interface Database {
+  discoveryRequests: DiscoveryRequest[]
   reasonTags: ReasonTag[]
   influencers: Influencer[]
   dncAuditLog: DncAuditEntry[]
@@ -36,6 +38,7 @@ const TEAM_MEMBERS: TeamMember[] = [
 ]
 
 const emptyDb = (): Database => ({
+  discoveryRequests: [],
   reasonTags: [],
   influencers: [],
   dncAuditLog: [],
@@ -325,6 +328,47 @@ export const mockAdapter: DataRepository = {
     const db = read()
     db.collabs = db.collabs.filter((c) => c.id !== id)
     db.shipments = db.shipments.map((s) => (s.collabId === id ? { ...s, collabId: null } : s))
+    write(db)
+    return tick(undefined)
+  },
+
+  async listDiscoveryRequests() {
+    const db = read()
+    return tick(
+      [...db.discoveryRequests].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)),
+    )
+  },
+
+  async createDiscoveryRequest(input, actorId: string) {
+    const db = read()
+    const request: DiscoveryRequest = {
+      ...input,
+      id: uid(),
+      status: '대기',
+      resultRaw: '',
+      note: '',
+      requestedBy: actorId,
+      requestedAt: now(),
+      finishedAt: null,
+    }
+    db.discoveryRequests.push(request)
+    write(db)
+    return tick(request)
+  },
+
+  async updateDiscoveryRequest(id, patch) {
+    const db = read()
+    const request = db.discoveryRequests.find((item) => item.id === id)
+    if (!request) throw new Error('발굴 요청을 찾을 수 없습니다.')
+    Object.assign(request, patch)
+    if (patch.status === '완료' || patch.status === '실패') request.finishedAt = now()
+    write(db)
+    return tick(request)
+  },
+
+  async deleteDiscoveryRequest(id) {
+    const db = read()
+    db.discoveryRequests = db.discoveryRequests.filter((item) => item.id !== id)
     write(db)
     return tick(undefined)
   },

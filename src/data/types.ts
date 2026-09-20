@@ -193,6 +193,27 @@ export interface Shipment {
   updatedAt: string
 }
 
+export const DISCOVERY_STATUSES = ['대기', '진행중', '완료', '실패'] as const
+export type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number]
+
+/**
+ * 발굴 요청 한 건. 어드민이 '대기'로 남겨두면 크롬 자동화가 집어가 처리하고
+ * 결과(resultRaw)를 채워 '완료'로 바꾼다.
+ */
+export interface DiscoveryRequest {
+  id: string
+  keywords: string[]
+  minFollowers: number
+  wanted: number
+  status: DiscoveryStatus
+  /** 자동화가 돌려준 결과 원문 — 한 줄에 한 명 */
+  resultRaw: string
+  note: string
+  requestedBy: string | null
+  requestedAt: string
+  finishedAt: string | null
+}
+
 export interface CommunicationLog {
   id: string
   influencerId: string

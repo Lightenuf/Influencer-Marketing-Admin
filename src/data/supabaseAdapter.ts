@@ -11,6 +11,7 @@ import type {
   Collab,
   CollabStage,
   CommunicationLog,
+  DiscoveryRequest,
   DncAuditEntry,
   Influencer,
   ReasonTag,
@@ -172,6 +173,19 @@ const shipmentColumns = (input: Partial<ShipmentInput>): Row => {
   if (input.deliveredAt !== undefined) row.delivered_at = input.deliveredAt
   return row
 }
+
+const toDiscoveryRequest = (row: Row): DiscoveryRequest => ({
+  id: row.id,
+  keywords: row.keywords ?? [],
+  minFollowers: row.min_followers ?? 0,
+  wanted: row.wanted ?? 0,
+  status: row.status,
+  resultRaw: row.result_raw ?? '',
+  note: row.note ?? '',
+  requestedBy: row.requested_by ?? null,
+  requestedAt: row.requested_at,
+  finishedAt: row.finished_at,
+})
 
 const toNote = (row: Row): CommunicationLog => ({
   id: row.id,
@@ -371,6 +385,54 @@ export const supabaseAdapter: DataRepository = {
   async deleteCollab(id) {
     const db = requireSupabase()
     const { error } = await db.from('collabs').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async listDiscoveryRequests() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db.from('discovery_requests').select('*').order('requested_at', { ascending: false }),
+    )
+    return rows.map(toDiscoveryRequest)
+  },
+
+  async createDiscoveryRequest(input, actorId: string) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('discovery_requests')
+        .insert({
+          keywords: input.keywords,
+          min_followers: input.minFollowers,
+          wanted: input.wanted,
+          requested_by: actorId,
+        })
+        .select()
+        .single(),
+    )
+    return toDiscoveryRequest(row)
+  },
+
+  async updateDiscoveryRequest(id, patch) {
+    const db = requireSupabase()
+    const columns: Row = {}
+    if (patch.status !== undefined) {
+      columns.status = patch.status
+      if (patch.status === '완료' || patch.status === '실패') {
+        columns.finished_at = new Date().toISOString()
+      }
+    }
+    if (patch.resultRaw !== undefined) columns.result_raw = patch.resultRaw
+    if (patch.note !== undefined) columns.note = patch.note
+    const row = unwrap(
+      await db.from('discovery_requests').update(columns).eq('id', id).select().single(),
+    )
+    return toDiscoveryRequest(row)
+  },
+
+  async deleteDiscoveryRequest(id) {
+    const db = requireSupabase()
+    const { error } = await db.from('discovery_requests').delete().eq('id', id)
     if (error) throw new Error(error.message)
   },
 

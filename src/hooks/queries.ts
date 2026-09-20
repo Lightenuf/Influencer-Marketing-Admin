@@ -7,7 +7,7 @@ import type {
   InfluencerInput,
   ShipmentInput,
 } from '@/data/repository'
-import type { CollabStage } from '@/data/types'
+import type { CollabStage, DiscoveryRequest } from '@/data/types'
 
 export const keys = {
   members: ['members'] as const,
@@ -17,6 +17,7 @@ export const keys = {
   collabs: ['collabs'] as const,
   shipments: ['shipments'] as const,
   reasonTags: ['reasonTags'] as const,
+  discoveryRequests: ['discoveryRequests'] as const,
   notes: (id: string) => ['notes', id] as const,
 }
 
@@ -167,6 +168,45 @@ export function useDeleteCollab() {
       client.invalidateQueries({ queryKey: keys.collabs })
       client.invalidateQueries({ queryKey: keys.shipments })
     },
+  })
+}
+
+/** 자동화가 결과를 채워 넣으면 화면이 저절로 갱신되도록 주기적으로 확인한다. */
+export const useDiscoveryRequests = () =>
+  useQuery({
+    queryKey: keys.discoveryRequests,
+    queryFn: () => repository.listDiscoveryRequests(),
+    refetchInterval: 15_000,
+  })
+
+export function useCreateDiscoveryRequest(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { keywords: string[]; minFollowers: number; wanted: number }) =>
+      repository.createDiscoveryRequest(input, actorId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.discoveryRequests }),
+  })
+}
+
+export function useUpdateDiscoveryRequest() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string
+      patch: Partial<Pick<DiscoveryRequest, 'status' | 'resultRaw' | 'note'>>
+    }) => repository.updateDiscoveryRequest(id, patch),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.discoveryRequests }),
+  })
+}
+
+export function useDeleteDiscoveryRequest() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => repository.deleteDiscoveryRequest(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.discoveryRequests }),
   })
 }
 

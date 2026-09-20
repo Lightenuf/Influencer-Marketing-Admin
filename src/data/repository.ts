@@ -3,6 +3,7 @@ import type {
   CollabStage,
   HoldReason,
   CommunicationLog,
+  DiscoveryRequest,
   DncAuditEntry,
   Influencer,
   ReasonTag,
@@ -88,6 +89,18 @@ export interface DataRepository {
   /** 보류를 풀고 원래 단계로 되돌린다. */
   resumeCollab(id: string): Promise<Collab>
   deleteCollab(id: string): Promise<void>
+
+  /** 발굴 요청 — 어드민이 남기고 크롬 자동화가 처리한다 */
+  listDiscoveryRequests(): Promise<DiscoveryRequest[]>
+  createDiscoveryRequest(
+    input: { keywords: string[]; minFollowers: number; wanted: number },
+    actorId: string,
+  ): Promise<DiscoveryRequest>
+  updateDiscoveryRequest(
+    id: string,
+    patch: Partial<Pick<DiscoveryRequest, 'status' | 'resultRaw' | 'note'>>,
+  ): Promise<DiscoveryRequest>
+  deleteDiscoveryRequest(id: string): Promise<void>
 
   /** 거절·연락 금지 사유 태그 — 팀원이 함께 관리한다 */
   listReasonTags(): Promise<ReasonTag[]>

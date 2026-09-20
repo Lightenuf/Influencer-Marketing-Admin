@@ -3,8 +3,16 @@ import { Link } from 'react-router-dom'
 import { useCurrentUser } from '@/auth/AuthProvider'
 import { Button, Card, CardHeader, EmptyState, Field, Input, Spinner, Textarea } from '@/components/ui'
 import type { Influencer } from '@/data/types'
-import { useCollabs, useCreateInfluencer, useInfluencers } from '@/hooks/queries'
-import { formatDate, formatFollowers, formatNumber } from '@/utils/format'
+import {
+  useCollabs,
+  useCreateDiscoveryRequest,
+  useCreateInfluencer,
+  useDeleteDiscoveryRequest,
+  useDiscoveryRequests,
+  useInfluencers,
+  useUpdateDiscoveryRequest,
+} from '@/hooks/queries'
+import { formatDate, formatDateTime, formatFollowers, formatNumber } from '@/utils/format'
 import { toCount } from '@/utils/profileLink'
 
 /** 프로필에 이 말이 있으면 공구를 돌리는 계정으로 본다. 화면 맨 아래에 그대로 안내한다. */
@@ -37,18 +45,24 @@ function parseCandidates(text: string): Candidate[] {
     const key = handle.toLowerCase()
     if (seen.has(key)) continue
 
-    const labelled = line.match(/(?:팔로워|followers?)\s*[:·]?\s*([\d.,]+\s*[만천억KkMm]?)/i)
+    // 아이디를 먼저 떼어낸다 — 아이디에 든 숫자(@abc_2024)를 팔로워수로 잘못 읽지 않도록.
+    const rest = line.replace(handleMatch[0], ' ')
+
+    const labelled = rest.match(/(?:팔로워|followers?)\s*[:·]?\s*([\d.,]+\s*[만천억KkMm]?)/i)
     let followerCount = labelled ? toCount(labelled[1]) : null
+    // 팔로워수로 읽은 글자는 소개글에서 빼둔다. '4.2만'의 '4.2'가 날짜로 보이는 것을 막기 위함.
+    let followerText = labelled ? labelled[0] : null
     if (followerCount === null) {
-      const numbers = [...line.matchAll(/([\d][\d.,]*\s*[만천억KkMm]?)/g)]
-        .map((m) => toCount(m[1]))
-        .filter((n): n is number => n !== null)
-      followerCount = numbers.length > 0 ? Math.max(...numbers) : null
+      let best: { value: number; text: string } | null = null
+      for (const m of rest.matchAll(/([\d][\d.,]*\s*[만천억KkMm]?)/g)) {
+        const value = toCount(m[1])
+        if (value !== null && (best === null || value > best.value)) best = { value, text: m[1] }
+      }
+      followerCount = best?.value ?? null
+      followerText = best?.text ?? null
     }
 
-    const bio = line
-      .replace(handleMatch[0], ' ')
-      .replace(/(?:팔로워|followers?)\s*[:·]?\s*[\d.,]+\s*[만천억KkMm]?/gi, ' ')
+    const bio = (followerText ? rest.replace(followerText, ' ') : rest)
       .replace(/\s{2,}/g, ' ')
       .trim()
 
@@ -79,12 +93,21 @@ export default function DiscoveryPage() {
   const [minFollowers, setMinFollowers] = useState('10000')
   const [wanted, setWanted] = useState('10')
 
-  const [raw, setRaw] = useState('')
-  const [searchedAt, setSearchedAt] = useState<string | null>(null)
-  const [searchedWith, setSearchedWith] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [manualResult, setManualResult] = useState('')
+
+  const { data: requests = [] } = useDiscoveryRequests()
+  const createRequest = useCreateDiscoveryRequest(user.id)
+  const updateRequest = useUpdateDiscoveryRequest()
+  const deleteRequest = useDeleteDiscoveryRequest()
+
+  // 가장 최근 요청 하나를 따라간다 — 자동화가 결과를 채우면 화면이 저절로 바뀐다.
+  const current = requests[0] ?? null
+  const raw = current?.resultRaw ?? ''
+  const searchedAt = current?.requestedAt ?? null
+  const searchedWith = current?.keywords ?? []
 
   const minimum = Number(minFollowers.replace(/[^\d]/g, '')) || 0
   const count = Number(wanted.replace(/[^\d]/g, '')) || 0
@@ -116,9 +139,10 @@ export default function DiscoveryPage() {
   )
 
   const startSearch = async () => {
-    // 복사가 막힌 환경에서도 검색 기록과 지시문은 남도록 순서를 지킨다.
-    setSearchedAt(new Date().toISOString())
-    setSearchedWith(keywords)
+    await createRequest.mutateAsync({ keywords, minFollowers: minimum, wanted: count })
+    setPicked(new Set())
+    setManualResult('')
+    // 자동화가 못 도는 상황에 대비해 지시문도 복사해 둔다.
     try {
       await navigator.clipboard.writeText(instruction)
       setCopied(true)
@@ -155,6 +179,8 @@ export default function DiscoveryPage() {
     })
   }, [raw, influencers, rejectedIds, minimum])
 
+  /** 요청에 딸린 조건으로 판정해야 하므로, 완료된 요청의 기준을 따른다. */
+
   const targets = rows.filter((row) => row.verdict === '발굴 대상')
   const selected = targets.filter((row) => picked.has(row.candidate.handle))
 
@@ -190,7 +216,12 @@ export default function DiscoveryPage() {
     }
     setPicked(new Set())
     setProgress(null)
-    setRaw('')
+    if (current) {
+      await updateRequest.mutateAsync({
+        id: current.id,
+        patch: { note: `${selected.length}명 컨택 리스트로 옮김` },
+      })
+    }
   }
 
   if (isLoading) return <Spinner />
@@ -276,16 +307,13 @@ export default function DiscoveryPage() {
             <p className="text-xs text-amber-600">검색 키워드를 두 개 이상 넣어주세요.</p>
           )}
 
-          {searchedAt && (
+          {current && current.status === '대기' && (
             <div className="rounded-lg bg-violet-50 p-4">
               <p className="text-xs leading-relaxed text-violet-800">
-                <b>
-                  {copied
-                    ? '크롬 자동화에 넘길 지시문을 복사했습니다.'
-                    : '아래 지시문을 복사해 크롬 자동화에 넘겨주세요.'}
-                </b>{' '}
-                크롬에서 실행하는 Claude 대화창에 붙여넣으면 검색과 프로필 확인을 대신해줍니다.
-                결과가 나오면 아래 칸에 그대로 붙여넣어 주세요.
+                <b>발굴 요청을 남겼습니다.</b> 크롬 자동화가 이 요청을 집어가 검색과 프로필 확인을
+                하고 결과를 여기에 채웁니다. 이 화면은 열어두기만 하면 15초마다 자동으로
+                확인합니다.
+                {copied && ' (지시문도 클립보드에 복사해 뒀습니다)'}
               </p>
               <pre className="mt-2 max-h-40 overflow-auto rounded-md bg-white p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-slate-700">
                 {instruction}
@@ -295,21 +323,79 @@ export default function DiscoveryPage() {
         </div>
       </Card>
 
-      <Card>
-        <CardHeader
-          title="발굴 결과 붙여넣기"
-          description="자동화가 돌려준 결과를 그대로 넣으면 조건에 맞는지 가려냅니다."
-        />
-        <div className="p-5">
-          <Textarea
-            rows={6}
-            value={raw}
-            onChange={(e) => setRaw(e.target.value)}
-            disabled={progress !== null}
-            placeholder={'@healthy_table_kr | 4.2만 | 9/15 공구 오픈\n@new_market_kr | 3.5만 | 마켓 할인 진행'}
+      {current && (
+        <Card>
+          <CardHeader
+            title="발굴 요청"
+            description={`${current.keywords.join(', ')} · 팔로워 ${formatNumber(
+              current.minFollowers,
+            )}명 이상 · ${formatNumber(current.wanted)}명 요청 · ${formatDateTime(
+              current.requestedAt,
+            )}`}
+            action={
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    current.status === '완료'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : current.status === '진행중'
+                        ? 'bg-amber-100 text-amber-700'
+                        : current.status === '실패'
+                          ? 'bg-rose-100 text-rose-700'
+                          : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {current.status}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm('이 발굴 요청을 지울까요?')) deleteRequest.mutate(current.id)
+                  }}
+                >
+                  요청 취소
+                </Button>
+              </div>
+            }
           />
-        </div>
-      </Card>
+
+          {current.note && (
+            <p className="border-t border-slate-100 px-5 py-3 text-sm text-slate-500">
+              {current.note}
+            </p>
+          )}
+
+          {current.status !== '완료' && (
+            <div className="space-y-3 p-5">
+              <p className="text-sm text-slate-500">
+                자동화가 아직 결과를 채우지 않았습니다. 직접 받아온 결과가 있다면 아래에 붙여넣어도
+                됩니다.
+              </p>
+              <Textarea
+                rows={5}
+                value={manualResult}
+                onChange={(e) => setManualResult(e.target.value)}
+                placeholder={'@healthy_table_kr | 4.2만 | 9/15 공구 오픈\n@new_market_kr | 3.5만 | 마켓 할인 진행'}
+              />
+              <div className="flex justify-end">
+                <Button
+                  variant="secondary"
+                  disabled={!manualResult.trim()}
+                  onClick={() =>
+                    updateRequest.mutate({
+                      id: current.id,
+                      patch: { resultRaw: manualResult, status: '완료' },
+                    })
+                  }
+                >
+                  결과 저장
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {raw.trim() !== '' && (
         <Card>
