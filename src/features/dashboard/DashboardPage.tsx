@@ -16,6 +16,7 @@ import { Button, Card, CardHeader, EmptyState, linkButtonClass, Spinner } from '
 import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import { isMockMode } from '@/data'
 import { COLLAB_STAGES } from '@/data/types'
+import type { Collab, CollabStage } from '@/data/types'
 import { useCollabs, useDemoData, useInfluencers } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
 
@@ -94,12 +95,24 @@ export default function DashboardPage() {
     const cohortIds = new Set(cohort.map((influencer) => influencer.id))
     const cohortCollabs = collabs.filter((collab) => cohortIds.has(collab.influencerId))
 
+    // 단계는 앞뒤 순서가 있으므로, '그 단계까지 갔던 적이 있는가'로 센다.
+    const reached = (collab: Collab, stage: CollabStage) =>
+      COLLAB_STAGES.indexOf(collab.stage) >= COLLAB_STAGES.indexOf(stage)
+
     const replied = new Set(cohortCollabs.map((collab) => collab.influencerId)).size
     const seeded = new Set(
       cohortCollabs.filter((collab) => collab.sampleShipDate).map((collab) => collab.influencerId),
     ).size
     const confirmed = new Set(
       cohortCollabs.filter((collab) => collab.marketDate).map((collab) => collab.influencerId),
+    ).size
+
+    // 테스트 통과율만은 전체가 아니라 '테스트에 들어간 사람' 대비로 본다.
+    const tested = new Set(
+      cohortCollabs.filter((collab) => reached(collab, '테스트중')).map((c) => c.influencerId),
+    ).size
+    const passed = new Set(
+      cohortCollabs.filter((collab) => reached(collab, '테스트 통과')).map((c) => c.influencerId),
     ).size
 
     const rate = (value: number) => (cohort.length ? Math.round((value / cohort.length) * 100) : 0)
@@ -110,9 +123,12 @@ export default function DashboardPage() {
       replied,
       seeded,
       confirmed,
+      tested,
+      passed,
       replyRate: rate(replied),
       seedRate: rate(seeded),
       confirmRate: rate(confirmed),
+      passRate: tested ? Math.round((passed / tested) * 100) : 0,
     }
   }, [influencers, collabs, period])
 
@@ -237,7 +253,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <StatCard
           label="전체 인플루언서"
           value={`${formatNumber(stats.total)}명`}
@@ -252,6 +268,11 @@ export default function DashboardPage() {
           label="씨딩율"
           value={`${stats.seedRate}%`}
           sub={`씨딩 ${formatNumber(stats.seeded)}명`}
+        />
+        <StatCard
+          label="테스트 통과율"
+          value={`${stats.passRate}%`}
+          sub={`테스트 ${formatNumber(stats.tested)}명 중 ${formatNumber(stats.passed)}명 통과`}
         />
         <StatCard
           label="확정율"
