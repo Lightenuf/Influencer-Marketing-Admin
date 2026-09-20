@@ -281,7 +281,7 @@ export default function DiscoveryPage() {
             </div>
           </Field>
 
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-start">
             <Field label="최소 팔로워수">
               <Input
                 inputMode="numeric"
@@ -296,7 +296,8 @@ export default function DiscoveryPage() {
                 onChange={(e) => setWanted(e.target.value.replace(/[^\d]/g, ''))}
               />
             </Field>
-            <div className="pb-6">
+            {/* 라벨 높이(1.625rem)만큼 내려 입력칸과 같은 줄에 선다 */}
+            <div className="md:mt-[1.625rem]">
               <Button onClick={startSearch} disabled={keywords.length < 2 || count === 0}>
                 {copied ? '✓ 복사했습니다' : '인플루언서 발굴'}
               </Button>
