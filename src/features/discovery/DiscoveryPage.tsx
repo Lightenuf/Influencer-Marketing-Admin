@@ -281,6 +281,9 @@ export default function DiscoveryPage() {
                   } else setKeywordDraft(value)
                 }}
                 onKeyDown={(e) => {
+                  // 한글을 조합하는 중에 누른 Enter는 글자를 확정하는 신호다.
+                  // 이때 태그로 만들면 확정된 끝 글자가 칸에 남아 한 번 더 등록된다.
+                  if (e.nativeEvent.isComposing) return
                   if (e.key === 'Enter') {
                     e.preventDefault()
                     addKeyword()

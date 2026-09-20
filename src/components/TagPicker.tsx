@@ -64,6 +64,8 @@ export default function TagPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
+            // 한글 조합 중 Enter는 글자를 확정하는 신호라 태그로 만들지 않는다.
+            if (e.nativeEvent.isComposing) return
             if (e.key === 'Enter') {
               e.preventDefault()
               if (candidates.length > 0) add(candidates[0].label)

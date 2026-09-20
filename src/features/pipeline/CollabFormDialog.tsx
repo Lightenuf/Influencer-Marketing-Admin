@@ -128,6 +128,8 @@ export default function CollabFormDialog({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                   // Enter 한 번으로 첫 후보 선택 (붙여넣고 바로 엔터)
+                  // 한글을 조합하는 중이면 글자를 확정하는 Enter이므로 넘긴다.
+                  if (e.nativeEvent.isComposing) return
                   if (e.key !== 'Enter') return
                   e.preventDefault()
                   const first = matches.find((m) => !alreadyInPipeline.has(m.id))
