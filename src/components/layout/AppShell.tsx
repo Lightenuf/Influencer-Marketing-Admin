@@ -30,6 +30,17 @@ const navGroups = [
   },
 ]
 
+/**
+ * 어떤 메뉴를 '정확히 그 주소일 때만' 켤지 가른다.
+ *
+ * 메뉴 주소가 다른 메뉴의 윗길이면(예: /ads 아래에 /ads/creatives), 하위 화면에 있을 때
+ * 둘 다 켜져 보인다. 그런 항목만 정확히 일치할 때 켠다.
+ * 반대로 /influencers 처럼 하위가 메뉴에 없는 경우는, 상세 화면에서도 메뉴가 켜져 있어야 한다.
+ */
+const menuPaths = navGroups.flatMap((group) => group.items.map((item) => item.to))
+const exactOnly = (to: string) =>
+  menuPaths.some((path) => path !== to && path.startsWith(`${to}/`))
+
 export default function AppShell() {
   const { user, signOut } = useAuth()
   const { data: influencers = [] } = useInfluencers()
@@ -59,6 +70,7 @@ export default function AppShell() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  end={exactOnly(item.to)}
                   className={({ isActive }) =>
                     clsx(
                       'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
