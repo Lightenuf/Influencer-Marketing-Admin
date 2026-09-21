@@ -55,12 +55,12 @@ function CardMemo({ collab }: { collab: Collab }) {
         {saved && <span className="text-[11px] text-emerald-600">저장됨</span>}
       </div>
       <textarea
-        rows={4}
+        rows={3}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         placeholder="특이 요청사항 · 기억할 것"
-        className="max-h-24 w-full resize-none overflow-y-auto rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] leading-relaxed text-slate-700 placeholder:text-slate-300 focus:border-violet-400 focus:outline-none"
+        className="w-full resize-none overflow-y-auto rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] leading-relaxed text-slate-700 placeholder:text-slate-300 focus:border-violet-400 focus:outline-none"
       />
     </div>
   )
