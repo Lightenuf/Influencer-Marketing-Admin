@@ -211,3 +211,23 @@ export const DEFAULT_TARGETING = {
  * 광고 세트를 만들 때 켜고 끌 수 있게 한다.
  */
 export const RECENT_BUYER_EXCLUSION_DAYS = 40
+
+/** 광고 계정에 저장해 둔 맞춤 타겟 */
+export interface MetaCustomAudience {
+  id: string
+  name: string
+  /** 몇 명쯤인지. 메타가 알려주지 않을 때도 있어 null이 될 수 있다. */
+  approximateCount: number | null
+}
+
+/**
+ * 제외 타겟으로 기본 선택할 후보를 이름으로 찾는다.
+ * 이름을 코드에 박아두면 메타에서 이름을 바꿨을 때 조용히 어긋나므로,
+ * 목록에서 그럴듯한 것을 짚어 주기만 하고 최종 선택은 사람이 한다.
+ */
+export const guessRecentBuyerAudience = (list: MetaCustomAudience[]) =>
+  list.find(
+    (audience) =>
+      audience.name.includes(String(RECENT_BUYER_EXCLUSION_DAYS)) &&
+      /구매|purchase/i.test(audience.name),
+  ) ?? null

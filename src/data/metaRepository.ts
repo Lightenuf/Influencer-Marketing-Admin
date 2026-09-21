@@ -2,6 +2,7 @@ import type {
   MetaAd,
   MetaAdSet,
   MetaCampaign,
+  MetaCustomAudience,
   MetaInsight,
   MetaLevel,
   MetaStatus,
@@ -28,6 +29,9 @@ export interface MetaRepository {
 
   /** 기간 집계. level이 가리키는 노드마다 한 줄씩 준다. */
   getInsights(level: Exclude<MetaLevel, 'account'>, period: MetaPeriod): Promise<MetaInsight[]>
+
+  /** 광고 계정에 저장된 맞춤 타겟 — 광고 세트를 만들 때 제외 대상으로 고른다 */
+  listCustomAudiences(): Promise<MetaCustomAudience[]>
 
   /** 고른 광고들의 주 단위 ROAS 추세 */
   getWeeklySeries(adIds: string[], period: MetaPeriod): Promise<MetaWeekPoint[]>

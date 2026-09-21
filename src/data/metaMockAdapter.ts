@@ -1,5 +1,12 @@
 import type { MetaPeriod, MetaRepository } from './metaRepository'
-import type { MetaAd, MetaAdSet, MetaCampaign, MetaInsight, MetaWeekPoint } from './metaTypes'
+import type {
+  MetaAd,
+  MetaAdSet,
+  MetaCampaign,
+  MetaCustomAudience,
+  MetaInsight,
+  MetaWeekPoint,
+} from './metaTypes'
 
 /**
  * 메타 계정 없이 화면을 만들고 확인하기 위한 가짜 데이터.
@@ -297,6 +304,16 @@ export const metaMockAdapter: MetaRepository = {
     await delay()
     const { adStatus } = readOverrides()
     return ADS.map((ad) => ({ ...ad, status: adStatus[ad.id] ?? ad.status }))
+  },
+
+  async listCustomAudiences(): Promise<MetaCustomAudience[]> {
+    await delay()
+    return [
+      { id: 'aud-1', name: '최근 40일 구매자', approximateCount: 3_420 },
+      { id: 'aud-2', name: '장바구니 담기 14일', approximateCount: 8_150 },
+      { id: 'aud-3', name: '인스타 참여 365일', approximateCount: 41_900 },
+      { id: 'aud-4', name: '구매자 유사타겟 1%', approximateCount: 512_000 },
+    ]
   },
 
   async getInsights(level, period) {

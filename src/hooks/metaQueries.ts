@@ -40,6 +40,14 @@ export const useMetaAds = () =>
     staleTime: FRESH_FOR,
   })
 
+/** 맞춤 타겟은 자주 바뀌지 않는다 — 한참 두고 쓴다 */
+export const useMetaCustomAudiences = () =>
+  useQuery({
+    queryKey: ['meta', 'audiences'] as const,
+    queryFn: () => metaRepository.listCustomAudiences(),
+    staleTime: 30 * 60 * 1000,
+  })
+
 export const useMetaInsights = (level: Exclude<MetaLevel, 'account'>, period: MetaPeriod) =>
   useQuery({
     queryKey: metaKeys.insights(level, period),
