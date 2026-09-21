@@ -348,8 +348,9 @@ export default function CreativeUploadPage() {
           {groups.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-slate-500">
-                이름이 같은 소재는 <b>광고 하나</b>로 묶입니다. 1:1과 9:16을 함께 올리면 메타가 노출
-                자리에 맞춰 골라 씁니다.
+                이름이 같은 소재는 <b>광고 하나</b>로 묶여, 노출 자리마다 골라 쓰입니다. 자리는 한
+                광고 안에서 겹칠 수 없습니다 — 1:1과 9:16이면 피드·스토리로, 1:1과 4:5처럼 둘 다
+                피드용이면 페이스북 피드·인스타 피드로 갈라주세요.
               </p>
 
               {groups.map((group) => (
