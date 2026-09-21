@@ -30,3 +30,18 @@ export function daysSince(value: string | null | undefined) {
 }
 
 export const toDateInputValue = (value: string | null) => (value ? value.slice(0, 10) : '')
+
+/** 1,234,000 → 123.4만 · 큰 광고비를 표에서 짧게 보이려고 쓴다 */
+export function formatWon(value: number) {
+  if (Math.abs(value) >= 10_000) {
+    const man = value / 10_000
+    return `${man >= 1000 ? formatNumber(Math.round(man)) : man.toFixed(1).replace(/\.0$/, '')}만`
+  }
+  return formatNumber(Math.round(value))
+}
+
+/** 2.345 → '2.35' — ROAS처럼 소수 둘째 자리까지 보는 값 */
+export const formatRatio = (value: number, digits = 2) => value.toFixed(digits)
+
+/** 1.234 → '1.23%' */
+export const formatPercent = (value: number, digits = 2) => `${value.toFixed(digits)}%`

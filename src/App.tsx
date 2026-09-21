@@ -3,6 +3,8 @@ import LoginPage from '@/auth/LoginPage'
 import ProtectedRoute from '@/auth/ProtectedRoute'
 import SignupPage from '@/auth/SignupPage'
 import AppShell from '@/components/layout/AppShell'
+import AdsDashboardPage from '@/features/ads/AdsDashboardPage'
+import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
 import CalendarPage from '@/features/calendar/CalendarPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import DiscoveryPage from '@/features/discovery/DiscoveryPage'
@@ -33,6 +35,8 @@ export default function App() {
           {/* 예전 주소로 들어오면 거절 명단으로 보낸다 */}
           <Route path="/do-not-contact" element={<Navigate to="/rejected" replace />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/ads" element={<AdsDashboardPage />} />
+          <Route path="/ads/creatives" element={<CreativePerformancePage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
