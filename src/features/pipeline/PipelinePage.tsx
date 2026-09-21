@@ -107,7 +107,10 @@ function StageCards({
   // 끄는 동안에는 화면에만 순서를 바꿔 두고, 손을 떼면 저장한다.
   const [order, setOrder] = useState(items)
   const [dragId, setDragId] = useState<string | null>(null)
-  const [offset, setOffset] = useState(0)
+  // 끄는 위치는 화면 갱신마다 바뀐다. 상태에 담으면 그때마다 카드 전체가 다시 그려져
+  // 손을 못 따라오므로, 움직이는 칸만 직접 만진다.
+  const pending = useRef<number | null>(null)
+  const frame = useRef(0)
 
   useEffect(() => {
     if (!dragId) setOrder(items)
@@ -135,12 +138,31 @@ function StageCards({
     }
   }, [order, dragId])
 
+  /** 겉의 자리(ref로 잡아둔 칸) 안에서 실제로 움직이는 칸 */
+  const movingNode = (id: string) =>
+    (cards.current.get(id)?.firstElementChild as HTMLElement | undefined) ?? null
+
+  /** 위치 반영은 화면 갱신 한 번에 한 번만 — 이벤트가 몰려도 프레임을 넘기지 않는다. */
+  const paint = () => {
+    frame.current = 0
+    const state = drag.current
+    if (!state || pending.current === null) return
+    const node = movingNode(state.id)
+    if (node) node.style.transform = `translateY(${pending.current}px)`
+  }
+
+  const schedule = (distance: number) => {
+    pending.current = distance
+    if (!frame.current) frame.current = requestAnimationFrame(paint)
+  }
+
   /** 카드의 빈 곳을 잡았을 때만 끌기 시작한다. 버튼·링크·메모칸은 원래 하던 일을 한다. */
   const startDrag = (collab: Collab, event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     if ((event.target as HTMLElement).closest('button, a, textarea, input, select, label')) return
     drag.current = { id: collab.id, startY: event.clientY, moved: false }
     event.currentTarget.setPointerCapture(event.pointerId)
+    event.currentTarget.style.willChange = 'transform'
   }
 
   const onDragMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -175,20 +197,27 @@ function StageCards({
         setOrder(next)
         // 카드가 한 칸 옮겨간 만큼 기준점도 옮겨야 손과 카드가 계속 붙어 있다. (8px은 카드 사이 간격)
         state.startY += (otherBox.height + 8) * direction
-        setOffset(event.clientY - state.startY)
+        schedule(event.clientY - state.startY)
         return
       }
     }
 
-    setOffset(distance)
+    schedule(distance)
   }
 
   const endDrag = () => {
     const state = drag.current
     drag.current = null
     document.body.style.userSelect = ''
+    if (frame.current) cancelAnimationFrame(frame.current)
+    frame.current = 0
+    pending.current = null
+    const node = state ? movingNode(state.id) : null
+    if (node) {
+      node.style.transform = ''
+      node.style.willChange = ''
+    }
     setDragId(null)
-    setOffset(0)
     if (state?.moved) onReorder(order.map((collab) => collab.id))
   }
 
@@ -208,14 +237,9 @@ function StageCards({
               onPointerMove={onDragMove}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
-              style={{
-                transform: dragId === collab.id ? `translateY(${offset}px)` : undefined,
-                position: dragId === collab.id ? 'relative' : undefined,
-                zIndex: dragId === collab.id ? 10 : undefined,
-              }}
               className={clsx(
                 'cursor-grab',
-                dragId === collab.id && 'cursor-grabbing opacity-90 shadow-lg',
+                dragId === collab.id && 'relative z-10 cursor-grabbing opacity-90 shadow-lg',
               )}
             >
               <Card className="p-3">
