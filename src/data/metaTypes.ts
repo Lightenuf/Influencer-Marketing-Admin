@@ -114,3 +114,41 @@ export function sumInsights(list: MetaInsight[]): Omit<MetaInsight, 'level' | 'i
     { spend: 0, revenue: 0, results: 0, reach: 0, impressions: 0, linkClicks: 0 },
   )
 }
+
+/**
+ * 캠페인 목표.
+ * 기본은 판매다 — 성과를 ROAS로 보기 때문. 다만 트래픽·참여로 돌릴 때도 있어 고를 수 있게 둔다.
+ */
+export const META_OBJECTIVES = [
+  {
+    value: 'OUTCOME_SALES',
+    label: '판매',
+    hint: '결제할 사람을 찾는다',
+    /** 판매만 전환 이벤트(구매 등)를 정해야 한다 */
+    needsConversionEvent: true,
+  },
+  {
+    value: 'OUTCOME_TRAFFIC',
+    label: '트래픽',
+    hint: '링크를 누를 사람을 찾는다',
+    needsConversionEvent: false,
+  },
+  {
+    value: 'OUTCOME_ENGAGEMENT',
+    label: '참여',
+    hint: '좋아요·댓글·메시지를 남길 사람을 찾는다',
+    needsConversionEvent: false,
+  },
+] as const
+
+export type MetaObjective = (typeof META_OBJECTIVES)[number]['value']
+
+/** 새 캠페인을 만들 때 미리 골라두는 값 */
+export const DEFAULT_OBJECTIVE: MetaObjective = 'OUTCOME_SALES'
+
+/** 목표에 따라 어울리는 버튼이 다르다. 업로드 화면에서 이 값으로 시작하고 바꿀 수 있게 한다. */
+export const DEFAULT_CTA: Record<MetaObjective, { value: string; label: string }> = {
+  OUTCOME_SALES: { value: 'SHOP_NOW', label: '지금 구매하기' },
+  OUTCOME_TRAFFIC: { value: 'LEARN_MORE', label: '더 알아보기' },
+  OUTCOME_ENGAGEMENT: { value: 'LEARN_MORE', label: '더 알아보기' },
+}
