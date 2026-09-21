@@ -24,6 +24,7 @@ const navGroups = [
     items: [
       { to: '/ads', label: '광고 대시보드', icon: '📈' },
       { to: '/ads/creatives', label: '소재 성과', icon: '🎬' },
+      { to: '/ads/manage', label: '광고 관리', icon: '🎛️' },
     ],
   },
 ]
