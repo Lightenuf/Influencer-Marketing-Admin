@@ -1,14 +1,20 @@
 import clsx from 'clsx'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DncBadge } from '@/components/badges'
 import { Button, Card, EmptyState, Spinner } from '@/components/ui'
-import { COLLAB_STAGES, type Collab, type CollabStage } from '@/data/types'
+import { COLLAB_STAGES, type Collab, type CollabStage, type Influencer } from '@/data/types'
 import CancelCollabDialog from '@/features/pipeline/CancelCollabDialog'
 import CollabFormDialog from '@/features/pipeline/CollabFormDialog'
 import MarketResultDialog from '@/features/pipeline/MarketResultDialog'
 import StageActions from '@/features/pipeline/StageActions'
-import { useCollabs, useInfluencers, useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
+import {
+  useCollabs,
+  useInfluencers,
+  useMoveCollabStage,
+  useReorderCollabs,
+  useUpdateCollab,
+} from '@/hooks/queries'
 import { daysSince } from '@/utils/format'
 import { profileUrl } from '@/utils/profileLink'
 
@@ -66,10 +72,187 @@ function CardMemo({ collab }: { collab: Collab }) {
   )
 }
 
+/**
+ * 한 단계의 카드 목록.
+ * 순서를 바꾸면 카드가 튀지 않고 미끄러지도록, 바뀌기 전 위치를 기억했다가
+ * 그만큼 되돌려 놓은 뒤 새 자리로 옮긴다.
+ */
+function StageCards({
+  items,
+  stage,
+  influencerOf,
+  onMoveStage,
+  onReorder,
+  onCancel,
+  onCompleteMarket,
+}: {
+  items: Collab[]
+  stage: CollabStage
+  influencerOf: (id: string) => Influencer | undefined
+  onMoveStage: (collab: Collab, direction: -1 | 1) => void
+  onReorder: (orderedIds: string[]) => void
+  onCancel: (collab: Collab) => void
+  onCompleteMarket: (collab: Collab) => void
+}) {
+  const cards = useRef(new Map<string, HTMLDivElement>())
+  const lastTop = useRef(new Map<string, number>())
+
+  const registerCard = (id: string) => (element: HTMLDivElement | null) => {
+    if (element) cards.current.set(id, element)
+    else cards.current.delete(id)
+  }
+
+  useLayoutEffect(() => {
+    for (const [id, element] of cards.current) {
+      const top = element.getBoundingClientRect().top
+      const before = lastTop.current.get(id)
+      if (before !== undefined && Math.abs(before - top) > 1) {
+        element.style.transition = 'none'
+        element.style.transform = `translateY(${before - top}px)`
+        requestAnimationFrame(() => {
+          element.style.transition = 'transform 220ms ease'
+          element.style.transform = ''
+        })
+      }
+      lastTop.current.set(id, top)
+    }
+  }, [items])
+
+  const swap = (index: number, direction: -1 | 1) => {
+    const next = [...items]
+    const target = index + direction
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    onReorder(next.map((collab) => collab.id))
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.length === 0 && (
+        <p className="px-2 py-6 text-center text-xs text-slate-400">비어 있음</p>
+      )}
+        {items.map((collab, index) => {
+          const influencer = influencerOf(collab.influencerId)
+          const waiting = daysSince(collab.stageEnteredAt)
+          const isStale = waiting >= STALE_DAYS && stage !== LAST_STAGE
+          return (
+            <div key={collab.id} ref={registerCard(collab.id)}>
+              <Card className="p-3">
+              <Link
+                to={`/influencers/${collab.influencerId}`}
+                className="block text-sm font-medium text-slate-900 hover:text-violet-600"
+              >
+                {influencer?.name ?? '삭제된 크리에이터'}
+              </Link>
+
+              {influencer?.snsHandle &&
+                (() => {
+                  const url = profileUrl(
+                    influencer.snsPlatform,
+                    influencer.snsHandle,
+                    influencer.snsUrl,
+                  )
+                  const handle = `@${influencer.snsHandle}`
+                  return url ? (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`${url} 새 창으로 열기`}
+                      className="mt-0.5 block text-[11px] text-slate-400 hover:text-violet-600 hover:underline"
+                    >
+                      {handle}
+                    </a>
+                  ) : (
+                    <p className="mt-0.5 text-[11px] text-slate-400">{handle}</p>
+                  )
+                })()}
+
+              {influencer?.doNotContact && (
+                <div className="mt-1.5">
+                  <DncBadge compact />
+                </div>
+              )}
+
+              <StageActions
+                collab={collab}
+                stage={stage}
+                onCompleteMarket={() => onCompleteMarket(collab)}
+              />
+
+              <CardMemo collab={collab} />
+
+              <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
+                <p className={clsx(isStale && 'font-semibold text-amber-600')}>
+                  {`${waiting}일째 ${stage}`}
+                  {isStale && ' ⚠️'}
+                </p>
+              </div>
+
+              <div className="mt-2.5 flex items-center gap-0.5 whitespace-nowrap">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-1.5"
+                  title="이전 단계로"
+                  onClick={() => onMoveStage(collab, -1)}
+                  disabled={stage === FIRST_STAGE}
+                >
+                  ←
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-1.5"
+                  title="다음 단계로"
+                  onClick={() => onMoveStage(collab, 1)}
+                  disabled={stage === LAST_STAGE}
+                >
+                  →
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-1.5"
+                  title="위로 올리기"
+                  onClick={() => swap(index, -1)}
+                  disabled={index === 0}
+                >
+                  ↑
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-1.5"
+                  title="아래로 내리기"
+                  onClick={() => swap(index, 1)}
+                  disabled={index === items.length - 1}
+                >
+                  ↓
+                </Button>
+                <span className="flex-1" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-1.5 text-rose-500 hover:bg-rose-50"
+                  onClick={() => onCancel(collab)}
+                >
+                  취소
+                </Button>
+              </div>
+              </Card>
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+
 export default function PipelinePage() {
   const { data: collabs, isLoading } = useCollabs()
   const { data: influencers = [] } = useInfluencers()
   const moveStage = useMoveCollabStage()
+  const reorder = useReorderCollabs()
 
   const [formOpen, setFormOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Collab | null>(null)
@@ -112,9 +295,9 @@ export default function PipelinePage() {
         <div className="flex snap-x gap-3 overflow-x-auto pb-2">
           {COLLAB_STAGES.map((stage) => {
             // 거절한 건은 '거절 명단'으로 빠지므로 보드에는 진행 중인 것만 남는다.
-            const items = (collabs ?? []).filter(
-              (collab) => collab.stage === stage && !collab.isCancelled,
-            )
+            const items = (collabs ?? [])
+              .filter((collab) => collab.stage === stage && !collab.isCancelled)
+              .sort((a, b) => a.sortOrder - b.sortOrder)
             return (
               <div
                 key={stage}
@@ -125,100 +308,15 @@ export default function PipelinePage() {
                   <span className="text-xs text-slate-500">{items.length}</span>
                 </div>
 
-                <div className="space-y-2">
-                  {items.length === 0 && (
-                    <p className="px-2 py-6 text-center text-xs text-slate-400">비어 있음</p>
-                  )}
-                  {items.map((collab) => {
-                    const influencer = influencerOf(collab.influencerId)
-                    const waiting = daysSince(collab.stageEnteredAt)
-                    const isStale = waiting >= STALE_DAYS && stage !== LAST_STAGE
-                    return (
-                      <Card key={collab.id} className="p-3">
-                        <Link
-                          to={`/influencers/${collab.influencerId}`}
-                          className="block text-sm font-medium text-slate-900 hover:text-violet-600"
-                        >
-                          {influencer?.name ?? '삭제된 크리에이터'}
-                        </Link>
-
-                        {influencer?.snsHandle &&
-                          (() => {
-                            const url = profileUrl(
-                              influencer.snsPlatform,
-                              influencer.snsHandle,
-                              influencer.snsUrl,
-                            )
-                            const handle = `@${influencer.snsHandle}`
-                            return url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noreferrer"
-                                title={`${url} 새 창으로 열기`}
-                                className="mt-0.5 block text-[11px] text-slate-400 hover:text-violet-600 hover:underline"
-                              >
-                                {handle}
-                              </a>
-                            ) : (
-                              <p className="mt-0.5 text-[11px] text-slate-400">{handle}</p>
-                            )
-                          })()}
-
-                        {influencer?.doNotContact && (
-                          <div className="mt-1.5">
-                            <DncBadge compact />
-                          </div>
-                        )}
-
-                        <StageActions
-                          collab={collab}
-                          stage={stage}
-                          onCompleteMarket={() => setMarketTarget(collab)}
-                        />
-
-                        <CardMemo collab={collab} />
-
-                        <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
-                          <p className={clsx(isStale && 'font-semibold text-amber-600')}>
-                            {`${waiting}일째 ${stage}`}
-                            {isStale && ' ⚠️'}
-                          </p>
-                        </div>
-
-                        <div className="mt-2.5 flex items-center gap-0.5 whitespace-nowrap">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="px-1.5"
-                            onClick={() => move(collab, -1)}
-                            disabled={stage === FIRST_STAGE}
-                          >
-                            ←
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="px-1.5"
-                            onClick={() => move(collab, 1)}
-                            disabled={stage === LAST_STAGE}
-                          >
-                            →
-                          </Button>
-                          <span className="flex-1" />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="px-1.5 text-rose-500 hover:bg-rose-50"
-                            onClick={() => setCancelTarget(collab)}
-                          >
-                            취소
-                          </Button>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
+                <StageCards
+                  items={items}
+                  stage={stage}
+                  influencerOf={influencerOf}
+                  onMoveStage={move}
+                  onReorder={reorder.mutate}
+                  onCancel={setCancelTarget}
+                  onCompleteMarket={setMarketTarget}
+                />
               </div>
             )
           })}

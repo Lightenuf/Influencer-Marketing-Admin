@@ -70,6 +70,7 @@ function migrate(db: Database): Database {
     recontactAt: collab.recontactAt ?? null,
     testFeedback: collab.testFeedback ?? null,
     memo: collab.memo ?? '',
+    sortOrder: collab.sortOrder ?? 0,
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
     marketDate: collab.marketDate ?? null,
@@ -255,6 +256,7 @@ export const mockAdapter: DataRepository = {
       ...input,
       id: uid(),
       memo: '',
+      sortOrder: 0,
       stageEnteredAt: now(),
       isOnHold: false,
       holdReason: null,
@@ -344,6 +346,15 @@ export const mockAdapter: DataRepository = {
     collab.updatedAt = now()
     write(db)
     return tick(collab)
+  },
+
+  async reorderCollabs(orderedIds) {
+    const db = read()
+    orderedIds.forEach((id, index) => {
+      const collab = db.collabs.find((item) => item.id === id)
+      if (collab) collab.sortOrder = index
+    })
+    write(db)
   },
 
   async deleteCollab(id) {

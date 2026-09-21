@@ -105,6 +105,7 @@ const toCollab = (row: Row): Collab => ({
   isSettled: row.is_settled ?? false,
   contentLinks: row.content_links ?? [],
   memo: row.memo ?? '',
+  sortOrder: row.sort_order ?? 0,
   isOnHold: row.is_on_hold ?? false,
   holdReason: row.hold_reason,
   holdDetail: row.hold_detail ?? '',
@@ -411,6 +412,15 @@ export const supabaseAdapter: DataRepository = {
         .single(),
     )
     return toCollab(row)
+  },
+
+  async reorderCollabs(orderedIds) {
+    const db = requireSupabase()
+    await Promise.all(
+      orderedIds.map((id, index) =>
+        db.from('collabs').update({ sort_order: index }).eq('id', id),
+      ),
+    )
   },
 
   async deleteCollab(id) {

@@ -143,6 +143,7 @@ export function buildDemoDatabase(): Database {
   const collabs: Collab[] = [
     {
       id: 'demo-collab-1',
+      sortOrder: 0,
       memo: '미팅은 오전만 가능. 남편분이 촬영 도와주심.',
       influencerId: 'demo-inf-1',
       title: '9월 마켓 공동구매',
@@ -178,6 +179,7 @@ export function buildDemoDatabase(): Database {
     },
     {
       id: 'demo-collab-2',
+      sortOrder: 1,
       memo: '음료 4종 중 자몽맛 선호. 다음엔 자몽 위주로 보내기.',
       influencerId: 'demo-inf-2',
       title: '프리바이오틱스 샘플 리뷰',
@@ -213,6 +215,7 @@ export function buildDemoDatabase(): Database {
     },
     {
       id: 'demo-collab-3',
+      sortOrder: 2,
       memo: '유가광고만 진행, 씨딩은 안 받는다고 함.',
       influencerId: 'demo-inf-4',
       title: '10월 유가 광고 제안',
@@ -248,6 +251,7 @@ export function buildDemoDatabase(): Database {
     },
     {
       id: 'demo-collab-4',
+      sortOrder: 3,
       memo: '마켓 전날 리마인드 스토리 올려주기로 함. 정산은 세금계산서.',
       influencerId: 'demo-inf-7',
       title: '8월 마켓 협업',
@@ -283,6 +287,7 @@ export function buildDemoDatabase(): Database {
     },
     {
       id: 'demo-collab-5',
+      sortOrder: 4,
       memo: '',
       influencerId: 'demo-inf-3',
       title: '',

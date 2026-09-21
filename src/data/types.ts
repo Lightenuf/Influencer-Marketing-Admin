@@ -174,6 +174,8 @@ export interface Collab {
   contentLinks: string[]
   /** 카드 메모 — 특이 요청사항처럼 이 사람과 일할 때 기억해야 할 것 */
   memo: string
+  /** 같은 단계 안에서의 카드 순서. 작을수록 위. */
+  sortOrder: number
   /** 보류 — 거절은 아니지만 지금은 진행할 수 없는 상태. 나중에 다시 연락한다. */
   isOnHold: boolean
   holdReason: HoldReason | null

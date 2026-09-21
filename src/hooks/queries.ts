@@ -147,6 +147,35 @@ export function useUpdateCollab() {
   })
 }
 
+/**
+ * 같은 단계 안에서 카드 순서를 바꾼다.
+ * 서버 응답을 기다리지 않고 화면부터 바꿔야 카드가 매끄럽게 미끄러진다.
+ */
+export function useReorderCollabs() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (orderedIds: string[]) => repository.reorderCollabs(orderedIds),
+    onMutate: async (orderedIds) => {
+      await client.cancelQueries({ queryKey: keys.collabs })
+      const previous = client.getQueryData<Collab[]>(keys.collabs)
+      if (previous) {
+        const rank = new Map(orderedIds.map((id, index) => [id, index]))
+        client.setQueryData<Collab[]>(
+          keys.collabs,
+          previous.map((collab) =>
+            rank.has(collab.id) ? { ...collab, sortOrder: rank.get(collab.id)! } : collab,
+          ),
+        )
+      }
+      return { previous }
+    },
+    onError: (_error, _ids, context) => {
+      if (context?.previous) client.setQueryData(keys.collabs, context.previous)
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: keys.collabs }),
+  })
+}
+
 export function useMoveCollabStage() {
   const client = useQueryClient()
   return useMutation({
