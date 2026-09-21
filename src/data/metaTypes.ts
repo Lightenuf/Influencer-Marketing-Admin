@@ -146,9 +146,40 @@ export type MetaObjective = (typeof META_OBJECTIVES)[number]['value']
 /** 새 캠페인을 만들 때 미리 골라두는 값 */
 export const DEFAULT_OBJECTIVE: MetaObjective = 'OUTCOME_SALES'
 
+/**
+ * 광고 버튼(CTA).
+ *
+ * 문구를 마음대로 쓸 수 없다 — 메타가 정해둔 값 중에서만 고를 수 있고,
+ * 실제로 보이는 글자는 메타가 사용자 언어에 맞춰 알아서 넣는다.
+ * 그래서 '직접 추가'는 이 목록에서 골라 즐겨찾기에 얹는 방식이 된다.
+ */
+export const META_CTAS = [
+  { value: 'SHOP_NOW', label: '지금 구매하기' },
+  { value: 'APPLY_NOW', label: '지금 신청하기' },
+  { value: 'LEARN_MORE', label: '더 알아보기' },
+  { value: 'ORDER_NOW', label: '지금 주문하기' },
+  { value: 'SIGN_UP', label: '가입하기' },
+  { value: 'SUBSCRIBE', label: '구독하기' },
+  { value: 'GET_OFFER', label: '혜택 받기' },
+  { value: 'BOOK_TRAVEL', label: '지금 예약하기' },
+  { value: 'CONTACT_US', label: '문의하기' },
+  { value: 'SEND_MESSAGE', label: '메시지 보내기' },
+  { value: 'DOWNLOAD', label: '다운로드' },
+  { value: 'WATCH_MORE', label: '더 보기' },
+  { value: 'NO_BUTTON', label: '버튼 없음' },
+] as const
+
+export type MetaCta = (typeof META_CTAS)[number]['value']
+
+/** 업로드 화면에 처음 보이는 버튼들. 나머지는 '다른 버튼 고르기'에서 꺼낸다. */
+export const FAVORITE_CTAS: MetaCta[] = ['SHOP_NOW', 'APPLY_NOW', 'LEARN_MORE']
+
+export const ctaLabel = (value: string) =>
+  META_CTAS.find((cta) => cta.value === value)?.label ?? value
+
 /** 목표에 따라 어울리는 버튼이 다르다. 업로드 화면에서 이 값으로 시작하고 바꿀 수 있게 한다. */
-export const DEFAULT_CTA: Record<MetaObjective, { value: string; label: string }> = {
-  OUTCOME_SALES: { value: 'SHOP_NOW', label: '지금 구매하기' },
-  OUTCOME_TRAFFIC: { value: 'LEARN_MORE', label: '더 알아보기' },
-  OUTCOME_ENGAGEMENT: { value: 'LEARN_MORE', label: '더 알아보기' },
+export const DEFAULT_CTA: Record<MetaObjective, MetaCta> = {
+  OUTCOME_SALES: 'SHOP_NOW',
+  OUTCOME_TRAFFIC: 'LEARN_MORE',
+  OUTCOME_ENGAGEMENT: 'LEARN_MORE',
 }
