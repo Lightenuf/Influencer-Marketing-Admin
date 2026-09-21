@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DncBadge } from '@/components/badges'
 import { Button, Card, EmptyState, Spinner } from '@/components/ui'
@@ -8,13 +8,63 @@ import CancelCollabDialog from '@/features/pipeline/CancelCollabDialog'
 import CollabFormDialog from '@/features/pipeline/CollabFormDialog'
 import MarketResultDialog from '@/features/pipeline/MarketResultDialog'
 import StageActions from '@/features/pipeline/StageActions'
-import { useCollabs, useInfluencers, useMoveCollabStage } from '@/hooks/queries'
+import { useCollabs, useInfluencers, useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
 import { daysSince } from '@/utils/format'
 import { profileUrl } from '@/utils/profileLink'
 
 const STALE_DAYS = 15
 const FIRST_STAGE = COLLAB_STAGES[0]
 const LAST_STAGE = COLLAB_STAGES[COLLAB_STAGES.length - 1]
+
+/**
+ * 카드 메모 — 특이 요청사항처럼 이 사람과 일할 때 기억할 것을 적는다.
+ * 글자를 칠 때마다 저장하면 목록이 계속 다시 그려지므로, 칸을 벗어날 때 한 번 저장한다.
+ */
+function CardMemo({ collab }: { collab: Collab }) {
+  const update = useUpdateCollab()
+  const [draft, setDraft] = useState(collab.memo)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => setDraft(collab.memo), [collab.memo])
+
+  const commit = () => {
+    if (draft === collab.memo) return
+    update.mutate(
+      { id: collab.id, patch: { memo: draft } },
+      {
+        onSuccess: () => {
+          setSaved(true)
+          setTimeout(() => setSaved(false), 1500)
+        },
+      },
+    )
+  }
+
+  // 칸 밖을 누르기 전에 창을 닫아도 남도록, 손을 멈추면 알아서 저장한다.
+  useEffect(() => {
+    if (draft === collab.memo) return
+    const timer = setTimeout(commit, 800)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft])
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between px-0.5 pb-0.5">
+        <span className="text-[11px] font-medium text-slate-500">메모</span>
+        {saved && <span className="text-[11px] text-emerald-600">저장됨</span>}
+      </div>
+      <textarea
+        rows={4}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        placeholder="특이 요청사항 · 기억할 것"
+        className="max-h-24 w-full resize-none overflow-y-auto rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] leading-relaxed text-slate-700 placeholder:text-slate-300 focus:border-violet-400 focus:outline-none"
+      />
+    </div>
+  )
+}
 
 export default function PipelinePage() {
   const { data: collabs, isLoading } = useCollabs()
@@ -126,6 +176,8 @@ export default function PipelinePage() {
                           stage={stage}
                           onCompleteMarket={() => setMarketTarget(collab)}
                         />
+
+                        <CardMemo collab={collab} />
 
                         <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
                           <p className={clsx(isStale && 'font-semibold text-amber-600')}>

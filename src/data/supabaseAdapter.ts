@@ -104,6 +104,7 @@ const toCollab = (row: Row): Collab => ({
   marketUnits: row.market_units ?? 0,
   isSettled: row.is_settled ?? false,
   contentLinks: row.content_links ?? [],
+  memo: row.memo ?? '',
   isOnHold: row.is_on_hold ?? false,
   holdReason: row.hold_reason,
   holdDetail: row.hold_detail ?? '',
@@ -118,7 +119,7 @@ const toCollab = (row: Row): Collab => ({
   updatedAt: row.updated_at,
 })
 
-const collabColumns = (input: Partial<CollabInput>): Row => {
+const collabColumns = (input: Partial<CollabInput & Pick<Collab, 'memo'>>): Row => {
   const row: Row = {}
   if (input.influencerId !== undefined) row.influencer_id = input.influencerId
   if (input.title !== undefined) row.title = input.title
@@ -139,6 +140,7 @@ const collabColumns = (input: Partial<CollabInput>): Row => {
   if (input.marketUnits !== undefined) row.market_units = input.marketUnits
   if (input.isSettled !== undefined) row.is_settled = input.isSettled
   if (input.contentLinks !== undefined) row.content_links = input.contentLinks
+  if (input.memo !== undefined) row.memo = input.memo
   return row
 }
 

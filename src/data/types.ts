@@ -172,6 +172,8 @@ export interface Collab {
   isSettled: boolean
   /** 잘 터진 콘텐츠 링크 모음 — 다음 협업 때 참고한다 */
   contentLinks: string[]
+  /** 카드 메모 — 특이 요청사항처럼 이 사람과 일할 때 기억해야 할 것 */
+  memo: string
   /** 보류 — 거절은 아니지만 지금은 진행할 수 없는 상태. 나중에 다시 연락한다. */
   isOnHold: boolean
   holdReason: HoldReason | null

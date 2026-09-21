@@ -69,6 +69,7 @@ function migrate(db: Database): Database {
     heldAt: collab.heldAt ?? null,
     recontactAt: collab.recontactAt ?? null,
     testFeedback: collab.testFeedback ?? null,
+    memo: collab.memo ?? '',
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
     marketDate: collab.marketDate ?? null,
@@ -253,6 +254,7 @@ export const mockAdapter: DataRepository = {
     const collab: Collab = {
       ...input,
       id: uid(),
+      memo: '',
       stageEnteredAt: now(),
       isOnHold: false,
       holdReason: null,

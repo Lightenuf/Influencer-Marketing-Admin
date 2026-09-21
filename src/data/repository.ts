@@ -30,6 +30,7 @@ export type CollabInput = Omit<
   | 'createdAt'
   | 'updatedAt'
   | 'stageEnteredAt'
+  | 'memo'
   | 'isCancelled'
   | 'cancelReasons'
   | 'cancelReasonDetail'
@@ -81,7 +82,7 @@ export interface DataRepository {
 
   listCollabs(): Promise<Collab[]>
   createCollab(input: CollabInput): Promise<Collab>
-  updateCollab(id: string, patch: Partial<CollabInput>): Promise<Collab>
+  updateCollab(id: string, patch: Partial<CollabInput & Pick<Collab, 'memo'>>): Promise<Collab>
   moveCollabStage(id: string, stage: CollabStage): Promise<Collab>
   cancelCollab(id: string, reasons: string[], reasonDetail: string): Promise<Collab>
   /** 거절 시점을 고친다 — 어드민을 만들기 전에 있었던 거절을 실제 날짜로 옮길 때 쓴다. */

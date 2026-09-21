@@ -7,7 +7,7 @@ import type {
   InfluencerInput,
   ShipmentInput,
 } from '@/data/repository'
-import type { CollabStage, DiscoveryRequest } from '@/data/types'
+import type { Collab, CollabStage, DiscoveryRequest } from '@/data/types'
 
 export const keys = {
   members: ['members'] as const,
@@ -136,8 +136,13 @@ export function useCreateCollab() {
 export function useUpdateCollab() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<CollabInput> }) =>
-      repository.updateCollab(id, patch),
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string
+      patch: Partial<CollabInput & Pick<Collab, 'memo'>>
+    }) => repository.updateCollab(id, patch),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
   })
 }
