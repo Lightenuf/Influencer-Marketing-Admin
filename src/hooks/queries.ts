@@ -155,8 +155,9 @@ export function useReorderCollabs() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (orderedIds: string[]) => repository.reorderCollabs(orderedIds),
-    onMutate: async (orderedIds) => {
-      await client.cancelQueries({ queryKey: keys.collabs })
+    // 기다리지 않고 그 자리에서 캐시를 고친다. 한 박자 늦게 고치면 손을 뗀 뒤 화면이 한 번 더 튄다.
+    onMutate: (orderedIds) => {
+      client.cancelQueries({ queryKey: keys.collabs })
       const previous = client.getQueryData<Collab[]>(keys.collabs)
       if (previous) {
         const rank = new Map(orderedIds.map((id, index) => [id, index]))
@@ -169,10 +170,12 @@ export function useReorderCollabs() {
       }
       return { previous }
     },
+    // 순서는 우리가 정한 값 그대로 저장되므로, 성공했다면 다시 받아올 것이 없다.
+    // 굳이 다시 받아오면 카드가 한 번 더 그려져 손을 뗀 뒤 버벅인다.
     onError: (_error, _ids, context) => {
       if (context?.previous) client.setQueryData(keys.collabs, context.previous)
+      client.invalidateQueries({ queryKey: keys.collabs })
     },
-    onSettled: () => client.invalidateQueries({ queryKey: keys.collabs }),
   })
 }
 

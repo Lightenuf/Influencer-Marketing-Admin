@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -104,17 +105,23 @@ function StageCards({
   const lastTop = useRef(new Map<string, number>())
   const drag = useRef<{ id: string; startY: number; moved: boolean } | null>(null)
 
-  // 끄는 동안에는 화면에만 순서를 바꿔 두고, 손을 떼면 저장한다.
-  const [order, setOrder] = useState(items)
-  const [dragId, setDragId] = useState<string | null>(null)
+  // 끄는 동안에만 쓰는 임시 순서(아이디 차례). 평소에는 받은 목록을 그대로 그린다.
+  // 목록을 통째로 복사해 두면 메모 같은 내용 변경이 화면에 늦게 반영된다.
+  const [preview, setPreview] = useState<string[] | null>(null)
   // 끄는 위치는 화면 갱신마다 바뀐다. 상태에 담으면 그때마다 카드 전체가 다시 그려져
   // 손을 못 따라오므로, 움직이는 칸만 직접 만진다.
   const pending = useRef<number | null>(null)
   const frame = useRef(0)
 
-  useEffect(() => {
-    if (!dragId) setOrder(items)
-  }, [items, dragId])
+  const order = useMemo(() => {
+    if (!preview) return items
+    const byId = new Map(items.map((collab) => [collab.id, collab]))
+    const shuffled = preview
+      .map((id) => byId.get(id))
+      .filter((collab): collab is Collab => collab !== undefined)
+    // 끄는 사이에 카드가 들어오거나 빠졌으면 임시 순서를 버린다.
+    return shuffled.length === items.length ? shuffled : items
+  }, [items, preview])
 
   const registerCard = (id: string) => (element: HTMLDivElement | null) => {
     if (element) cards.current.set(id, element)
@@ -126,7 +133,7 @@ function StageCards({
     for (const [id, element] of cards.current) {
       const top = element.getBoundingClientRect().top
       const before = lastTop.current.get(id)
-      if (id !== dragId && before !== undefined && Math.abs(before - top) > 1) {
+      if (id !== drag.current?.id && before !== undefined && Math.abs(before - top) > 1) {
         element.style.transition = 'none'
         element.style.transform = `translateY(${before - top}px)`
         requestAnimationFrame(() => {
@@ -136,7 +143,7 @@ function StageCards({
       }
       lastTop.current.set(id, top)
     }
-  }, [order, dragId])
+  }, [order])
 
   /** 겉의 자리(ref로 잡아둔 칸) 안에서 실제로 움직이는 칸 */
   const movingNode = (id: string) =>
@@ -174,8 +181,14 @@ function StageCards({
     if (!state.moved) {
       if (Math.abs(distance) < 5) return
       state.moved = true
-      setDragId(state.id)
       document.body.style.userSelect = 'none'
+      movingNode(state.id)?.classList.add(
+        'relative',
+        'z-10',
+        'cursor-grabbing',
+        'opacity-90',
+        'shadow-lg',
+      )
     }
 
     const index = order.findIndex((collab) => collab.id === state.id)
@@ -192,9 +205,9 @@ function StageCards({
       const otherCentre = otherBox.top + otherBox.height / 2
       const passed = direction === 1 ? selfCentre > otherCentre : selfCentre < otherCentre
       if (passed) {
-        const next = [...order]
+        const next = order.map((collab) => collab.id)
         ;[next[index], next[index + direction]] = [next[index + direction], next[index]]
-        setOrder(next)
+        setPreview(next)
         // 카드가 한 칸 옮겨간 만큼 기준점도 옮겨야 손과 카드가 계속 붙어 있다. (8px은 카드 사이 간격)
         state.startY += (otherBox.height + 8) * direction
         schedule(event.clientY - state.startY)
@@ -216,9 +229,19 @@ function StageCards({
     if (node) {
       node.style.transform = ''
       node.style.willChange = ''
+      node.classList.remove('relative', 'z-10', 'cursor-grabbing', 'opacity-90', 'shadow-lg')
     }
-    setDragId(null)
-    if (state?.moved) onReorder(order.map((collab) => collab.id))
+    if (!state?.moved) {
+      setPreview(null)
+      return
+    }
+    // 화면은 이미 새 차례로 보이고 있으므로, 목록을 고쳐 쓰는 일은 다음 그림까지 미룬다.
+    // 손을 떼는 그 순간에 함께 하면 한 박자 걸린다.
+    const orderedIds = order.map((collab) => collab.id)
+    requestAnimationFrame(() => {
+      onReorder(orderedIds)
+      setPreview(null)
+    })
   }
 
   return (
@@ -237,10 +260,7 @@ function StageCards({
               onPointerMove={onDragMove}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
-              className={clsx(
-                'cursor-grab',
-                dragId === collab.id && 'relative z-10 cursor-grabbing opacity-90 shadow-lg',
-              )}
+              className="cursor-grab"
             >
               <Card className="p-3">
                 {/* 링크는 글자만큼만 차지한다 — 옆 빈 곳은 카드를 끄는 데 쓴다 */}
