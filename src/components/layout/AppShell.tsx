@@ -8,7 +8,7 @@ import { useInfluencers } from '@/hooks/queries'
 /** 메뉴가 길어져 하는 일끼리 묶는다 — 크리에이터 쪽과 광고 쪽 */
 const navGroups = [
   {
-    title: null,
+    title: '인플루언서 마케팅',
     items: [
       { to: '/dashboard', label: '대시보드', icon: '📊' },
       { to: '/discovery', label: '인플루언서 발굴', icon: '🔍' },
@@ -20,7 +20,7 @@ const navGroups = [
     ],
   },
   {
-    title: '메타 광고',
+    title: '퍼포먼스 마케팅',
     items: [
       { to: '/ads', label: '광고 대시보드', icon: '📈' },
       { to: '/ads/creatives', label: '소재 성과', icon: '🎬' },
@@ -59,13 +59,11 @@ export default function AppShell() {
         </Link>
 
         <nav className="flex-1 space-y-0.5 px-3">
-          {navGroups.map((group) => (
-            <div key={group.title ?? 'main'} className={group.title ? 'pt-3' : undefined}>
-              {group.title && (
-                <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400">
-                  {group.title}
-                </p>
-              )}
+          {navGroups.map((group, index) => (
+            <div key={group.title} className={index === 0 ? 'pt-1' : 'pt-5'}>
+              <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-slate-400">
+                {group.title}
+              </p>
               {group.items.map((item) => (
                 <NavLink
                   key={item.to}
