@@ -264,6 +264,37 @@ Deno.serve(async (request) => {
         )
       }
 
+      case 'igAccounts': {
+        // 인스타 계정 ID는 용도별로 여러 개다. 광고에 쓸 수 있는 것만 모아 보여준다.
+        const found: GraphRow[] = []
+
+        try {
+          const linked = await graph(`${act}/instagram_accounts`, { fields: 'id,username' })
+          for (const row of linked) found.push({ ...row, from: '광고 계정에 연결됨' })
+        } catch (error) {
+          found.push({ from: '광고 계정에 연결됨', error: String(error) })
+        }
+
+        if (PAGE_ID) {
+          try {
+            const viaPage = await graph(`${PAGE_ID}/instagram_accounts`, { fields: 'id,username' })
+            for (const row of viaPage) found.push({ ...row, from: '페이지에 연결됨' })
+          } catch (error) {
+            found.push({ from: '페이지에 연결됨', error: String(error) })
+          }
+          try {
+            const backed = await graph(`${PAGE_ID}/page_backed_instagram_accounts`, {
+              fields: 'id,username',
+            })
+            for (const row of backed) found.push({ ...row, from: '페이지 전용 계정' })
+          } catch (error) {
+            found.push({ from: '페이지 전용 계정', error: String(error) })
+          }
+        }
+
+        return json({ current: INSTAGRAM_ID, candidates: found })
+      }
+
       case 'uploadImage': {
         // 이미지는 크지 않아 함수를 거쳐 그대로 넘긴다.
         const form = new URLSearchParams({
@@ -299,7 +330,8 @@ Deno.serve(async (request) => {
 
         // 표준 이미지·영상 크리에이티브로만 만든다. 카탈로그(DPA)는 쓰지 않는다.
         const storySpec: GraphRow = { page_id: PAGE_ID }
-        if (INSTAGRAM_ID) storySpec.instagram_actor_id = INSTAGRAM_ID
+        // 인스타 계정을 적으면 인스타에도 같은 계정으로 나간다. 적지 않으면 페이지 이름으로 나간다.
+        if (INSTAGRAM_ID) storySpec.instagram_user_id = INSTAGRAM_ID
 
         if (creative.kind === 'video') {
           storySpec.video_data = {
@@ -329,7 +361,21 @@ Deno.serve(async (request) => {
           })
         }
 
-        const made = await post(`${act}/adcreatives`, creativePayload)
+        let made
+        try {
+          made = await post(`${act}/adcreatives`, creativePayload)
+        } catch (error) {
+          // 예전 이름을 쓰는 계정도 있어 한 번 더 시도한다.
+          const message = error instanceof Error ? error.message : String(error)
+          if (INSTAGRAM_ID && /instagram/i.test(message)) {
+            delete storySpec.instagram_user_id
+            storySpec.instagram_actor_id = INSTAGRAM_ID
+            creativePayload.object_story_spec = JSON.stringify(storySpec)
+            made = await post(`${act}/adcreatives`, creativePayload)
+          } else {
+            throw error
+          }
+        }
 
         // 항상 멈춘 상태로 만든다 — 확인하고 사람이 켠다.
         const ad = await post(`${act}/ads`, {
