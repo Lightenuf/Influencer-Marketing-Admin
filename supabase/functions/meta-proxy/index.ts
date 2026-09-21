@@ -14,8 +14,17 @@
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 
-const TOKEN = Deno.env.get('META_ACCESS_TOKEN') ?? ''
-const ACCOUNT = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
+/**
+ * 설정은 요청이 올 때마다 읽는다.
+ * 함수가 이미 떠 있는 상태에서 Secret을 넣거나 고쳐도 다시 배포하지 않고 반영되게 하기 위함.
+ */
+let TOKEN = ''
+let ACCOUNT = ''
+
+function loadSecrets() {
+  TOKEN = (Deno.env.get('META_ACCESS_TOKEN') ?? '').trim()
+  ACCOUNT = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').trim().replace(/^act_/, '')
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -104,6 +113,18 @@ const INSIGHT_FIELDS =
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
+  loadSecrets()
+
+  // 설정이 제대로 들어갔는지 확인하는 용도. 토큰 값은 내보내지 않고 길이만 알린다.
+  const peek = request.headers.get('x-meta-diag')
+  if (peek) {
+    return json({
+      tokenLength: TOKEN.length,
+      accountId: ACCOUNT ? `${ACCOUNT.slice(0, 4)}…(${ACCOUNT.length}자리)` : '(없음)',
+      metaSecretNames: Object.keys(Deno.env.toObject()).filter((key) => key.includes('META')),
+    })
+  }
 
   if (!TOKEN || !ACCOUNT) {
     return json(
