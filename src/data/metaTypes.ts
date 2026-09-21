@@ -183,3 +183,31 @@ export const DEFAULT_CTA: Record<MetaObjective, MetaCta> = {
   OUTCOME_TRAFFIC: 'LEARN_MORE',
   OUTCOME_ENGAGEMENT: 'LEARN_MORE',
 }
+
+/**
+ * 광고를 만들 때 미리 채워 두는 값들.
+ * "매번 설정하지 않아도 되게" 하기 위한 것이지 잠그기 위한 것이 아니므로, 화면에서 바꿀 수 있다.
+ */
+
+/** 판매 목표일 때 무엇을 성과로 셀지 */
+export const DEFAULT_CONVERSION_EVENT = 'PURCHASE'
+
+/** 소재마다 다를 수 있어 업로드 화면에서 고칠 수 있게 한다 */
+export const DEFAULT_LANDING_URL = 'https://drinkbreevo.com/shop_view?idx=10'
+
+/**
+ * 기본 타겟 — 연령·성별을 가르지 않는다.
+ * 18세 아래로는 내릴 수 없다(메타가 막는다). 65는 '65세 이상' 전체를 뜻한다.
+ */
+export const DEFAULT_TARGETING = {
+  ageMin: 18,
+  ageMax: 65,
+  /** 'all'이면 성별을 가리지 않는다 */
+  genders: 'all' as const,
+}
+
+/**
+ * 최근에 산 사람에게 또 보여주지 않으려고 뺄 때 쓰는 기간.
+ * 광고 세트를 만들 때 켜고 끌 수 있게 한다.
+ */
+export const RECENT_BUYER_EXCLUSION_DAYS = 40
