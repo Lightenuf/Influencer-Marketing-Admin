@@ -144,6 +144,21 @@ export default function CreativeUploadPage() {
 
   const buyerAudience = useMemo(() => guessRecentBuyerAudience(audiences), [audiences])
 
+  /**
+   * 한 광고로 묶을 수 없는 조합을 미리 걸러낸다.
+   * 메타는 노출 자리마다 소재를 하나씩만 받고, 영상과 이미지를 한 광고에 섞지 못한다.
+   */
+  const groupIssue = (group: { items: Array<{ item: Item }> }) => {
+    if (group.items.length < 2) return null
+    const slots = group.items.map(({ item }) => item.slot)
+    if (new Set(slots).size !== slots.length) {
+      return '같은 자리에 소재가 둘 이상입니다. 하나를 다른 자리로 바꾸거나, 이름을 다르게 해 따로 올리세요.'
+    }
+    const kinds = new Set(group.items.map(({ item }) => item.file.type.split('/')[0]))
+    if (kinds.size > 1) return '영상과 이미지는 한 광고로 묶을 수 없습니다. 이름을 다르게 해주세요.'
+    return null
+  }
+
   /** 이름이 같은 소재는 한 광고가 된다 */
   const groups = useMemo(() => {
     const map = new Map<string, { name: string; items: Array<{ item: Item; index: number }> }>()
@@ -188,10 +203,13 @@ export default function CreativeUploadPage() {
   const patch = (index: number, change: Partial<Item>) =>
     setItems((current) => current.map((item, i) => (i === index ? { ...item, ...change } : item)))
 
+  const blocked = groups.some((group) => groupIssue(group) !== null)
+
   const ready =
     items.some((item) => item.stage === '대기') &&
     adsetId !== '' &&
     landingUrl.trim() !== '' &&
+    !blocked &&
     !running
 
   /**
@@ -345,6 +363,12 @@ export default function CreativeUploadPage() {
                       </span>
                     )}
                   </div>
+
+                  {groupIssue(group) && (
+                    <p className="border-b border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      {groupIssue(group)}
+                    </p>
+                  )}
 
                   <div className="divide-y divide-slate-100">
                     {group.items.map(({ item, index }) => (
