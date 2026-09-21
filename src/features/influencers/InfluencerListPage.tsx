@@ -99,6 +99,12 @@ function ContactLog({ influencer }: { influencer: Influencer }) {
    * 인스타 DM 창을 열고, 시딩 문구를 클립보드에 넣고, 보낸 것으로 기록한다.
    * 인스타는 밖에서 메시지를 대신 보낼 수 없어, 창까지만 열어주고 전송은 사람이 한다.
    */
+  /**
+   * 프로필을 열어 준다. 파트너십 메시지는 프로필의 '메시지 보내기' →
+   * '우선순위 메시지 보내기' 를 거쳐야만 열리고, 그 경로를 주소로 건너뛸 수 없다.
+   * (대화방 주소 /direct/partnerships/t/숫자 의 숫자는 대화가 생긴 뒤에야 발급된다)
+   * 그래서 문 앞까지만 데려다주고 마지막 두 번은 사람이 누른다.
+   */
   const openDm = () => {
     // ① 복사 먼저. 창을 열면 화면이 포커스를 잃어 복사가 막힌다.
     const body = templates[0]?.body
@@ -106,8 +112,9 @@ function ContactLog({ influencer }: { influencer: Influencer }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     }
-    // ② 그 다음 DM 창. 클릭 흐름 안에서 열어야 브라우저가 막지 않는다.
-    window.open(`https://ig.me/m/${influencer.snsHandle}`, '_blank', 'noopener')
+    // ② 프로필 열기. 클릭 흐름 안에서 열어야 브라우저가 막지 않는다.
+    const url = profileUrl(influencer.snsPlatform, influencer.snsHandle, influencer.snsUrl)
+    if (url) window.open(url, '_blank', 'noopener')
     // ③ 보낸 것으로 기록. 잘못 눌렀으면 날짜 옆 × 로 지운다.
     log.mutate({ id: influencer.id, date: today() })
   }
@@ -140,11 +147,11 @@ function ContactLog({ influencer }: { influencer: Influencer }) {
         title={
           influencer.doNotContact
             ? '연락 금지 대상입니다.'
-            : '인스타 DM 창을 열고, 시딩 문구를 복사하고, 보낸 것으로 기록합니다'
+            : '시딩 문구를 복사하고 프로필을 엽니다. 프로필에서 메시지 보내기 → 우선순위 메시지 보내기'
         }
         onClick={openDm}
       >
-        {copied ? '✓ 문구 복사됨' : 'DM 보내기'}
+        {copied ? '✓ 문구 복사됨' : 'DM 보내러 가기'}
       </Button>
     </div>
   )
