@@ -229,6 +229,16 @@ export interface DiscoveryRequest {
   finishedAt: string | null
 }
 
+export interface MessageTemplate {
+  id: string
+  name: string
+  body: string
+  sortOrder: number
+  updatedBy: string | null
+  updatedAt: string
+  createdAt: string
+}
+
 export interface CommunicationLog {
   id: string
   influencerId: string

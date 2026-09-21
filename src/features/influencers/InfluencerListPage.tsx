@@ -11,12 +11,14 @@ import {
   type Influencer,
 } from '@/data/types'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
+import MessageTemplates from '@/features/influencers/MessageTemplates'
 import {
   useCollabs,
   useCreateCollab,
   useDemoData,
   useInfluencers,
   useLogContact,
+  useMessageTemplates,
   useUndoContact,
 } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
@@ -37,11 +39,78 @@ const hasProfile = (influencer: Influencer) =>
 const today = () => new Date().toISOString().slice(0, 10)
 
 /** 메시지를 보낸 날과 횟수. 버튼 한 번이 한 건이고, 잘못 눌렀으면 바로 되돌린다. */
+/** 등록일(YYYY-MM-DD)만 뽑는다. */
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString('sv-SE')
+
+/** 오늘·어제는 글자로, 그 전은 날짜로 읽는다. */
+function dayLabel(day: string) {
+  const today = new Date().toLocaleDateString('sv-SE')
+  const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('sv-SE')
+  if (day === today) return '오늘'
+  if (day === yesterday) return '어제'
+  return formatDate(day)
+}
+
+/**
+ * 목록을 등록일별로 묶는다. 목록이 최신순이라 묶음도 최신순으로 나온다.
+ * 며칠에 몇 명을 넣었는지 한눈에 보려는 것.
+ */
+function groupByDay(list: Influencer[]) {
+  const groups: { day: string; items: Influencer[] }[] = []
+  for (const influencer of list) {
+    const day = dayOf(influencer.createdAt)
+    const last = groups[groups.length - 1]
+    if (last && last.day === day) last.items.push(influencer)
+    else groups.push({ day, items: [influencer] })
+  }
+  return groups
+}
+
+/**
+ * 클립보드에 그 자리에서 복사한다.
+ * navigator.clipboard 는 비동기라, 새 창을 연 뒤에는 화면이 포커스를 잃어 막힌다.
+ * 그래서 창을 열기 전에 동기 방식으로 먼저 복사한다.
+ */
+function copyNow(text: string) {
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.style.position = 'fixed'
+    area.style.top = '-1000px'
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(area)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 function ContactLog({ influencer }: { influencer: Influencer }) {
   const log = useLogContact()
   const undo = useUndoContact()
+  const { data: templates = [] } = useMessageTemplates()
   const dates = influencer.contactedDates
   const last = dates[dates.length - 1]
+  const [copied, setCopied] = useState(false)
+
+  /**
+   * 인스타 DM 창을 열고, 시딩 문구를 클립보드에 넣고, 보낸 것으로 기록한다.
+   * 인스타는 밖에서 메시지를 대신 보낼 수 없어, 창까지만 열어주고 전송은 사람이 한다.
+   */
+  const openDm = () => {
+    // ① 복사 먼저. 창을 열면 화면이 포커스를 잃어 복사가 막힌다.
+    const body = templates[0]?.body
+    if (body && copyNow(body)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    }
+    // ② 그 다음 DM 창. 클릭 흐름 안에서 열어야 브라우저가 막지 않는다.
+    window.open(`https://ig.me/m/${influencer.snsHandle}`, '_blank', 'noopener')
+    // ③ 보낸 것으로 기록. 잘못 눌렀으면 날짜 옆 × 로 지운다.
+    log.mutate({ id: influencer.id, date: today() })
+  }
 
   return (
     <div className="flex items-center justify-end gap-2 whitespace-nowrap">
@@ -71,11 +140,11 @@ function ContactLog({ influencer }: { influencer: Influencer }) {
         title={
           influencer.doNotContact
             ? '연락 금지 대상입니다.'
-            : '오늘 메시지를 보낸 것으로 기록합니다'
+            : '인스타 DM 창을 열고, 시딩 문구를 복사하고, 보낸 것으로 기록합니다'
         }
-        onClick={() => log.mutate({ id: influencer.id, date: today() })}
+        onClick={openDm}
       >
-        발송
+        {copied ? '✓ 문구 복사됨' : 'DM 보내기'}
       </Button>
     </div>
   )
@@ -188,6 +257,8 @@ export default function InfluencerListPage() {
         </div>
       </div>
 
+      <MessageTemplates />
+
       <Card className="p-4">
         <div className="grid gap-3 md:grid-cols-3">
           <Input
@@ -272,7 +343,19 @@ export default function InfluencerListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((influencer) => (
+                {groupByDay(filtered).map((group) => [
+                  <tr key={`day-${group.day}`} className="bg-slate-100/80">
+                    <td
+                      colSpan={7}
+                      className="border-y border-slate-200 px-5 py-1.5 text-xs font-semibold text-slate-600"
+                    >
+                      {dayLabel(group.day)}
+                      <span className="ml-2 font-normal text-slate-400">
+                        {group.items.length}명 등록
+                      </span>
+                    </td>
+                  </tr>,
+                  ...group.items.map((influencer) => (
                   <tr
                     key={influencer.id}
                     className={clsx(
@@ -382,7 +465,8 @@ export default function InfluencerListPage() {
                       </Button>
                     </td>
                   </tr>
-                ))}
+                  )),
+                ])}
               </tbody>
             </table>
           </div>

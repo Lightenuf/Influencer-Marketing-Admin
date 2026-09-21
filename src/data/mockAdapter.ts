@@ -14,6 +14,7 @@ import type {
   DiscoveryRequest,
   DncAuditEntry,
   Influencer,
+  MessageTemplate,
   ReasonTag,
   Shipment,
   TeamMember,
@@ -24,6 +25,7 @@ const STORAGE_KEY = 'breevo-influencer-admin:v1'
 export interface Database {
   discoveryRequests: DiscoveryRequest[]
   reasonTags: ReasonTag[]
+  messageTemplates: MessageTemplate[]
   influencers: Influencer[]
   dncAuditLog: DncAuditEntry[]
   collabs: Collab[]
@@ -40,6 +42,7 @@ const TEAM_MEMBERS: TeamMember[] = [
 const emptyDb = (): Database => ({
   discoveryRequests: [],
   reasonTags: [],
+  messageTemplates: [],
   influencers: [],
   dncAuditLog: [],
   collabs: [],
@@ -404,6 +407,45 @@ export const mockAdapter: DataRepository = {
     db.discoveryRequests = db.discoveryRequests.filter((item) => item.id !== id)
     write(db)
     return tick(undefined)
+  },
+
+  async listMessageTemplates() {
+    const db = read()
+    return tick([...db.messageTemplates].sort((a, b) => a.sortOrder - b.sortOrder))
+  },
+
+  async saveMessageTemplate(id, patch, actorId) {
+    const db = read()
+    const found = db.messageTemplates.find((item) => item.id === id)
+    if (!found) throw new Error('메시지 템플릿을 찾을 수 없습니다.')
+    if (patch.name !== undefined) found.name = patch.name
+    if (patch.body !== undefined) found.body = patch.body
+    found.updatedBy = actorId
+    found.updatedAt = now()
+    write(db)
+    return tick(found)
+  },
+
+  async createMessageTemplate(name, actorId) {
+    const db = read()
+    const template: MessageTemplate = {
+      id: uid(),
+      name,
+      body: '',
+      sortOrder: db.messageTemplates.length,
+      updatedBy: actorId,
+      updatedAt: now(),
+      createdAt: now(),
+    }
+    db.messageTemplates.push(template)
+    write(db)
+    return tick(template)
+  },
+
+  async deleteMessageTemplate(id: string) {
+    const db = read()
+    db.messageTemplates = db.messageTemplates.filter((item) => item.id !== id)
+    write(db)
   },
 
   async listReasonTags() {

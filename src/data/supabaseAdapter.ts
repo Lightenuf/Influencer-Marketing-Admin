@@ -14,6 +14,7 @@ import type {
   DiscoveryRequest,
   DncAuditEntry,
   Influencer,
+  MessageTemplate,
   ReasonTag,
   Shipment,
   TeamMember,
@@ -27,6 +28,16 @@ const toTeamMember = (row: Row): TeamMember => ({
   email: row.email ?? '',
   displayName: row.display_name ?? row.email ?? '이름 없음',
   role: row.role === 'admin' ? 'admin' : 'member',
+})
+
+const toMessageTemplate = (row: Row): MessageTemplate => ({
+  id: row.id,
+  name: row.name,
+  body: row.body ?? '',
+  sortOrder: row.sort_order ?? 0,
+  updatedBy: row.updated_by ?? null,
+  updatedAt: row.updated_at,
+  createdAt: row.created_at,
 })
 
 const toInfluencer = (row: Row): Influencer => ({
@@ -474,6 +485,43 @@ export const supabaseAdapter: DataRepository = {
   async deleteDiscoveryRequest(id) {
     const db = requireSupabase()
     const { error } = await db.from('discovery_requests').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async listMessageTemplates() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db.from('message_templates').select('*').order('sort_order'),
+    )
+    return rows.map(toMessageTemplate)
+  },
+
+  async saveMessageTemplate(id, patch, actorId) {
+    const db = requireSupabase()
+    const row: Row = { updated_by: actorId, updated_at: new Date().toISOString() }
+    if (patch.name !== undefined) row.name = patch.name
+    if (patch.body !== undefined) row.body = patch.body
+    return toMessageTemplate(
+      unwrap(await db.from('message_templates').update(row).eq('id', id).select().single()),
+    )
+  },
+
+  async createMessageTemplate(name, actorId) {
+    const db = requireSupabase()
+    return toMessageTemplate(
+      unwrap(
+        await db
+          .from('message_templates')
+          .insert({ name, body: '', updated_by: actorId })
+          .select()
+          .single(),
+      ),
+    )
+  },
+
+  async deleteMessageTemplate(id) {
+    const db = requireSupabase()
+    const { error } = await db.from('message_templates').delete().eq('id', id)
     if (error) throw new Error(error.message)
   },
 

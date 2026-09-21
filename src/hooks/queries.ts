@@ -18,6 +18,7 @@ export const keys = {
   shipments: ['shipments'] as const,
   reasonTags: ['reasonTags'] as const,
   discoveryRequests: ['discoveryRequests'] as const,
+  messageTemplates: ['messageTemplates'] as const,
   notes: (id: string) => ['notes', id] as const,
 }
 
@@ -194,6 +195,38 @@ export function useCancelCollab() {
     mutationFn: ({ id, reasons, detail }: { id: string; reasons: string[]; detail: string }) =>
       repository.cancelCollab(id, reasons, detail),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
+  })
+}
+
+export function useMessageTemplates() {
+  return useQuery({
+    queryKey: keys.messageTemplates,
+    queryFn: () => repository.listMessageTemplates(),
+  })
+}
+
+export function useSaveMessageTemplate(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; body?: string } }) =>
+      repository.saveMessageTemplate(id, patch, actorId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.messageTemplates }),
+  })
+}
+
+export function useCreateMessageTemplate(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) => repository.createMessageTemplate(name, actorId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.messageTemplates }),
+  })
+}
+
+export function useDeleteMessageTemplate() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => repository.deleteMessageTemplate(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.messageTemplates }),
   })
 }
 

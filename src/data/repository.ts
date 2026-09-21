@@ -6,6 +6,7 @@ import type {
   DiscoveryRequest,
   DncAuditEntry,
   Influencer,
+  MessageTemplate,
   ReasonTag,
   Shipment,
   TeamMember,
@@ -121,6 +122,16 @@ export interface DataRepository {
   createShipment(input: ShipmentInput): Promise<Shipment>
   updateShipment(id: string, patch: Partial<ShipmentInput>): Promise<Shipment>
   deleteShipment(id: string): Promise<void>
+
+  /** 시딩 메시지 등 자주 바뀌는 문구를 팀원이 어드민에서 고친다. */
+  listMessageTemplates(): Promise<MessageTemplate[]>
+  saveMessageTemplate(
+    id: string,
+    patch: { name?: string; body?: string },
+    actorId: string,
+  ): Promise<MessageTemplate>
+  createMessageTemplate(name: string, actorId: string): Promise<MessageTemplate>
+  deleteMessageTemplate(id: string): Promise<void>
 
   listNotes(influencerId: string): Promise<CommunicationLog[]>
   addNote(influencerId: string, note: string, authorId: string): Promise<CommunicationLog>
