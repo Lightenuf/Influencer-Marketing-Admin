@@ -360,27 +360,41 @@ Deno.serve(async (request) => {
           const labelKey = isVideo ? 'video_label' : 'image_label'
           const slots = [...new Set(assets.map((asset) => String(asset.slot)))]
 
-          const positionsOf = (slot: string) =>
-            slot === 'story'
-              ? {
-                  publisher_platforms: ['facebook', 'instagram'],
-                  facebook_positions: ['story'],
-                  instagram_positions: ['story', 'reels'],
-                }
-              : {
-                  publisher_platforms: ['facebook', 'instagram'],
-                  facebook_positions: ['feed'],
-                  instagram_positions: ['stream', 'explore'],
-                }
+          const positionsOf = (slot: string) => {
+            if (slot === 'story') {
+              return {
+                publisher_platforms: ['facebook', 'instagram'],
+                facebook_positions: ['story'],
+                instagram_positions: ['story', 'reels'],
+              }
+            }
+            if (slot === 'ig_feed') {
+              return {
+                publisher_platforms: ['instagram'],
+                instagram_positions: ['stream', 'explore'],
+              }
+            }
+            if (slot === 'fb_feed') {
+              return { publisher_platforms: ['facebook'], facebook_positions: ['feed'] }
+            }
+            return {
+              publisher_platforms: ['facebook', 'instagram'],
+              facebook_positions: ['feed'],
+              instagram_positions: ['stream', 'explore'],
+            }
+          }
 
           const feedSpec: GraphRow = {
             ad_formats: [isVideo ? 'SINGLE_VIDEO' : 'SINGLE_IMAGE'],
             bodies: [{ text: message }],
             link_urls: [{ website_url: link }],
             call_to_action_types: [String(params.cta)],
-            asset_customization_rules: slots.map((slot) => ({
+            // 규칙이 닿지 않는 자리도 있으므로 맨 앞 소재를 기본으로 삼는다.
+            // (기본이 없으면 메타가 'Invalid parameter'로 되돌려 보낸다)
+            asset_customization_rules: slots.map((slot, index) => ({
               customization_spec: positionsOf(slot),
               [labelKey]: { name: slot },
+              ...(index === 0 ? { is_default: true } : {}),
             })),
           }
 

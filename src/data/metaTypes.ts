@@ -241,11 +241,20 @@ export type CreativeRef =
  * 소재가 놓이는 자리.
  * 피드는 정사각(1:1)·세로(4:5)를, 스토리·릴스는 9:16을 쓴다.
  */
-export type PlacementSlot = 'feed' | 'story'
+export type PlacementSlot = 'feed' | 'ig_feed' | 'fb_feed' | 'story'
 
 export const PLACEMENT_LABELS: Record<PlacementSlot, string> = {
-  feed: '피드',
+  feed: '피드 전체',
+  ig_feed: '인스타 피드',
+  fb_feed: '페이스북 피드',
   story: '스토리·릴스',
+}
+
+export const PLACEMENT_HINTS: Record<PlacementSlot, string> = {
+  feed: '인스타·페이스북 피드 모두',
+  ig_feed: '인스타에서는 4:5가 가장 크게 보인다',
+  fb_feed: '페이스북에서는 1:1이 무난하다',
+  story: '9:16이 여백 없이 꽉 찬다',
 }
 
 /** 가로세로 비율로 어디에 쓸 소재인지 짐작한다 */
