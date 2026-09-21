@@ -34,7 +34,7 @@ export default function SignupPage() {
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-sm p-8">
         <div className="mb-6 text-center">
-          <p className="text-xs font-semibold tracking-widest text-violet-600">BREEVO</p>
+          <p className="text-xs font-semibold tracking-widest text-violet-600">Breevo</p>
           <h1 className="mt-1 text-xl font-bold text-slate-900">팀 계정 만들기</h1>
           <p className="mt-2 text-sm text-slate-500">
             회사 이메일(<b>{ALLOWED_EMAIL_DOMAIN}</b>)로만 가입할 수 있습니다

@@ -35,8 +35,8 @@ export default function LoginPage() {
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-sm p-8">
         <div className="mb-6 text-center">
-          <p className="text-xs font-semibold tracking-widest text-violet-600">BREEVO</p>
-          <h1 className="mt-1 text-xl font-bold text-slate-900">인플루언서 관리 어드민</h1>
+          <p className="text-xs font-semibold tracking-widest text-violet-600">Breevo</p>
+          <h1 className="mt-1 text-xl font-bold text-slate-900">마케팅 허브</h1>
           <p className="mt-2 text-sm text-slate-500">팀 계정으로 로그인하세요</p>
         </div>
 
