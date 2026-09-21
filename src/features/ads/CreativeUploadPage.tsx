@@ -10,11 +10,14 @@ import {
   FAVORITE_CTAS,
   META_CTAS,
   META_OBJECTIVES,
+  PLACEMENT_LABELS,
   RECENT_BUYER_EXCLUSION_DAYS,
   ctaLabel,
   guessRecentBuyerAudience,
+  slotOfRatio,
   type MetaCta,
   type MetaObjective,
+  type PlacementSlot,
 } from '@/data/metaTypes'
 import {
   useCreateAd,
@@ -34,13 +37,63 @@ type Stage = '대기' | '올리는 중' | '완료' | '실패'
 
 interface Item {
   file: File
-  /** 광고 이름 — 파일 이름에서 확장자를 뗀 것으로 시작한다 */
+  /**
+   * 광고 이름.
+   * 이름이 같은 소재끼리 한 광고로 묶인다 — 1:1과 9:16을 함께 올릴 때를 위한 것.
+   */
   name: string
+  /** 피드용인지 스토리용인지. 파일 비율을 보고 정하고, 손으로 바꿀 수 있다. */
+  slot: PlacementSlot
+  /** '1080×1080' 처럼 보여줄 크기 */
+  size: string
   stage: Stage
   message: string
 }
 
-const niceName = (fileName: string) => fileName.replace(/\.[^.]+$/, '')
+/** 확장자만 뗀 파일 이름 */
+const niceName = (fileName: string) => fileName.replace(/\.[^.]+$/, '').trim()
+
+/**
+ * 같은 광고의 다른 비율은 보통 이름 뒤에 꼬리표만 붙는다.
+ * ('인스타 피드_3' 과 '인스타 피드_3-1')
+ * 그래서 다른 이름의 앞부분인 이름이 있으면 짧은 쪽으로 맞춰 한 광고로 묶는다.
+ * 숫자만 이어 붙은 다른 소재('..._3' 과 '..._30')가 섞이지 않도록,
+ * 꼬리표가 구분자(- _ 공백 괄호)로 시작할 때만 같은 것으로 본다.
+ */
+function mergeNames(names: string[]): string[] {
+  const unique = [...new Set(names)].sort((a, b) => a.length - b.length)
+  return names.map((name) => {
+    const shorter = unique.find(
+      (candidate) =>
+        candidate.length < name.length &&
+        name.startsWith(candidate) &&
+        /^[-_ (]/.test(name.slice(candidate.length)),
+    )
+    return shorter ?? name
+  })
+}
+
+/** 이미지·영상의 실제 크기를 읽는다 — 비율로 놓일 자리를 정하기 위함 */
+function readSize(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const done = (width: number, height: number) => {
+      URL.revokeObjectURL(url)
+      resolve({ width, height })
+    }
+    if (file.type.startsWith('video/')) {
+      const video = document.createElement('video')
+      video.onloadedmetadata = () => done(video.videoWidth, video.videoHeight)
+      video.onerror = () => done(0, 0)
+      video.src = url
+    } else {
+      const image = new Image()
+      image.onload = () => done(image.naturalWidth, image.naturalHeight)
+      image.onerror = () => done(0, 0)
+      image.src = url
+    }
+  })
+}
 
 const stageTone: Record<Stage, string> = {
   대기: 'bg-slate-100 text-slate-500',
@@ -91,6 +144,18 @@ export default function CreativeUploadPage() {
 
   const buyerAudience = useMemo(() => guessRecentBuyerAudience(audiences), [audiences])
 
+  /** 이름이 같은 소재는 한 광고가 된다 */
+  const groups = useMemo(() => {
+    const map = new Map<string, { name: string; items: Array<{ item: Item; index: number }> }>()
+    items.forEach((item, index) => {
+      const key = item.name.trim() || `이름 없음 ${index + 1}`
+      const group = map.get(key) ?? { name: key, items: [] }
+      group.items.push({ item, index })
+      map.set(key, group)
+    })
+    return [...map.values()]
+  }, [items])
+
   const adsetLabel = (id: string) => {
     const adset = adsets.find((item) => item.id === id)
     if (!adset) return id
@@ -98,17 +163,26 @@ export default function CreativeUploadPage() {
     return campaign ? `${campaign.name} › ${adset.name}` : adset.name
   }
 
-  const addFiles = (files: FileList | null) => {
+  const addFiles = async (files: FileList | null) => {
     if (!files) return
-    setItems((current) => [
-      ...current,
-      ...[...files].map((file) => ({
-        file,
-        name: niceName(file.name),
-        stage: '대기' as Stage,
-        message: '',
-      })),
-    ])
+    const added = await Promise.all(
+      [...files].map(async (file) => {
+        const { width, height } = await readSize(file)
+        return {
+          file,
+          name: niceName(file.name),
+          slot: slotOfRatio(width, height),
+          size: width && height ? `${width}×${height}` : '',
+          stage: '대기' as Stage,
+          message: '',
+        }
+      }),
+    )
+    setItems((current) => {
+      const next = [...current, ...added]
+      const merged = mergeNames(next.map((item) => item.name))
+      return next.map((item, index) => ({ ...item, name: merged[index] }))
+    })
   }
 
   const patch = (index: number, change: Partial<Item>) =>
@@ -120,32 +194,46 @@ export default function CreativeUploadPage() {
     landingUrl.trim() !== '' &&
     !running
 
-  /** 한 건씩 차례로 올린다 — 한꺼번에 보내면 메타가 막는다 */
+  /**
+   * 이름이 같은 소재는 한 광고로 묶어 올린다.
+   * 광고는 한 건씩 차례로 만든다 — 한꺼번에 보내면 메타가 막는다.
+   */
   const run = async () => {
     setRunning(true)
-    for (const [index, item] of items.entries()) {
-      if (item.stage === '완료') continue
-      patch(index, { stage: '올리는 중', message: '' })
+
+    for (const group of groups) {
+      if (group.items.every(({ item }) => item.stage === '완료')) continue
+      for (const { index } of group.items) patch(index, { stage: '올리는 중', message: '' })
+
       try {
-        const creative = await uploadCreative.mutateAsync(item.file)
+        const creatives = []
+        for (const { item } of group.items) {
+          const ref = await uploadCreative.mutateAsync(item.file)
+          creatives.push({ ref, slot: item.slot })
+        }
+
         await createAd.mutateAsync({
           adsetId,
-          name: item.name,
+          name: group.name,
           primaryText,
           landingUrl: landingUrl.trim(),
           cta,
-          creative,
+          creatives,
           isPartnership,
           partnerInstagramId: isPartnership ? partnerInstagramId.trim() : undefined,
         })
-        patch(index, { stage: '완료', message: '일시중지 상태로 만들어졌습니다' })
+
+        const where =
+          creatives.length > 1
+            ? `소재 ${creatives.length}개를 한 광고로 묶었습니다`
+            : '일시중지 상태로 만들어졌습니다'
+        for (const { index } of group.items) patch(index, { stage: '완료', message: where })
       } catch (error) {
-        patch(index, {
-          stage: '실패',
-          message: error instanceof Error ? error.message : '알 수 없는 오류',
-        })
+        const message = error instanceof Error ? error.message : '알 수 없는 오류'
+        for (const { index } of group.items) patch(index, { stage: '실패', message })
       }
     }
+
     setRunning(false)
   }
 
@@ -239,52 +327,92 @@ export default function CreativeUploadPage() {
             className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-violet-700"
           />
 
-          {items.length > 0 && (
-            <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {items.map((item, index) => (
-                <div key={`${item.file.name}-${index}`} className="flex items-center gap-2 p-2.5">
-                  <span className="w-10 shrink-0 text-center text-xs text-slate-400">
-                    {item.file.type.startsWith('video/') ? '영상' : '이미지'}
-                  </span>
-                  <Input
-                    value={item.name}
-                    onChange={(e) => patch(index, { name: e.target.value })}
-                    className="py-1 text-sm"
-                    placeholder="광고 이름"
-                  />
-                  <span className="w-20 shrink-0 text-right text-xs text-slate-400">
-                    {formatNumber(Math.round(item.file.size / 1024))}KB
-                  </span>
-                  <span
-                    className={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-medium ${stageTone[item.stage]}`}
-                  >
-                    {item.stage}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={running}
-                    onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
-                    className="px-1 text-slate-300 hover:text-rose-500 disabled:opacity-40"
-                  >
-                    ×
-                  </button>
+          {groups.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500">
+                이름이 같은 소재는 <b>광고 하나</b>로 묶입니다. 1:1과 9:16을 함께 올리면 메타가 노출
+                자리에 맞춰 골라 씁니다.
+              </p>
+
+              {groups.map((group) => (
+                <div key={group.name} className="rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
+                    <span className="text-xs text-slate-400">광고</span>
+                    <span className="text-sm font-medium text-slate-800">{group.name}</span>
+                    {group.items.length > 1 && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                        소재 {group.items.length}개 묶음
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {group.items.map(({ item, index }) => (
+                      <div key={index} className="flex items-center gap-2 p-2.5">
+                        <span className="w-10 shrink-0 text-center text-xs text-slate-400">
+                          {item.file.type.startsWith('video/') ? '영상' : '이미지'}
+                        </span>
+                        <Input
+                          value={item.name}
+                          onChange={(e) => patch(index, { name: e.target.value })}
+                          className="py-1 text-sm"
+                          placeholder="광고 이름"
+                        />
+                        <div className="w-32 shrink-0">
+                          <Select
+                            value={item.slot}
+                            onChange={(e) =>
+                              patch(index, { slot: e.target.value as PlacementSlot })
+                            }
+                            className="py-1 text-xs"
+                          >
+                            {(Object.keys(PLACEMENT_LABELS) as PlacementSlot[]).map((slot) => (
+                              <option key={slot} value={slot}>
+                                {PLACEMENT_LABELS[slot]}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                        <span className="w-28 shrink-0 text-right text-xs whitespace-nowrap text-slate-400">
+                          {item.size || `${formatNumber(Math.round(item.file.size / 1024))}KB`}
+                        </span>
+                        <span
+                          className={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-medium ${stageTone[item.stage]}`}
+                        >
+                          {item.stage}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={running}
+                          onClick={() =>
+                            setItems((current) => current.filter((_, i) => i !== index))
+                          }
+                          className="px-1 text-slate-300 hover:text-rose-500 disabled:opacity-40"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {items.some((item) => item.message) && (
+          {groups.some((group) => group.items[0].item.message) && (
             <div className="space-y-1">
-              {items
-                .filter((item) => item.message)
-                .map((item, index) => (
+              {groups
+                .filter((group) => group.items[0].item.message)
+                .map((group) => (
                   <p
-                    key={index}
+                    key={group.name}
                     className={
-                      item.stage === '실패' ? 'text-xs text-rose-600' : 'text-xs text-emerald-600'
+                      group.items[0].item.stage === '실패'
+                        ? 'text-xs text-rose-600'
+                        : 'text-xs text-emerald-600'
                     }
                   >
-                    {item.name} — {item.message}
+                    {group.name} — {group.items[0].item.message}
                   </p>
                 ))}
             </div>
@@ -552,13 +680,16 @@ export default function CreativeUploadPage() {
       <div className="flex items-center justify-end gap-3 pb-4">
         {items.length > 0 && (
           <span className="text-sm text-slate-500">
-            완료 {items.filter((item) => item.stage === '완료').length} / {items.length}
+            소재 {items.filter((item) => item.stage === '완료').length} / {items.length} 완료
           </span>
         )}
         <Button onClick={run} disabled={!ready}>
           {running
             ? '올리는 중...'
-            : `${formatNumber(items.filter((item) => item.stage !== '완료').length)}개 광고 만들기`}
+            : `광고 ${formatNumber(
+                groups.filter((group) => group.items.some(({ item }) => item.stage !== '완료'))
+                  .length,
+              )}개 만들기`}
         </Button>
       </div>
     </div>

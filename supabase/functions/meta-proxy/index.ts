@@ -324,34 +324,80 @@ Deno.serve(async (request) => {
       case 'createAd': {
         if (!PAGE_ID) throw new Error('META_PAGE_ID가 설정되지 않았습니다.')
 
-        const creative = params.creative as GraphRow
-        const link = String(params.landingUrl)
-        const cta = { type: String(params.cta), value: { link } }
+        const assets = (params.creatives ?? []) as Array<GraphRow & { ref: GraphRow }>
+        if (assets.length === 0) throw new Error('올릴 소재가 없습니다.')
 
-        // 표준 이미지·영상 크리에이티브로만 만든다. 카탈로그(DPA)는 쓰지 않는다.
+        const link = String(params.landingUrl)
+        const message = String(params.primaryText ?? '')
+        const cta = { type: String(params.cta), value: { link } }
+        const isVideo = assets[0].ref.kind === 'video'
+
         const storySpec: GraphRow = { page_id: PAGE_ID }
         // 인스타 계정을 적으면 인스타에도 같은 계정으로 나간다. 적지 않으면 페이지 이름으로 나간다.
         if (INSTAGRAM_ID) storySpec.instagram_user_id = INSTAGRAM_ID
 
-        if (creative.kind === 'video') {
-          storySpec.video_data = {
-            video_id: creative.videoId,
-            message: String(params.primaryText ?? ''),
-            call_to_action: cta,
-            ...(creative.thumbnailUrl ? { image_url: creative.thumbnailUrl } : {}),
-          }
-        } else {
-          storySpec.link_data = {
-            image_hash: creative.imageHash,
-            link,
-            message: String(params.primaryText ?? ''),
-            call_to_action: cta,
-          }
-        }
+        const creativePayload: Record<string, string> = { name: `${params.name} 소재` }
 
-        const creativePayload: Record<string, string> = {
-          name: `${params.name} 소재`,
-          object_story_spec: JSON.stringify(storySpec),
+        if (assets.length === 1) {
+          // 소재가 하나면 그대로 쓴다.
+          const only = assets[0].ref
+          if (isVideo) {
+            storySpec.video_data = {
+              video_id: only.videoId,
+              message,
+              call_to_action: cta,
+              ...(only.thumbnailUrl ? { image_url: only.thumbnailUrl } : {}),
+            }
+          } else {
+            storySpec.link_data = { image_hash: only.imageHash, link, message, call_to_action: cta }
+          }
+          creativePayload.object_story_spec = JSON.stringify(storySpec)
+        } else {
+          /**
+           * 여러 비율을 올렸으면 광고는 하나로 두고, 노출 자리에 따라 소재가 갈리게 한다.
+           * 피드에는 정사각을, 스토리·릴스에는 세로를 쓴다.
+           */
+          const labelKey = isVideo ? 'video_label' : 'image_label'
+          const slots = [...new Set(assets.map((asset) => String(asset.slot)))]
+
+          const positionsOf = (slot: string) =>
+            slot === 'story'
+              ? {
+                  publisher_platforms: ['facebook', 'instagram'],
+                  facebook_positions: ['story'],
+                  instagram_positions: ['story', 'reels'],
+                }
+              : {
+                  publisher_platforms: ['facebook', 'instagram'],
+                  facebook_positions: ['feed'],
+                  instagram_positions: ['stream', 'explore'],
+                }
+
+          const feedSpec: GraphRow = {
+            ad_formats: [isVideo ? 'SINGLE_VIDEO' : 'SINGLE_IMAGE'],
+            bodies: [{ text: message }],
+            link_urls: [{ website_url: link }],
+            call_to_action_types: [String(params.cta)],
+            asset_customization_rules: slots.map((slot) => ({
+              customization_spec: positionsOf(slot),
+              [labelKey]: { name: slot },
+            })),
+          }
+
+          if (isVideo) {
+            feedSpec.videos = assets.map((asset) => ({
+              video_id: asset.ref.videoId,
+              adlabels: [{ name: String(asset.slot) }],
+            }))
+          } else {
+            feedSpec.images = assets.map((asset) => ({
+              hash: asset.ref.imageHash,
+              adlabels: [{ name: String(asset.slot) }],
+            }))
+          }
+
+          creativePayload.object_story_spec = JSON.stringify(storySpec)
+          creativePayload.asset_feed_spec = JSON.stringify(feedSpec)
         }
 
         // 파트너십 광고는 원작자를 함께 적어야 한다.

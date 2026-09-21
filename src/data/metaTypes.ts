@@ -237,6 +237,29 @@ export type CreativeRef =
   | { kind: 'image'; imageHash: string }
   | { kind: 'video'; videoId: string; thumbnailUrl: string | null }
 
+/**
+ * 소재가 놓이는 자리.
+ * 피드는 정사각(1:1)·세로(4:5)를, 스토리·릴스는 9:16을 쓴다.
+ */
+export type PlacementSlot = 'feed' | 'story'
+
+export const PLACEMENT_LABELS: Record<PlacementSlot, string> = {
+  feed: '피드',
+  story: '스토리·릴스',
+}
+
+/** 가로세로 비율로 어디에 쓸 소재인지 짐작한다 */
+export function slotOfRatio(width: number, height: number): PlacementSlot {
+  if (!width || !height) return 'feed'
+  // 세로로 길쭉하면(9:16 = 0.5625) 스토리·릴스용으로 본다.
+  return width / height < 0.7 ? 'story' : 'feed'
+}
+
+export interface CreativeAsset {
+  ref: CreativeRef
+  slot: PlacementSlot
+}
+
 /** 광고 한 건을 만들 때 필요한 것 */
 export interface AdCreateInput {
   adsetId: string
@@ -245,7 +268,11 @@ export interface AdCreateInput {
   primaryText: string
   landingUrl: string
   cta: MetaCta
-  creative: CreativeRef
+  /**
+   * 소재 묶음.
+   * 하나면 그대로 쓰고, 여러 개면 노출 위치에 따라 갈라 쓰도록 메타에 맡긴다.
+   */
+  creatives: CreativeAsset[]
   /**
    * 파트너십 광고로 돌릴지.
    * 켜려면 크리에이터 인스타 계정과 계정 레벨 파트너십이 미리 연결돼 있어야 한다.
