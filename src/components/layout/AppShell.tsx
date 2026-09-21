@@ -25,6 +25,7 @@ const navGroups = [
       { to: '/ads', label: '광고 대시보드', icon: '📈' },
       { to: '/ads/creatives', label: '소재 성과', icon: '🎬' },
       { to: '/ads/manage', label: '광고 관리', icon: '🎛️' },
+      { to: '/ads/upload', label: '소재 업로드', icon: '⬆️' },
     ],
   },
 ]

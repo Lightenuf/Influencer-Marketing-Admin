@@ -376,6 +376,7 @@ export function buildDemoDatabase(): Database {
 
   return {
     discoveryRequests: [],
+    uploadPresets: [],
     messageTemplates: [],
     reasonTags: DEFAULT_REASON_TAGS.map((label, index) => ({
       id: `tag-default-${index}`,

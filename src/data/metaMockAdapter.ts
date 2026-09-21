@@ -1,5 +1,9 @@
 import type { MetaPeriod, MetaRepository } from './metaRepository'
 import type {
+  AdCreateInput,
+  AdSetCreateInput,
+  CampaignCreateInput,
+  CreativeRef,
   MetaAd,
   MetaAdSet,
   MetaCampaign,
@@ -396,6 +400,29 @@ export const metaMockAdapter: MetaRepository = {
     }
 
     return points.sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+  },
+
+  async uploadCreative(file: File): Promise<CreativeRef> {
+    await delay()
+    // 실제로 올리지 않고 올린 척만 한다.
+    return file.type.startsWith('video/')
+      ? { kind: 'video', videoId: `mock-video-${Date.now()}`, thumbnailUrl: null }
+      : { kind: 'image', imageHash: `mock-image-${Date.now()}` }
+  },
+
+  async createAd(input: AdCreateInput) {
+    await delay()
+    return { id: `mock-ad-${input.adsetId}-${Date.now()}` }
+  },
+
+  async createCampaign(_input: CampaignCreateInput) {
+    await delay()
+    return { id: `mock-campaign-${Date.now()}` }
+  },
+
+  async createAdSet(_input: AdSetCreateInput) {
+    await delay()
+    return { id: `mock-adset-${Date.now()}` }
   },
 
   async setAdStatus(adId, status) {

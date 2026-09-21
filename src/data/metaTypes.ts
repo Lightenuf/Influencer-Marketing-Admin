@@ -231,3 +231,62 @@ export const guessRecentBuyerAudience = (list: MetaCustomAudience[]) =>
       audience.name.includes(String(RECENT_BUYER_EXCLUSION_DAYS)) &&
       /구매|purchase/i.test(audience.name),
   ) ?? null
+
+/** 업로드한 소재가 메타에 자리 잡은 결과 — 광고를 만들 때 이걸 가리킨다 */
+export type CreativeRef =
+  | { kind: 'image'; imageHash: string }
+  | { kind: 'video'; videoId: string; thumbnailUrl: string | null }
+
+/** 광고 한 건을 만들 때 필요한 것 */
+export interface AdCreateInput {
+  adsetId: string
+  name: string
+  /** 광고 문구 (본문) */
+  primaryText: string
+  landingUrl: string
+  cta: MetaCta
+  creative: CreativeRef
+  /**
+   * 파트너십 광고로 돌릴지.
+   * 켜려면 크리에이터 인스타 계정과 계정 레벨 파트너십이 미리 연결돼 있어야 한다.
+   */
+  isPartnership: boolean
+  /** 파트너십일 때 원작자 인스타그램 계정 ID */
+  partnerInstagramId?: string
+}
+
+export interface CampaignCreateInput {
+  name: string
+  objective: MetaObjective
+  /** 캠페인 예산 최적화로 만들 때의 하루 예산(원). 비우면 광고 세트에서 예산을 잡는다. */
+  dailyBudget: number | null
+}
+
+export interface AdSetCreateInput {
+  campaignId: string
+  name: string
+  /** 캠페인이 CBO면 비워 둔다 */
+  dailyBudget: number | null
+  ageMin: number
+  ageMax: number
+  /** 'all'이면 성별을 가리지 않는다 */
+  genders: 'all' | 'male' | 'female'
+  /** 빼고 싶은 맞춤 타겟 (예: 최근 40일 구매자) */
+  excludedAudienceIds: string[]
+}
+
+/** 자주 쓰는 업로드 설정 묶음 */
+export interface MetaUploadPreset {
+  id: string
+  name: string
+  objective: MetaObjective
+  adsetId: string | null
+  cta: MetaCta
+  landingUrl: string
+  primaryText: string
+  isPartnership: boolean
+  createdBy: string | null
+  createdAt: string
+}
+
+export type MetaUploadPresetInput = Omit<MetaUploadPreset, 'id' | 'createdBy' | 'createdAt'>

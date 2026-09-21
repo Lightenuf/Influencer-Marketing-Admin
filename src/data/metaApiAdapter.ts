@@ -1,6 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import type { MetaPeriod, MetaRepository } from './metaRepository'
 import type {
+  AdCreateInput,
+  AdSetCreateInput,
+  CampaignCreateInput,
+  CreativeRef,
   MetaAd,
   MetaAdSet,
   MetaCampaign,
@@ -61,6 +65,39 @@ export const metaApiAdapter: MetaRepository = {
   getWeeklySeries: (adIds, period) =>
     call<MetaWeekPoint[]>('weekly', { adIds, from: period.from, to: period.to }),
 
+  /**
+   * 이미지는 함수를 거쳐 그대로 올린다.
+   * 영상은 Storage에 올린 뒤 잠깐 열리는 주소만 넘겨, 메타가 직접 받아가게 한다.
+   * (큰 파일은 함수를 통과하지 못한다)
+   */
+  async uploadCreative(file: File): Promise<CreativeRef> {
+    if (!supabase) throw new Error('로그인 정보가 없습니다. 다시 로그인해주세요.')
+
+    if (file.type.startsWith('video/')) {
+      const path = `${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
+      const { error: uploadError } = await supabase.storage
+        .from('meta-creatives')
+        .upload(path, file, { contentType: file.type, upsert: true })
+      if (uploadError) throw new Error(`영상을 올리지 못했습니다: ${uploadError.message}`)
+
+      // 메타가 받아갈 동안만 열어둔다.
+      const { data: signed, error: signError } = await supabase.storage
+        .from('meta-creatives')
+        .createSignedUrl(path, 60 * 30)
+      if (signError || !signed) throw new Error('영상 주소를 만들지 못했습니다.')
+
+      return call<CreativeRef>('uploadVideo', { fileUrl: signed.signedUrl, name: file.name })
+    }
+
+    const base64 = await toBase64(file)
+    return call<CreativeRef>('uploadImage', { base64, name: file.name })
+  },
+
+  createAd: (input: AdCreateInput) => call<{ id: string }>('createAd', { ...input }),
+  createCampaign: (input: CampaignCreateInput) =>
+    call<{ id: string }>('createCampaign', { ...input }),
+  createAdSet: (input: AdSetCreateInput) => call<{ id: string }>('createAdSet', { ...input }),
+
   async setAdStatus(adId: string, status: MetaStatus) {
     await call('setAdStatus', { adId, status })
     // 메타가 바꾼 결과를 다시 주지 않으므로, 우리가 보낸 값을 그대로 돌려준다.
@@ -71,4 +108,18 @@ export const metaApiAdapter: MetaRepository = {
   async setDailyBudget(target, won) {
     await call('setDailyBudget', { level: target.level, id: target.id, won })
   },
+}
+
+/** 파일을 글자로 바꿔 함수에 실어 보낸다 (이미지 전용) */
+function toBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result)
+      // 'data:image/png;base64,....' 에서 뒤쪽만 쓴다.
+      resolve(result.slice(result.indexOf(',') + 1))
+    }
+    reader.onerror = () => reject(new Error('파일을 읽지 못했습니다.'))
+    reader.readAsDataURL(file)
+  })
 }

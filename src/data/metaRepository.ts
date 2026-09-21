@@ -1,4 +1,8 @@
 import type {
+  AdCreateInput,
+  AdSetCreateInput,
+  CampaignCreateInput,
+  CreativeRef,
   MetaAd,
   MetaAdSet,
   MetaCampaign,
@@ -35,6 +39,18 @@ export interface MetaRepository {
 
   /** 고른 광고들의 주 단위 ROAS 추세 */
   getWeeklySeries(adIds: string[], period: MetaPeriod): Promise<MetaWeekPoint[]>
+
+  /**
+   * 소재 파일을 메타에 올린다.
+   * 이미지는 곧바로, 영상은 메타가 받아갈 수 있는 주소를 만들어 넘긴다.
+   */
+  uploadCreative(file: File): Promise<CreativeRef>
+
+  /** 광고를 만든다. 실수로 돈이 나가지 않도록 항상 '일시중지' 상태로 만든다. */
+  createAd(input: AdCreateInput): Promise<{ id: string }>
+
+  createCampaign(input: CampaignCreateInput): Promise<{ id: string }>
+  createAdSet(input: AdSetCreateInput): Promise<{ id: string }>
 
   /** 광고 켜기·일시중지 */
   setAdStatus(adId: string, status: MetaStatus): Promise<MetaAd>

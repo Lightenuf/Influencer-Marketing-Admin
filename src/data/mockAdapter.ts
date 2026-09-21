@@ -1,3 +1,4 @@
+import type { MetaUploadPreset } from './metaTypes'
 import type {
   CollabInput,
   DataRepository,
@@ -24,6 +25,7 @@ const STORAGE_KEY = 'breevo-influencer-admin:v1'
 
 export interface Database {
   discoveryRequests: DiscoveryRequest[]
+  uploadPresets: MetaUploadPreset[]
   reasonTags: ReasonTag[]
   messageTemplates: MessageTemplate[]
   influencers: Influencer[]
@@ -41,6 +43,7 @@ const TEAM_MEMBERS: TeamMember[] = [
 
 const emptyDb = (): Database => ({
   discoveryRequests: [],
+  uploadPresets: [],
   reasonTags: [],
   messageTemplates: [],
   influencers: [],
@@ -88,6 +91,7 @@ function migrate(db: Database): Database {
         ? [(collab as unknown as { cancelReason: string }).cancelReason]
         : []),
   }))
+  db.uploadPresets = db.uploadPresets ?? []
   db.influencers = db.influencers.map((influencer) => ({
     ...influencer,
     followingCount: influencer.followingCount ?? 0,
@@ -126,7 +130,7 @@ const uid = () => crypto.randomUUID()
 const now = () => new Date().toISOString()
 
 /** 실제 네트워크 호출처럼 보이게 하는 최소 지연 — 로딩 상태 UI를 검증하기 위함 */
-const tick = <T,>(value: T): Promise<T> =>
+const tick = <T>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), 60))
 
 function requireInfluencer(db: Database, id: string): Influencer {
@@ -366,6 +370,25 @@ export const mockAdapter: DataRepository = {
     db.shipments = db.shipments.map((s) => (s.collabId === id ? { ...s, collabId: null } : s))
     write(db)
     return tick(undefined)
+  },
+
+  async listUploadPresets() {
+    const db = read()
+    return tick([...(db.uploadPresets ?? [])].reverse())
+  },
+
+  async createUploadPreset(input, actorId) {
+    const db = read()
+    const preset = { ...input, id: uid(), createdBy: actorId, createdAt: now() }
+    db.uploadPresets = [...(db.uploadPresets ?? []), preset]
+    write(db)
+    return tick(preset)
+  },
+
+  async deleteUploadPreset(id) {
+    const db = read()
+    db.uploadPresets = (db.uploadPresets ?? []).filter((preset) => preset.id !== id)
+    write(db)
   },
 
   async listDiscoveryRequests() {

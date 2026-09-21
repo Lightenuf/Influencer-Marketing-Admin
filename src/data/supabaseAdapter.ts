@@ -1,4 +1,5 @@
 import { requireSupabase } from '@/lib/supabase'
+import type { MetaUploadPreset } from './metaTypes'
 import type {
   CollabInput,
   DataRepository,
@@ -155,6 +156,19 @@ const collabColumns = (input: Partial<CollabInput & Pick<Collab, 'memo'>>): Row 
   if (input.memo !== undefined) row.memo = input.memo
   return row
 }
+
+const toUploadPreset = (row: Row): MetaUploadPreset => ({
+  id: row.id,
+  name: row.name,
+  objective: row.objective,
+  adsetId: row.adset_id,
+  cta: row.cta,
+  landingUrl: row.landing_url ?? '',
+  primaryText: row.primary_text ?? '',
+  isPartnership: row.is_partnership ?? false,
+  createdBy: row.created_by,
+  createdAt: row.created_at,
+})
 
 const toShipment = (row: Row): Shipment => ({
   id: row.id,
@@ -369,9 +383,7 @@ export const supabaseAdapter: DataRepository = {
 
   async holdCollab(id: string, change: Partial<HoldChange>) {
     const db = requireSupabase()
-    const current = unwrap(
-      await db.from('collabs').select('held_at').eq('id', id).single(),
-    )
+    const current = unwrap(await db.from('collabs').select('held_at').eq('id', id).single())
     // 넘어온 항목만 바꾼다. 빠진 항목은 기존 값을 지킨다.
     const patch: Row = {
       is_on_hold: true,
@@ -381,14 +393,7 @@ export const supabaseAdapter: DataRepository = {
     if (change.reason !== undefined) patch.hold_reason = change.reason
     if (change.detail !== undefined) patch.hold_detail = change.detail
     if (change.recontactAt !== undefined) patch.recontact_at = change.recontactAt
-    const row = unwrap(
-      await db
-        .from('collabs')
-        .update(patch)
-        .eq('id', id)
-        .select()
-        .single(),
-    )
+    const row = unwrap(await db.from('collabs').update(patch).eq('id', id).select().single())
     return toCollab(row)
   },
 
@@ -428,15 +433,48 @@ export const supabaseAdapter: DataRepository = {
   async reorderCollabs(orderedIds) {
     const db = requireSupabase()
     await Promise.all(
-      orderedIds.map((id, index) =>
-        db.from('collabs').update({ sort_order: index }).eq('id', id),
-      ),
+      orderedIds.map((id, index) => db.from('collabs').update({ sort_order: index }).eq('id', id)),
     )
   },
 
   async deleteCollab(id) {
     const db = requireSupabase()
     const { error } = await db.from('collabs').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async listUploadPresets() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db.from('meta_upload_presets').select('*').order('created_at', { ascending: false }),
+    )
+    return rows.map(toUploadPreset)
+  },
+
+  async createUploadPreset(input, actorId) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('meta_upload_presets')
+        .insert({
+          name: input.name,
+          objective: input.objective,
+          adset_id: input.adsetId,
+          cta: input.cta,
+          landing_url: input.landingUrl,
+          primary_text: input.primaryText,
+          is_partnership: input.isPartnership,
+          created_by: actorId,
+        })
+        .select()
+        .single(),
+    )
+    return toUploadPreset(row)
+  },
+
+  async deleteUploadPreset(id) {
+    const db = requireSupabase()
+    const { error } = await db.from('meta_upload_presets').delete().eq('id', id)
     if (error) throw new Error(error.message)
   },
 
@@ -490,9 +528,7 @@ export const supabaseAdapter: DataRepository = {
 
   async listMessageTemplates() {
     const db = requireSupabase()
-    const rows = unwrap<Row[]>(
-      await db.from('message_templates').select('*').order('sort_order'),
-    )
+    const rows = unwrap<Row[]>(await db.from('message_templates').select('*').order('sort_order'))
     return rows.map(toMessageTemplate)
   },
 
@@ -528,14 +564,12 @@ export const supabaseAdapter: DataRepository = {
   async listReasonTags() {
     const db = requireSupabase()
     const rows = unwrap<Row[]>(await db.from('reason_tags').select('*').order('label'))
-    return rows.map(
-      (row): ReasonTag => ({
-        id: row.id,
-        label: row.label,
-        createdBy: row.created_by ?? null,
-        createdAt: row.created_at,
-      }),
-    )
+    return rows.map((row): ReasonTag => ({
+      id: row.id,
+      label: row.label,
+      createdBy: row.created_by ?? null,
+      createdAt: row.created_at,
+    }))
   },
 
   async createReasonTag(label: string, actorId: string) {
@@ -547,7 +581,12 @@ export const supabaseAdapter: DataRepository = {
         .select()
         .single(),
     )
-    return { id: row.id, label: row.label, createdBy: row.created_by ?? null, createdAt: row.created_at }
+    return {
+      id: row.id,
+      label: row.label,
+      createdBy: row.created_by ?? null,
+      createdAt: row.created_at,
+    }
   },
 
   async deleteReasonTag(id: string) {

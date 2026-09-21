@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { metaRepository } from '@/data'
+import { metaRepository, repository } from '@/data'
 import type { MetaPeriod } from '@/data/metaRepository'
-import type { MetaLevel, MetaStatus } from '@/data/metaTypes'
+import type {
+  AdCreateInput,
+  AdSetCreateInput,
+  CampaignCreateInput,
+  MetaLevel,
+  MetaStatus,
+  MetaUploadPresetInput,
+} from '@/data/metaTypes'
 
 /**
  * 메타 지표는 실시간일 필요가 없고, 메타 API에는 호출 한도가 있다.
@@ -82,5 +89,56 @@ export function useSetDailyBudget() {
         queryKey: variables.level === 'campaign' ? metaKeys.campaigns : metaKeys.adsets,
       })
     },
+  })
+}
+
+/** 자주 쓰는 업로드 설정 묶음 */
+export const useUploadPresets = () =>
+  useQuery({
+    queryKey: ['meta', 'presets'] as const,
+    queryFn: () => repository.listUploadPresets(),
+  })
+
+export function useCreateUploadPreset(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: MetaUploadPresetInput) => repository.createUploadPreset(input, actorId),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['meta', 'presets'] }),
+  })
+}
+
+export function useDeleteUploadPreset() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => repository.deleteUploadPreset(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['meta', 'presets'] }),
+  })
+}
+
+/** 소재 파일을 메타에 올린다 */
+export const useUploadCreative = () =>
+  useMutation({ mutationFn: (file: File) => metaRepository.uploadCreative(file) })
+
+export function useCreateAd() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: AdCreateInput) => metaRepository.createAd(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: metaKeys.ads }),
+  })
+}
+
+export function useCreateCampaign() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CampaignCreateInput) => metaRepository.createCampaign(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: metaKeys.campaigns }),
+  })
+}
+
+export function useCreateAdSet() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: AdSetCreateInput) => metaRepository.createAdSet(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: metaKeys.adsets }),
   })
 }

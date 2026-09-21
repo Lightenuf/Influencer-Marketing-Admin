@@ -21,9 +21,15 @@ const GRAPH = 'https://graph.facebook.com/v21.0'
 let TOKEN = ''
 let ACCOUNT = ''
 
+/** 크리에이티브를 만들 때 '누가 올리는 광고인지'로 쓰인다 */
+let PAGE_ID = ''
+let INSTAGRAM_ID = ''
+
 function loadSecrets() {
   TOKEN = (Deno.env.get('META_ACCESS_TOKEN') ?? '').trim()
   ACCOUNT = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').trim().replace(/^act_/, '')
+  PAGE_ID = (Deno.env.get('META_PAGE_ID') ?? '').trim()
+  INSTAGRAM_ID = (Deno.env.get('META_INSTAGRAM_ACTOR_ID') ?? '').trim()
 }
 
 const CORS = {
@@ -122,6 +128,8 @@ Deno.serve(async (request) => {
     return json({
       tokenLength: TOKEN.length,
       accountId: ACCOUNT ? `${ACCOUNT.slice(0, 4)}…(${ACCOUNT.length}자리)` : '(없음)',
+      pageId: PAGE_ID || '(없음 — 소재 업로드에 필요)',
+      instagramId: INSTAGRAM_ID || '(없음 — 소재 업로드에 필요)',
       metaSecretNames: Object.keys(Deno.env.toObject()).filter((key) => key.includes('META')),
     })
   }
@@ -254,6 +262,125 @@ Deno.serve(async (request) => {
             }
           }),
         )
+      }
+
+      case 'uploadImage': {
+        // 이미지는 크지 않아 함수를 거쳐 그대로 넘긴다.
+        const form = new URLSearchParams({
+          access_token: TOKEN,
+          bytes: String(params.base64),
+          name: String(params.name ?? 'creative'),
+        })
+        const response = await fetch(`${GRAPH}/${act}/adimages`, { method: 'POST', body: form })
+        const result = await response.json()
+        if (result.error) throw new Error(result.error.message)
+        // 응답이 { images: { <파일이름>: { hash } } } 모양으로 온다.
+        const first = Object.values(result.images ?? {})[0] as GraphRow | undefined
+        if (!first?.hash) throw new Error('이미지를 올렸지만 메타가 해시를 주지 않았습니다.')
+        return json({ kind: 'image', imageHash: String(first.hash) })
+      }
+
+      case 'uploadVideo': {
+        // 영상은 함수를 통과시키지 않는다. 주소만 넘기면 메타가 직접 받아간다.
+        const result = await post(`${act}/advideos`, {
+          file_url: String(params.fileUrl),
+          name: String(params.name ?? 'creative'),
+        })
+        if (!result.id) throw new Error('영상을 올렸지만 메타가 id를 주지 않았습니다.')
+        return json({ kind: 'video', videoId: String(result.id), thumbnailUrl: null })
+      }
+
+      case 'createAd': {
+        if (!PAGE_ID) throw new Error('META_PAGE_ID가 설정되지 않았습니다.')
+
+        const creative = params.creative as GraphRow
+        const link = String(params.landingUrl)
+        const cta = { type: String(params.cta), value: { link } }
+
+        // 표준 이미지·영상 크리에이티브로만 만든다. 카탈로그(DPA)는 쓰지 않는다.
+        const storySpec: GraphRow = { page_id: PAGE_ID }
+        if (INSTAGRAM_ID) storySpec.instagram_actor_id = INSTAGRAM_ID
+
+        if (creative.kind === 'video') {
+          storySpec.video_data = {
+            video_id: creative.videoId,
+            message: String(params.primaryText ?? ''),
+            call_to_action: cta,
+            ...(creative.thumbnailUrl ? { image_url: creative.thumbnailUrl } : {}),
+          }
+        } else {
+          storySpec.link_data = {
+            image_hash: creative.imageHash,
+            link,
+            message: String(params.primaryText ?? ''),
+            call_to_action: cta,
+          }
+        }
+
+        const creativePayload: Record<string, string> = {
+          name: `${params.name} 소재`,
+          object_story_spec: JSON.stringify(storySpec),
+        }
+
+        // 파트너십 광고는 원작자를 함께 적어야 한다.
+        if (params.isPartnership && params.partnerInstagramId) {
+          creativePayload.branded_content = JSON.stringify({
+            instagram_branded_content: { sponsor_id: params.partnerInstagramId },
+          })
+        }
+
+        const made = await post(`${act}/adcreatives`, creativePayload)
+
+        // 항상 멈춘 상태로 만든다 — 확인하고 사람이 켠다.
+        const ad = await post(`${act}/ads`, {
+          name: String(params.name),
+          adset_id: String(params.adsetId),
+          creative: JSON.stringify({ creative_id: made.id }),
+          status: 'PAUSED',
+        })
+        return json({ id: String(ad.id) })
+      }
+
+      case 'createCampaign': {
+        const payload: Record<string, string> = {
+          name: String(params.name),
+          objective: String(params.objective),
+          status: 'PAUSED',
+          special_ad_categories: '[]',
+        }
+        if (params.dailyBudget) {
+          payload.daily_budget = String(Math.round(Number(params.dailyBudget)))
+        }
+        const made = await post(`${act}/campaigns`, payload)
+        return json({ id: String(made.id) })
+      }
+
+      case 'createAdSet': {
+        const targeting: GraphRow = {
+          geo_locations: { countries: ['KR'] },
+          age_min: Number(params.ageMin ?? 18),
+          age_max: Number(params.ageMax ?? 65),
+        }
+        if (params.genders === 'male') targeting.genders = [1]
+        if (params.genders === 'female') targeting.genders = [2]
+        const excluded = (params.excludedAudienceIds ?? []) as string[]
+        if (excluded.length > 0) {
+          targeting.excluded_custom_audiences = excluded.map((id) => ({ id }))
+        }
+
+        const payload: Record<string, string> = {
+          name: String(params.name),
+          campaign_id: String(params.campaignId),
+          billing_event: 'IMPRESSIONS',
+          optimization_goal: 'OFFSITE_CONVERSIONS',
+          targeting: JSON.stringify(targeting),
+          status: 'PAUSED',
+        }
+        if (params.dailyBudget) {
+          payload.daily_budget = String(Math.round(Number(params.dailyBudget)))
+        }
+        const made = await post(`${act}/adsets`, payload)
+        return json({ id: String(made.id) })
       }
 
       case 'setAdStatus': {

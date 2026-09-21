@@ -1,3 +1,4 @@
+import type { MetaUploadPreset, MetaUploadPresetInput } from './metaTypes'
 import type {
   Collab,
   CollabStage,
@@ -100,6 +101,11 @@ export interface DataRepository {
   /** 보류를 풀고 원래 단계로 되돌린다. */
   resumeCollab(id: string): Promise<Collab>
   deleteCollab(id: string): Promise<void>
+
+  /** 소재 업로드 프리셋 — 자주 쓰는 설정 묶음 */
+  listUploadPresets(): Promise<MetaUploadPreset[]>
+  createUploadPreset(input: MetaUploadPresetInput, actorId: string): Promise<MetaUploadPreset>
+  deleteUploadPreset(id: string): Promise<void>
 
   /** 발굴 요청 — 어드민이 남기고 크롬 자동화가 처리한다 */
   listDiscoveryRequests(): Promise<DiscoveryRequest[]>
