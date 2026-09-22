@@ -195,14 +195,36 @@ export default function PerformancePage() {
       .sort((a, b) => b.marketRevenue - a.marketRevenue)
   }, [collabs, monthKey])
 
-  /** 아직 열지 않은 마켓 — 달과 상관없이 준비 중인 것을 모두 본다 */
+  /**
+   * 아직 열지 않은 마켓 — 달과 상관없이 준비 중인 것을 모두 본다.
+   * 곧 열리는 것부터 본다. 날짜를 아직 안 잡은 건은 맨 뒤로 보낸다.
+   */
   const waiting = useMemo(
     () =>
       (collabs ?? [])
         .filter((collab) => collab.stage === '마켓 준비 중' && !collab.isCancelled)
-        .sort((a, b) => a.sortOrder - b.sortOrder),
+        .sort((a, b) => {
+          if (!a.marketDate) return b.marketDate ? 1 : a.sortOrder - b.sortOrder
+          if (!b.marketDate) return -1
+          return a.marketDate.localeCompare(b.marketDate)
+        }),
     [collabs],
   )
+
+  /** 준비 중인 마켓을 다 더하면 이번에 얼마를 내고 몇 개가 나갈지가 나온다 */
+  const waitingTotals = useMemo(() => {
+    const byProduct: Record<string, number> = {}
+    let revenue = 0
+    for (const collab of waiting) {
+      revenue += collab.targetRevenue
+      for (const product of PRODUCTS) {
+        const count = collab.plannedUnits?.[product] ?? 0
+        if (count > 0) byProduct[product] = (byProduct[product] ?? 0) + count
+      }
+    }
+    const units = Object.values(byProduct).reduce((sum, count) => sum + count, 0)
+    return { revenue, byProduct, units }
+  }, [waiting])
 
   const totals = useMemo(
     () =>
@@ -293,8 +315,36 @@ export default function PerformancePage() {
       <Card>
         <CardHeader
           title={`마켓 준비 ${formatNumber(waiting.length)}건`}
-          description="아직 열지 않은 마켓입니다. 달을 바꿔도 그대로 보입니다"
+          description="아직 열지 않은 마켓입니다. 곧 열리는 순서로 보이며, 달을 바꿔도 그대로입니다"
         />
+
+        {waiting.length > 0 && (
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-3 border-b border-slate-100 bg-slate-50 px-5 py-3">
+            <div>
+              <p className="text-xs text-slate-500">예상 매출</p>
+              <p className="mt-0.5 text-xl font-bold text-slate-900">
+                {formatNumber(waitingTotals.revenue)}
+                <span className="ml-0.5 text-sm font-semibold text-slate-500">원</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">예상 소요량</p>
+              <p className="mt-0.5 text-xl font-bold text-slate-900">
+                {formatNumber(waitingTotals.units)}
+                <span className="ml-0.5 text-sm font-semibold text-slate-500">개</span>
+              </p>
+            </div>
+            {PRODUCTS.map((product) => (
+              <div key={product}>
+                <p className="text-xs text-slate-500">{product}</p>
+                <p className="mt-0.5 text-base font-medium text-slate-700">
+                  {formatNumber(waitingTotals.byProduct[product] ?? 0)}
+                  <span className="ml-0.5 text-xs text-slate-400">개</span>
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
         {waiting.length === 0 ? (
           <EmptyState
             title="준비 중인 마켓이 없습니다"
