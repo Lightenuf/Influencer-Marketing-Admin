@@ -23,7 +23,11 @@ export const keys = {
 }
 
 export const useTeamMembers = () =>
-  useQuery({ queryKey: keys.members, queryFn: () => repository.listTeamMembers(), staleTime: Infinity })
+  useQuery({
+    queryKey: keys.members,
+    queryFn: () => repository.listTeamMembers(),
+    staleTime: Infinity,
+  })
 
 export const useInfluencers = () =>
   useQuery({ queryKey: keys.influencers, queryFn: () => repository.listInfluencers() })
@@ -44,7 +48,10 @@ export const useShipments = () =>
   useQuery({ queryKey: keys.shipments, queryFn: () => repository.listShipments() })
 
 export const useNotes = (influencerId: string) =>
-  useQuery({ queryKey: keys.notes(influencerId), queryFn: () => repository.listNotes(influencerId) })
+  useQuery({
+    queryKey: keys.notes(influencerId),
+    queryFn: () => repository.listNotes(influencerId),
+  })
 
 /** 인플루언서가 바뀌면 목록·상세·감사로그가 모두 영향을 받으므로 함께 무효화한다. */
 function useInvalidateInfluencers() {
@@ -142,7 +149,7 @@ export function useUpdateCollab() {
       patch,
     }: {
       id: string
-      patch: Partial<CollabInput & Pick<Collab, 'memo'>>
+      patch: Partial<CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedBudget'>>
     }) => repository.updateCollab(id, patch),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
   })

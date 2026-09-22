@@ -164,6 +164,10 @@ export interface Collab {
   meetingAt: string | null
   /** 마켓 대기중 — 마켓 여는 날짜 */
   marketDate: string | null
+  /** 마켓 대기중 — 이 마켓에서 내려는 매출(원). 끝나면 실제와 견준다. */
+  targetRevenue: number
+  /** 마켓 대기중 — 이 마켓에 쓸 예산(원). 샘플·광고·수수료처럼 들어갈 돈. */
+  plannedBudget: number
   /** 마켓 완료 — 그 마켓으로 일으킨 매출(원) */
   marketRevenue: number
   /** 마켓 완료 — 판매 수량 */

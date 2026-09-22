@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { useEffect, useState } from 'react'
 import type { Collab, CollabStage } from '@/data/types'
 import { useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
@@ -18,8 +19,7 @@ function daysUntil(date: string) {
   return Math.round((target - now) / 86_400_000)
 }
 
-const chip =
-  'rounded-md px-2 py-1 text-[11px] font-medium transition disabled:opacity-50'
+const chip = 'rounded-md px-2 py-1 text-[11px] font-medium transition disabled:opacity-50'
 const chipOff = 'bg-slate-100 text-slate-500 hover:bg-slate-200'
 
 function DateRow({
@@ -40,6 +40,52 @@ function DateRow({
         onChange={(e) => onChange(e.target.value || null)}
         className="mt-0.5 w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
       />
+    </label>
+  )
+}
+
+/**
+ * 금액을 적는 줄.
+ * 글자를 칠 때마다 저장하면 목록이 계속 다시 그려지므로, 칸을 벗어날 때 한 번 저장한다.
+ */
+function MoneyRow({
+  label,
+  value,
+  hint,
+  onCommit,
+}: {
+  label: string
+  value: number
+  hint?: string
+  onCommit: (won: number) => void
+}) {
+  const [draft, setDraft] = useState(value ? String(value) : '')
+
+  useEffect(() => setDraft(value ? String(value) : ''), [value])
+
+  const commit = () => {
+    const next = Number(draft.replace(/[^\d]/g, '')) || 0
+    if (next !== value) onCommit(next)
+  }
+
+  return (
+    <label className="block">
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <div className="mt-0.5 flex items-center gap-1">
+        <input
+          inputMode="numeric"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ''))}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+          placeholder="0"
+          className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-right text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
+        />
+        <span className="text-[11px] text-slate-400">원</span>
+      </div>
+      {hint && <span className="mt-0.5 block text-[10px] text-slate-400">{hint}</span>}
     </label>
   )
 }
@@ -159,9 +205,7 @@ export default function StageActions({
           <button
             type="button"
             title={collab.testFeedback === '긍정' ? '다시 누르면 선택이 풀립니다' : undefined}
-            onClick={() =>
-              patch({ testFeedback: collab.testFeedback === '긍정' ? null : '긍정' })
-            }
+            onClick={() => patch({ testFeedback: collab.testFeedback === '긍정' ? null : '긍정' })}
             className={clsx(
               chip,
               'flex-1',
@@ -175,9 +219,7 @@ export default function StageActions({
           <button
             type="button"
             title={collab.testFeedback === '부정' ? '다시 누르면 선택이 풀립니다' : undefined}
-            onClick={() =>
-              patch({ testFeedback: collab.testFeedback === '부정' ? null : '부정' })
-            }
+            onClick={() => patch({ testFeedback: collab.testFeedback === '부정' ? null : '부정' })}
             className={clsx(
               chip,
               'flex-1',
@@ -239,7 +281,11 @@ export default function StageActions({
     const left = collab.meetingAt ? daysUntil(collab.meetingAt) : null
     return (
       <div className="mt-2 space-y-1.5">
-        <DateRow label="미팅 날짜" value={collab.meetingAt} onChange={(v) => patch({ meetingAt: v })} />
+        <DateRow
+          label="미팅 날짜"
+          value={collab.meetingAt}
+          onChange={(v) => patch({ meetingAt: v })}
+        />
 
         {left !== null && (
           <p
@@ -248,7 +294,11 @@ export default function StageActions({
               left < 0 ? 'font-medium text-amber-600' : 'text-slate-500',
             )}
           >
-            {left > 0 ? `미팅 D-${left}` : left === 0 ? '오늘 미팅' : `미팅일이 ${-left}일 지났습니다`}
+            {left > 0
+              ? `미팅 D-${left}`
+              : left === 0
+                ? '오늘 미팅'
+                : `미팅일이 ${-left}일 지났습니다`}
           </p>
         )}
 
@@ -283,9 +333,29 @@ export default function StageActions({
               left <= 3 ? 'font-medium text-amber-600' : 'text-slate-500',
             )}
           >
-            {left > 0 ? `마켓 D-${left}` : left === 0 ? '오늘 마켓' : `마켓일이 ${-left}일 지났습니다`}
+            {left > 0
+              ? `마켓 D-${left}`
+              : left === 0
+                ? '오늘 마켓'
+                : `마켓일이 ${-left}일 지났습니다`}
           </p>
         )}
+
+        <MoneyRow
+          label="목표 매출"
+          value={collab.targetRevenue}
+          onCommit={(won) => patch({ targetRevenue: won })}
+        />
+        <MoneyRow
+          label="예산 소요량"
+          value={collab.plannedBudget}
+          hint={
+            collab.targetRevenue > 0 && collab.plannedBudget > 0
+              ? `목표 ROAS ${(collab.targetRevenue / collab.plannedBudget).toFixed(1)}`
+              : undefined
+          }
+          onCommit={(won) => patch({ plannedBudget: won })}
+        />
 
         <button
           type="button"
@@ -312,11 +382,7 @@ export default function StageActions({
         {collab.contentLinks.length > 0 && (
           <p className="text-[11px] text-slate-400">콘텐츠 {collab.contentLinks.length}개</p>
         )}
-        <button
-          type="button"
-          onClick={onCompleteMarket}
-          className={clsx(chip, 'w-full', chipOff)}
-        >
+        <button type="button" onClick={onCompleteMarket} className={clsx(chip, 'w-full', chipOff)}>
           성과 수정
         </button>
       </div>
