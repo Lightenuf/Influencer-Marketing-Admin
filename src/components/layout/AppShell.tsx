@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { Button } from '@/components/ui'
@@ -38,8 +39,38 @@ const navGroups = [
  * 반대로 /influencers 처럼 하위가 메뉴에 없는 경우는, 상세 화면에서도 메뉴가 켜져 있어야 한다.
  */
 const menuPaths = navGroups.flatMap((group) => group.items.map((item) => item.to))
-const exactOnly = (to: string) =>
-  menuPaths.some((path) => path !== to && path.startsWith(`${to}/`))
+const exactOnly = (to: string) => menuPaths.some((path) => path !== to && path.startsWith(`${to}/`))
+
+/** 저장에 실패하면 화면 위에 띄운다. 조용히 사라지는 것보다 낫다. */
+function SaveErrorBanner() {
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onFailed = (event: Event) => setMessage(String((event as CustomEvent).detail))
+    window.addEventListener('breevo:save-failed', onFailed)
+    return () => window.removeEventListener('breevo:save-failed', onFailed)
+  }, [])
+
+  if (!message) return null
+
+  return (
+    <div className="border-b border-rose-200 bg-rose-50 px-6 py-2.5">
+      <div className="flex items-start gap-3">
+        <p className="flex-1 text-sm text-rose-800">
+          <b>저장하지 못했습니다.</b> 적은 내용은 새로고침하면 사라집니다.
+          <span className="ml-1 text-xs text-rose-600">{message}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => setMessage(null)}
+          className="shrink-0 text-sm text-rose-400 hover:text-rose-700"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function AppShell() {
   const { user, signOut } = useAuth()
@@ -110,6 +141,8 @@ export default function AppShell() {
             로그아웃
           </Button>
         </header>
+
+        <SaveErrorBanner />
 
         <main className="flex-1 overflow-x-auto p-6">
           <Outlet />
