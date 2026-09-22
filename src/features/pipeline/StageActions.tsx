@@ -45,19 +45,21 @@ function DateRow({
 }
 
 /**
- * 금액을 적는 줄.
+ * 숫자를 적는 줄 (금액·수량).
  * 글자를 칠 때마다 저장하면 목록이 계속 다시 그려지므로, 칸을 벗어날 때 한 번 저장한다.
  */
-function MoneyRow({
+function AmountRow({
   label,
+  unit,
   value,
   hint,
   onCommit,
 }: {
   label: string
+  unit: string
   value: number
   hint?: string
-  onCommit: (won: number) => void
+  onCommit: (value: number) => void
 }) {
   const [draft, setDraft] = useState(value ? String(value) : '')
 
@@ -83,7 +85,7 @@ function MoneyRow({
           placeholder="0"
           className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-right text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
         />
-        <span className="text-[11px] text-slate-400">원</span>
+        <span className="text-[11px] text-slate-400">{unit}</span>
       </div>
       {hint && <span className="mt-0.5 block text-[10px] text-slate-400">{hint}</span>}
     </label>
@@ -341,20 +343,22 @@ export default function StageActions({
           </p>
         )}
 
-        <MoneyRow
+        <AmountRow
           label="목표 매출"
+          unit="원"
           value={collab.targetRevenue}
-          onCommit={(won) => patch({ targetRevenue: won })}
+          onCommit={(value) => patch({ targetRevenue: value })}
         />
-        <MoneyRow
-          label="예산 소요량"
-          value={collab.plannedBudget}
+        <AmountRow
+          label="예상 소요량"
+          unit="개"
+          value={collab.plannedUnits}
           hint={
-            collab.targetRevenue > 0 && collab.plannedBudget > 0
-              ? `목표 ROAS ${(collab.targetRevenue / collab.plannedBudget).toFixed(1)}`
+            collab.targetRevenue > 0 && collab.plannedUnits > 0
+              ? `개당 ${formatNumber(Math.round(collab.targetRevenue / collab.plannedUnits))}원`
               : undefined
           }
-          onCommit={(won) => patch({ plannedBudget: won })}
+          onCommit={(value) => patch({ plannedUnits: value })}
         />
 
         <button

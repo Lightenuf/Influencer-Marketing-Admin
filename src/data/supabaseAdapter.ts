@@ -118,7 +118,7 @@ const toCollab = (row: Row): Collab => ({
   contentLinks: row.content_links ?? [],
   memo: row.memo ?? '',
   targetRevenue: row.target_revenue ?? 0,
-  plannedBudget: row.planned_budget ?? 0,
+  plannedUnits: row.planned_units ?? 0,
   sortOrder: row.sort_order ?? 0,
   isOnHold: row.is_on_hold ?? false,
   holdReason: row.hold_reason,
@@ -135,7 +135,7 @@ const toCollab = (row: Row): Collab => ({
 })
 
 const collabColumns = (
-  input: Partial<CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedBudget'>>,
+  input: Partial<CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedUnits'>>,
 ): Row => {
   const row: Row = {}
   if (input.influencerId !== undefined) row.influencer_id = input.influencerId
@@ -159,7 +159,7 @@ const collabColumns = (
   if (input.contentLinks !== undefined) row.content_links = input.contentLinks
   if (input.memo !== undefined) row.memo = input.memo
   if (input.targetRevenue !== undefined) row.target_revenue = input.targetRevenue
-  if (input.plannedBudget !== undefined) row.planned_budget = input.plannedBudget
+  if (input.plannedUnits !== undefined) row.planned_units = input.plannedUnits
   return row
 }
 
