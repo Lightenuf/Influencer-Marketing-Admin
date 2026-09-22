@@ -51,22 +51,26 @@ function DateRow({
 function AmountRow({
   label,
   unit,
+  /** 적는 단위가 저장 단위와 다를 때 쓴다. '만원'으로 적고 원으로 저장하는 식. */
+  scale = 1,
   value,
   hint,
   onCommit,
 }: {
   label: string
   unit: string
+  scale?: number
   value: number
   hint?: string
   onCommit: (value: number) => void
 }) {
-  const [draft, setDraft] = useState(value ? String(value) : '')
+  const shown = value ? String(Math.round(value / scale)) : ''
+  const [draft, setDraft] = useState(shown)
 
-  useEffect(() => setDraft(value ? String(value) : ''), [value])
+  useEffect(() => setDraft(shown), [shown])
 
   const commit = () => {
-    const next = Number(draft.replace(/[^\d]/g, '')) || 0
+    const next = (Number(draft.replace(/[^\d]/g, '')) || 0) * scale
     if (next !== value) onCommit(next)
   }
 
@@ -345,7 +349,8 @@ export default function StageActions({
 
         <AmountRow
           label="목표 매출"
-          unit="원"
+          unit="만원"
+          scale={10_000}
           value={collab.targetRevenue}
           onCommit={(value) => patch({ targetRevenue: value })}
         />
