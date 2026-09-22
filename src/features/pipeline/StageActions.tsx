@@ -97,17 +97,12 @@ function AmountRow({
   )
 }
 
-/**
- * 맛마다 몇 개나 나갈지 적는 줄.
- * 아래에 합계를 보여주고, 목표 매출이 있으면 개당 얼마인지도 함께 알려준다.
- */
+/** 맛마다 몇 개나 나갈지 적는 줄. 아래에 합계를 보여준다. */
 function UnitsRow({
   units,
-  targetRevenue,
   onCommit,
 }: {
   units: Record<string, number>
-  targetRevenue: number
   onCommit: (units: Record<string, number>) => void
 }) {
   const shown = (product: string) => (units?.[product] ? String(units[product]) : '')
@@ -161,14 +156,7 @@ function UnitsRow({
           </label>
         ))}
       </div>
-      <p className="mt-0.5 text-[11px] text-slate-500">
-        총 {formatNumber(total)}개{' '}
-        {targetRevenue > 0 && total > 0 && (
-          <span className="ml-1 text-slate-400">
-            · 개당 {formatNumber(Math.round(targetRevenue / total))}원
-          </span>
-        )}
-      </p>
+      <p className="mt-0.5 text-[11px] text-slate-500">총 {formatNumber(total)}개</p>
     </div>
   )
 }
@@ -433,7 +421,6 @@ export default function StageActions({
         />
         <UnitsRow
           units={collab.plannedUnits}
-          targetRevenue={collab.targetRevenue}
           onCommit={(units) => patch({ plannedUnits: units })}
         />
 
