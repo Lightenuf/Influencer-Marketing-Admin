@@ -78,6 +78,7 @@ function migrate(db: Database): Database {
     testFeedback: collab.testFeedback ?? null,
     memo: collab.memo ?? '',
     targetRevenue: collab.targetRevenue ?? 0,
+    settlementAmount: collab.settlementAmount ?? 0,
     // 맛을 나누기 전에는 숫자 하나였다. 그 값은 첫 맛으로 옮긴다.
     plannedUnits:
       typeof collab.plannedUnits === 'number'
@@ -271,6 +272,7 @@ export const mockAdapter: DataRepository = {
       id: uid(),
       memo: '',
       targetRevenue: 0,
+      settlementAmount: 0,
       plannedUnits: {},
       sortOrder: 0,
       stageEnteredAt: now(),

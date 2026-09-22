@@ -149,7 +149,9 @@ export function useUpdateCollab() {
       patch,
     }: {
       id: string
-      patch: Partial<CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedUnits'>>
+      patch: Partial<
+        CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedUnits' | 'settlementAmount'>
+      >
     }) => repository.updateCollab(id, patch),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.collabs }),
   })

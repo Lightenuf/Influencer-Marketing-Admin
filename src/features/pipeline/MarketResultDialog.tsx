@@ -25,6 +25,7 @@ export default function MarketResultDialog({
   const [revenue, setRevenue] = useState('')
   const [units, setUnits] = useState('')
   const [settled, setSettled] = useState(false)
+  const [settlement, setSettlement] = useState('')
   const [links, setLinks] = useState<string[]>([])
   const [linkDraft, setLinkDraft] = useState('')
 
@@ -34,6 +35,7 @@ export default function MarketResultDialog({
     setRevenue(collab.marketRevenue ? String(collab.marketRevenue) : '')
     setUnits(collab.marketUnits ? String(collab.marketUnits) : '')
     setSettled(collab.isSettled)
+    setSettlement(collab.settlementAmount ? String(collab.settlementAmount) : '')
     setLinks(collab.contentLinks)
     setLinkDraft('')
   }, [collab, open])
@@ -63,6 +65,7 @@ export default function MarketResultDialog({
         marketRevenue: Number(revenue.replace(/,/g, '')) || 0,
         marketUnits: Number(units.replace(/,/g, '')) || 0,
         isSettled: settled,
+        settlementAmount: Number(settlement.replace(/,/g, '')) || 0,
         contentLinks: allLinks,
       },
     })
@@ -105,7 +108,10 @@ export default function MarketResultDialog({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="매출 (원)" hint={revenue ? `${formatNumber(Number(revenue) || 0)}원` : undefined}>
+          <Field
+            label="매출 (원)"
+            hint={revenue ? `${formatNumber(Number(revenue) || 0)}원` : undefined}
+          >
             <Input
               inputMode="numeric"
               value={revenue}
@@ -124,7 +130,28 @@ export default function MarketResultDialog({
           </Field>
         </div>
 
-        <Field label="콘텐츠 링크" hint="잘 터진 릴스·피드 주소를 남겨두면 다음 협업 때 참고할 수 있습니다">
+        <Field
+          label="정산액 (원)"
+          hint={
+            settlement && revenue
+              ? `매출의 ${((Number(settlement) / Math.max(Number(revenue), 1)) * 100).toFixed(1)}% · 남는 금액 ${formatNumber(
+                  (Number(revenue) || 0) - (Number(settlement) || 0),
+                )}원`
+              : '크리에이터에게 준 금액 (수수료 포함)'
+          }
+        >
+          <Input
+            inputMode="numeric"
+            value={settlement}
+            onChange={(e) => setSettlement(e.target.value.replace(/[^\d]/g, ''))}
+            placeholder="예) 640000"
+          />
+        </Field>
+
+        <Field
+          label="콘텐츠 링크"
+          hint="잘 터진 릴스·피드 주소를 남겨두면 다음 협업 때 참고할 수 있습니다"
+        >
           <div className="flex gap-2">
             <Input
               value={linkDraft}
@@ -137,7 +164,12 @@ export default function MarketResultDialog({
               }}
               placeholder="https://www.instagram.com/reel/..."
             />
-            <Button type="button" variant="secondary" onClick={addLink} disabled={!linkDraft.trim()}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={addLink}
+              disabled={!linkDraft.trim()}
+            >
               추가
             </Button>
           </div>

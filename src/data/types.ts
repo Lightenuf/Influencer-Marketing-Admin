@@ -184,6 +184,8 @@ export interface Collab {
   marketUnits: number
   /** 마켓 완료 — 정산까지 끝났는지 */
   isSettled: boolean
+  /** 마켓 완료 — 크리에이터에게 준 정산액(수수료 포함, 원) */
+  settlementAmount: number
   /** 잘 터진 콘텐츠 링크 모음 — 다음 협업 때 참고한다 */
   contentLinks: string[]
   /** 카드 메모 — 특이 요청사항처럼 이 사람과 일할 때 기억해야 할 것 */

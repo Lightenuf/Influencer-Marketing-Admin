@@ -45,3 +45,11 @@ export const formatRatio = (value: number, digits = 2) => value.toFixed(digits)
 
 /** 1.234 → '1.23%' */
 export const formatPercent = (value: number, digits = 2) => `${value.toFixed(digits)}%`
+
+/** 오늘부터 그 날짜까지 남은 일수. 지난 날짜면 음수. */
+export function daysUntil(value: string | null | undefined) {
+  if (!value) return 0
+  const target = new Date(`${value.slice(0, 10)}T00:00:00`).getTime()
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00').getTime()
+  return Math.round((target - today) / 86_400_000)
+}

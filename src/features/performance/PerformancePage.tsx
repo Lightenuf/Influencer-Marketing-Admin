@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner } from '@/components/ui'
-import type { Collab } from '@/data/types'
+import { totalUnits, type Collab } from '@/data/types'
 import MarketResultDialog from '@/features/pipeline/MarketResultDialog'
 import { useCollabs, useInfluencers, useUpdateCollab } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
-import { formatDate, formatNumber } from '@/utils/format'
+import { daysUntil, formatDate, formatNumber } from '@/utils/format'
 import { profileUrl } from '@/utils/profileLink'
 
 /** 링크는 표 안에서 바로 덧붙이고 지운다 — 성과를 보다가 떠오를 때 남길 수 있게. */
@@ -14,8 +14,7 @@ function ContentLinks({ collab }: { collab: Collab }) {
   const update = useUpdateCollab()
   const [draft, setDraft] = useState('')
 
-  const save = (links: string[]) =>
-    update.mutate({ id: collab.id, patch: { contentLinks: links } })
+  const save = (links: string[]) => update.mutate({ id: collab.id, patch: { contentLinks: links } })
 
   const add = () => {
     const url = draft.trim()
@@ -85,6 +84,15 @@ export default function PerformancePage() {
       .sort((a, b) => b.marketRevenue - a.marketRevenue)
   }, [collabs, monthKey])
 
+  /** 아직 열지 않은 마켓 — 달과 상관없이 준비 중인 것을 모두 본다 */
+  const waiting = useMemo(
+    () =>
+      (collabs ?? [])
+        .filter((collab) => collab.stage === '마켓 대기중' && !collab.isCancelled)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [collabs],
+  )
+
   const totals = useMemo(
     () =>
       done.reduce(
@@ -92,8 +100,9 @@ export default function PerformancePage() {
           revenue: sum.revenue + collab.marketRevenue,
           units: sum.units + collab.marketUnits,
           settled: sum.settled + (collab.isSettled ? collab.marketRevenue : 0),
+          settlement: sum.settlement + collab.settlementAmount,
         }),
-        { revenue: 0, units: 0, settled: 0 },
+        { revenue: 0, units: 0, settled: 0, settlement: 0 },
       ),
     [done],
   )
@@ -111,6 +120,7 @@ export default function PerformancePage() {
           마켓일: formatDate(collab.marketDate),
           매출: collab.marketRevenue,
           판매수량: collab.marketUnits,
+          정산액: collab.settlementAmount,
           정산: collab.isSettled ? 'Y' : 'N',
           콘텐츠링크: collab.contentLinks.join(' '),
         }
@@ -135,19 +145,26 @@ export default function PerformancePage() {
 
       <MonthPicker value={month} onChange={setMonth} />
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <Card className="p-5 md:col-span-2">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="p-5">
           <p className="text-sm text-slate-500">
             {month ? `${month.getMonth() + 1}월 공동구매 총매출` : '전체 기간 총매출'}
           </p>
-          <p className="mt-1 text-3xl font-bold text-slate-900">
+          <p className="mt-1 text-2xl font-bold text-slate-900">
             {formatNumber(totals.revenue)}
-            <span className="ml-1 text-lg font-semibold text-slate-500">원</span>
+            <span className="ml-1 text-base font-semibold text-slate-500">원</span>
           </p>
           <p className="mt-0.5 text-xs text-slate-400">
-            정산 완료 {formatNumber(totals.settled)}원 · 미정산{' '}
-            {formatNumber(totals.revenue - totals.settled)}원
+            정산액 {formatNumber(totals.settlement)}원 · 남은 금액{' '}
+            {formatNumber(totals.revenue - totals.settlement)}원
           </p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm text-slate-500">진행 예정 마켓</p>
+          <p className="mt-1 text-2xl font-bold text-violet-700">
+            {formatNumber(waiting.length)}건
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">달과 상관없이 준비 중인 전체</p>
         </Card>
         <Card className="p-5">
           <p className="text-sm text-slate-500">진행한 마켓</p>
@@ -161,6 +178,86 @@ export default function PerformancePage() {
           <p className="mt-1 text-2xl font-bold text-slate-900">{formatNumber(totals.units)}개</p>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader
+          title={`마켓 준비 ${formatNumber(waiting.length)}건`}
+          description="아직 열지 않은 마켓입니다. 달을 바꿔도 그대로 보입니다"
+        />
+        {waiting.length === 0 ? (
+          <EmptyState
+            title="준비 중인 마켓이 없습니다"
+            description="파이프라인에서 '마켓 대기중'으로 옮기면 이곳에 나타납니다."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-5 py-2.5 text-left font-medium">크리에이터</th>
+                  <th className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
+                    마켓 예정일
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                    목표 매출
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                    예상 소요량
+                  </th>
+                  <th className="px-5 py-2.5 text-right font-medium">관리</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {waiting.map((collab) => {
+                  const influencer = nameOf(collab.influencerId)
+                  const left = collab.marketDate ? daysUntil(collab.marketDate) : null
+                  const units = totalUnits(collab.plannedUnits)
+                  return (
+                    <tr key={collab.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-3">
+                        <Link
+                          to={`/influencers/${collab.influencerId}/edit`}
+                          className="font-medium text-slate-900 hover:text-violet-600"
+                        >
+                          {influencer?.name ?? '삭제된 크리에이터'}
+                        </Link>
+                        {influencer && (
+                          <div className="text-xs text-slate-400">@{influencer.snsHandle}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-600">
+                        {formatDate(collab.marketDate)}{' '}
+                        {left !== null && (
+                          <span
+                            className={
+                              left <= 3 && left >= 0
+                                ? 'ml-1 text-xs font-medium text-amber-600'
+                                : 'ml-1 text-xs text-slate-400'
+                            }
+                          >
+                            {left > 0 ? `D-${left}` : left === 0 ? '오늘' : `${-left}일 지남`}
+                          </span>
+                        )}
+                      </td>
+                      <td className="tabular px-3 py-3 text-right whitespace-nowrap text-slate-700">
+                        {collab.targetRevenue > 0 ? `${formatNumber(collab.targetRevenue)}원` : '-'}
+                      </td>
+                      <td className="tabular px-3 py-3 text-right whitespace-nowrap text-slate-600">
+                        {units > 0 ? `${formatNumber(units)}개` : '-'}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <Button size="sm" onClick={() => setEditing(collab)}>
+                          마켓 완료 처리
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <CardHeader title="크리에이터별 성과" description="매출이 큰 순서" />
@@ -178,6 +275,7 @@ export default function PerformancePage() {
                   <th className="px-3 py-2.5 text-left font-medium">마켓일</th>
                   <th className="px-3 py-2.5 text-right font-medium">매출</th>
                   <th className="px-3 py-2.5 text-right font-medium">수량</th>
+                  <th className="px-3 py-2.5 text-right font-medium">정산액</th>
                   <th className="px-3 py-2.5 text-left font-medium">정산</th>
                   <th className="px-3 py-2.5 text-left font-medium">콘텐츠 링크</th>
                   <th className="px-5 py-2.5 text-right font-medium">관리</th>
@@ -221,6 +319,9 @@ export default function PerformancePage() {
                       </td>
                       <td className="tabular px-3 py-3 text-right text-slate-600">
                         {formatNumber(collab.marketUnits)}
+                      </td>
+                      <td className="tabular px-3 py-3 text-right whitespace-nowrap text-slate-600">
+                        {collab.settlementAmount > 0 ? formatNumber(collab.settlementAmount) : '-'}
                       </td>
                       <td className="px-3 py-3">
                         <span

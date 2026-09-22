@@ -36,6 +36,7 @@ export type CollabInput = Omit<
   | 'sortOrder'
   | 'targetRevenue'
   | 'plannedUnits'
+  | 'settlementAmount'
   | 'isCancelled'
   | 'cancelReasons'
   | 'cancelReasonDetail'
@@ -89,7 +90,9 @@ export interface DataRepository {
   createCollab(input: CollabInput): Promise<Collab>
   updateCollab(
     id: string,
-    patch: Partial<CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedUnits'>>,
+    patch: Partial<
+      CollabInput & Pick<Collab, 'memo' | 'targetRevenue' | 'plannedUnits' | 'settlementAmount'>
+    >,
   ): Promise<Collab>
   /** 한 단계 안의 카드 순서를 준 순서대로 다시 매긴다 */
   reorderCollabs(orderedIds: string[]): Promise<void>
