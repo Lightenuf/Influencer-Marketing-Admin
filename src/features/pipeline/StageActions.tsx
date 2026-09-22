@@ -89,7 +89,7 @@ function AmountRow({
           placeholder="0"
           className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-right text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
         />
-        <span className="text-[11px] text-slate-400">{unit}</span>
+        <span className="shrink-0 text-[11px] whitespace-nowrap text-slate-400">{unit}</span>
       </div>
       {hint && <span className="mt-0.5 block text-[10px] text-slate-400">{hint}</span>}
     </label>
