@@ -267,7 +267,7 @@ export function buildDemoDatabase(): Database {
       influencerId: 'demo-inf-7',
       title: '8월 마켓 협업',
       collabType: '마켓',
-      stage: '마켓 대기중',
+      stage: '마켓 준비 중',
       stageEnteredAt: daysAgo(15),
       startDate: dateOnly(45),
       endDate: dateOnly(30),

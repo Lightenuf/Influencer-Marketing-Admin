@@ -92,7 +92,7 @@ export const COLLAB_STAGES = [
   '테스트중',
   '테스트 통과',
   '미팅 확정',
-  '마켓 대기중',
+  '마켓 준비 중',
   '마켓 완료',
 ] as const
 export type CollabStage = (typeof COLLAB_STAGES)[number]
@@ -169,12 +169,12 @@ export interface Collab {
   lastContactedAt: string | null
   /** 미팅 확정 — 미팅 날짜 */
   meetingAt: string | null
-  /** 마켓 대기중 — 마켓 여는 날짜 */
+  /** 마켓 준비 중 — 마켓 여는 날짜 */
   marketDate: string | null
-  /** 마켓 대기중 — 이 마켓에서 내려는 매출(원). 끝나면 실제와 견준다. */
+  /** 마켓 준비 중 — 이 마켓에서 내려는 매출(원). 끝나면 실제와 견준다. */
   targetRevenue: number
   /**
-   * 마켓 대기중 — 이 마켓에 나갈 것으로 보는 제품 수량(개).
+   * 마켓 준비 중 — 이 마켓에 나갈 것으로 보는 제품 수량(개).
    * 맛마다 따로 적는다. 늘어나는 맛은 PRODUCTS 에만 더하면 된다.
    */
   plannedUnits: Record<string, number>

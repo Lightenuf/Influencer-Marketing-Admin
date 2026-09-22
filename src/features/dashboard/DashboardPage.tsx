@@ -32,7 +32,7 @@ const STAGE_COLORS: Record<string, string> = {
   테스트중: '#a78bfa',
   '테스트 통과': '#8b5cf6',
   '미팅 확정': '#7c3aed',
-  '마켓 대기중': '#5b21b6',
+  '마켓 준비 중': '#5b21b6',
 }
 
 function StatCard({
@@ -120,7 +120,7 @@ export default function DashboardPage() {
     )
     const passed = peopleWhere((collab) => reached(collab, '테스트 통과'))
     const meeting = peopleWhere((collab) => reached(collab, '미팅 확정'))
-    const market = peopleWhere((collab) => reached(collab, '마켓 대기중'))
+    const market = peopleWhere((collab) => reached(collab, '마켓 준비 중'))
 
     // 씨딩으로 세긴 했지만 배송일이 비어 있는 사람 — 캘린더와 기록에서 빠진다.
     const seededWithoutDate = [...seeded].filter(

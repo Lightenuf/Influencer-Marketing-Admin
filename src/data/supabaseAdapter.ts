@@ -99,7 +99,8 @@ const toCollab = (row: Row): Collab => ({
   influencerId: row.influencer_id,
   title: row.title,
   collabType: row.collab_type,
-  stage: row.stage,
+  // 예전 이름으로 저장된 기록도 새 이름으로 읽는다.
+  stage: row.stage === '마켓 대기중' ? '마켓 준비 중' : row.stage,
   stageEnteredAt: row.stage_entered_at,
   startDate: row.start_date,
   endDate: row.end_date,

@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner } from '@/components/ui'
-import { totalUnits, type Collab } from '@/data/types'
+import { PRODUCTS, type Collab } from '@/data/types'
 import MarketResultDialog from '@/features/pipeline/MarketResultDialog'
 import { useCollabs, useInfluencers, useUpdateCollab } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
@@ -67,6 +67,117 @@ function ContentLinks({ collab }: { collab: Collab }) {
   )
 }
 
+/** 목표 매출 — 만원 단위로 적고 원으로 저장한다 */
+function TargetRevenueCell({ collab }: { collab: Collab }) {
+  const update = useUpdateCollab()
+  const shown = collab.targetRevenue ? String(Math.round(collab.targetRevenue / 10_000)) : ''
+  const [draft, setDraft] = useState(shown)
+
+  useEffect(() => setDraft(shown), [shown])
+
+  const commit = () => {
+    const next = (Number(draft.replace(/[^\d]/g, '')) || 0) * 10_000
+    if (next !== collab.targetRevenue) {
+      update.mutate({ id: collab.id, patch: { targetRevenue: next } })
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <input
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ''))}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+        }}
+        placeholder="0"
+        className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-right text-sm text-slate-700 focus:border-violet-400 focus:outline-none"
+      />
+      <span className="shrink-0 text-xs whitespace-nowrap text-slate-400">만원</span>
+    </div>
+  )
+}
+
+/**
+ * 예상 소요량 — 평소에는 합계만 보이고, 누르면 맛별로 펼쳐 적는다.
+ * 표가 길어지지 않게 하면서도 맛마다 몇 개인지 적을 수 있게 하기 위함.
+ */
+function PlannedUnitsCell({ collab }: { collab: Collab }) {
+  const update = useUpdateCollab()
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setDraft(
+      Object.fromEntries(
+        PRODUCTS.map((product) => [
+          product,
+          collab.plannedUnits?.[product] ? String(collab.plannedUnits[product]) : '',
+        ]),
+      ),
+    )
+  }, [collab.plannedUnits])
+
+  const commit = () => {
+    const next: Record<string, number> = {}
+    for (const product of PRODUCTS) {
+      const count = Number((draft[product] ?? '').replace(/[^\d]/g, '')) || 0
+      if (count > 0) next[product] = count
+    }
+    if (JSON.stringify(next) !== JSON.stringify(collab.plannedUnits ?? {})) {
+      update.mutate({ id: collab.id, patch: { plannedUnits: next } })
+    }
+  }
+
+  const total = PRODUCTS.reduce(
+    (sum, product) => sum + (Number((draft[product] ?? '').replace(/[^\d]/g, '')) || 0),
+    0,
+  )
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 text-sm text-slate-700 hover:text-violet-600"
+        title="맛별로 적기"
+      >
+        <span className="tabular">{total > 0 ? `${formatNumber(total)}개` : '적기'}</span>
+        <span className="text-xs text-slate-400">{open ? '▴' : '▾'}</span>
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-1">
+          {PRODUCTS.map((product) => (
+            <label key={product} className="flex items-center justify-end gap-1">
+              <span className="shrink-0 text-xs whitespace-nowrap text-slate-500">{product}</span>
+              <input
+                inputMode="numeric"
+                value={draft[product] ?? ''}
+                onChange={(e) =>
+                  setDraft((current) => ({
+                    ...current,
+                    [product]: e.target.value.replace(/[^\d]/g, ''),
+                  }))
+                }
+                onBlur={commit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                }}
+                placeholder="0"
+                className="w-16 rounded-md border border-slate-200 bg-white px-2 py-1 text-right text-sm text-slate-700 focus:border-violet-400 focus:outline-none"
+              />
+              <span className="shrink-0 text-xs text-slate-400">개</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PerformancePage() {
   const { data: collabs, isLoading } = useCollabs()
   const { data: influencers = [] } = useInfluencers()
@@ -88,7 +199,7 @@ export default function PerformancePage() {
   const waiting = useMemo(
     () =>
       (collabs ?? [])
-        .filter((collab) => collab.stage === '마켓 대기중' && !collab.isCancelled)
+        .filter((collab) => collab.stage === '마켓 준비 중' && !collab.isCancelled)
         .sort((a, b) => a.sortOrder - b.sortOrder),
     [collabs],
   )
@@ -187,7 +298,7 @@ export default function PerformancePage() {
         {waiting.length === 0 ? (
           <EmptyState
             title="준비 중인 마켓이 없습니다"
-            description="파이프라인에서 '마켓 대기중'으로 옮기면 이곳에 나타납니다."
+            description="파이프라인에서 '마켓 준비 중'으로 옮기면 이곳에 나타납니다."
           />
         ) : (
           <div className="overflow-x-auto">
@@ -211,7 +322,6 @@ export default function PerformancePage() {
                 {waiting.map((collab) => {
                   const influencer = nameOf(collab.influencerId)
                   const left = collab.marketDate ? daysUntil(collab.marketDate) : null
-                  const units = totalUnits(collab.plannedUnits)
                   return (
                     <tr key={collab.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3">
@@ -239,11 +349,11 @@ export default function PerformancePage() {
                           </span>
                         )}
                       </td>
-                      <td className="tabular px-3 py-3 text-right whitespace-nowrap text-slate-700">
-                        {collab.targetRevenue > 0 ? `${formatNumber(collab.targetRevenue)}원` : '-'}
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <TargetRevenueCell collab={collab} />
                       </td>
-                      <td className="tabular px-3 py-3 text-right whitespace-nowrap text-slate-600">
-                        {units > 0 ? `${formatNumber(units)}개` : '-'}
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <PlannedUnitsCell collab={collab} />
                       </td>
                       <td className="px-5 py-3 text-right">
                         <Button size="sm" onClick={() => setEditing(collab)}>
@@ -264,7 +374,7 @@ export default function PerformancePage() {
         {done.length === 0 ? (
           <EmptyState
             title={monthKey ? '이 달에 마친 마켓이 없습니다' : '아직 마친 마켓이 없습니다'}
-            description="파이프라인 '마켓 대기중' 카드에서 '마켓 완료 처리'를 누르면 이곳에 쌓입니다."
+            description="파이프라인 '마켓 준비 중' 카드에서 '마켓 완료 처리'를 누르면 이곳에 쌓입니다."
           />
         ) : (
           <div className="overflow-x-auto">

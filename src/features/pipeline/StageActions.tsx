@@ -1,6 +1,4 @@
 import clsx from 'clsx'
-import { useEffect, useState } from 'react'
-import { PRODUCTS } from '@/data/types'
 import type { Collab, CollabStage } from '@/data/types'
 import { useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
@@ -42,122 +40,6 @@ function DateRow({
         className="mt-0.5 w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
       />
     </label>
-  )
-}
-
-/**
- * 숫자를 적는 줄 (금액·수량).
- * 글자를 칠 때마다 저장하면 목록이 계속 다시 그려지므로, 칸을 벗어날 때 한 번 저장한다.
- */
-function AmountRow({
-  label,
-  unit,
-  /** 적는 단위가 저장 단위와 다를 때 쓴다. '만원'으로 적고 원으로 저장하는 식. */
-  scale = 1,
-  value,
-  hint,
-  onCommit,
-}: {
-  label: string
-  unit: string
-  scale?: number
-  value: number
-  hint?: string
-  onCommit: (value: number) => void
-}) {
-  const shown = value ? String(Math.round(value / scale)) : ''
-  const [draft, setDraft] = useState(shown)
-
-  useEffect(() => setDraft(shown), [shown])
-
-  const commit = () => {
-    const next = (Number(draft.replace(/[^\d]/g, '')) || 0) * scale
-    if (next !== value) onCommit(next)
-  }
-
-  return (
-    <label className="block">
-      <span className="text-[11px] text-slate-500">{label}</span>
-      <div className="mt-0.5 flex items-center gap-1">
-        <input
-          inputMode="numeric"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ''))}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-          }}
-          placeholder="0"
-          className="w-full rounded-md border border-slate-200 bg-white px-1.5 py-1 text-right text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
-        />
-        <span className="shrink-0 text-[11px] whitespace-nowrap text-slate-400">{unit}</span>
-      </div>
-      {hint && <span className="mt-0.5 block text-[10px] text-slate-400">{hint}</span>}
-    </label>
-  )
-}
-
-/** 맛마다 몇 개나 나갈지 적는 줄. 아래에 합계를 보여준다. */
-function UnitsRow({
-  units,
-  onCommit,
-}: {
-  units: Record<string, number>
-  onCommit: (units: Record<string, number>) => void
-}) {
-  const shown = (product: string) => (units?.[product] ? String(units[product]) : '')
-  const [draft, setDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(PRODUCTS.map((product) => [product, shown(product)])),
-  )
-
-  useEffect(() => {
-    setDraft(Object.fromEntries(PRODUCTS.map((product) => [product, shown(product)])))
-    // units 가 바뀔 때만 다시 맞춘다
-  }, [units])
-
-  const commit = () => {
-    const next: Record<string, number> = {}
-    for (const product of PRODUCTS) {
-      const count = Number((draft[product] ?? '').replace(/[^\d]/g, '')) || 0
-      if (count > 0) next[product] = count
-    }
-    if (JSON.stringify(next) !== JSON.stringify(units ?? {})) onCommit(next)
-  }
-
-  const total = PRODUCTS.reduce(
-    (sum, product) => sum + (Number((draft[product] ?? '').replace(/[^\d]/g, '')) || 0),
-    0,
-  )
-
-  return (
-    <div>
-      <span className="text-[11px] text-slate-500">예상 소요량</span>
-      <div className="mt-0.5 flex items-center gap-1.5">
-        {PRODUCTS.map((product) => (
-          <label key={product} className="flex min-w-0 flex-1 items-center gap-1">
-            <span className="shrink-0 text-[11px] whitespace-nowrap text-slate-500">{product}</span>
-            <input
-              inputMode="numeric"
-              value={draft[product] ?? ''}
-              onChange={(e) =>
-                setDraft((current) => ({
-                  ...current,
-                  [product]: e.target.value.replace(/[^\d]/g, ''),
-                }))
-              }
-              onBlur={commit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-              }}
-              placeholder="0"
-              className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-1 py-1 text-right text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
-            />
-            <span className="shrink-0 text-[11px] whitespace-nowrap text-slate-400">개</span>
-          </label>
-        ))}
-      </div>
-      <p className="mt-0.5 text-[11px] text-slate-500">총 {formatNumber(total)}개</p>
-    </div>
   )
 }
 
@@ -378,17 +260,17 @@ export default function StageActions({
           value={collab.marketDate}
           onChange={(v) => {
             if (!v) return
-            // 마켓 날짜가 잡혔으면 곧 '마켓 대기중'.
+            // 마켓 날짜가 잡혔으면 곧 '마켓 준비 중'.
             patch({ marketDate: v })
-            moveStage.mutate({ id: collab.id, stage: '마켓 대기중' })
+            moveStage.mutate({ id: collab.id, stage: '마켓 준비 중' })
           }}
         />
       </div>
     )
   }
 
-  // ── 마켓 대기중: 마켓 여는 날짜 + 끝나면 성과 남기기 ──
-  if (stage === '마켓 대기중') {
+  // ── 마켓 준비 중: 마켓 여는 날짜 + 끝나면 성과 남기기 ──
+  if (stage === '마켓 준비 중') {
     const left = collab.marketDate ? daysUntil(collab.marketDate) : null
     return (
       <div className="mt-2 space-y-1.5">
@@ -411,18 +293,6 @@ export default function StageActions({
                 : `마켓일이 ${-left}일 지났습니다`}
           </p>
         )}
-
-        <AmountRow
-          label="목표 매출"
-          unit="만원"
-          scale={10_000}
-          value={collab.targetRevenue}
-          onCommit={(value) => patch({ targetRevenue: value })}
-        />
-        <UnitsRow
-          units={collab.plannedUnits}
-          onCommit={(units) => patch({ plannedUnits: units })}
-        />
 
         <button
           type="button"
