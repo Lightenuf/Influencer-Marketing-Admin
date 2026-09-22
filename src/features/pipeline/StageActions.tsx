@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
+import { PRODUCTS } from '@/data/types'
 import type { Collab, CollabStage } from '@/data/types'
 import { useMoveCollabStage, useUpdateCollab } from '@/hooks/queries'
 import { daysSince, formatDate, formatNumber } from '@/utils/format'
@@ -93,6 +94,82 @@ function AmountRow({
       </div>
       {hint && <span className="mt-0.5 block text-[10px] text-slate-400">{hint}</span>}
     </label>
+  )
+}
+
+/**
+ * 맛마다 몇 개나 나갈지 적는 줄.
+ * 아래에 합계를 보여주고, 목표 매출이 있으면 개당 얼마인지도 함께 알려준다.
+ */
+function UnitsRow({
+  units,
+  targetRevenue,
+  onCommit,
+}: {
+  units: Record<string, number>
+  targetRevenue: number
+  onCommit: (units: Record<string, number>) => void
+}) {
+  const shown = (product: string) => (units?.[product] ? String(units[product]) : '')
+  const [draft, setDraft] = useState<Record<string, string>>(() =>
+    Object.fromEntries(PRODUCTS.map((product) => [product, shown(product)])),
+  )
+
+  useEffect(() => {
+    setDraft(Object.fromEntries(PRODUCTS.map((product) => [product, shown(product)])))
+    // units 가 바뀔 때만 다시 맞춘다
+  }, [units])
+
+  const commit = () => {
+    const next: Record<string, number> = {}
+    for (const product of PRODUCTS) {
+      const count = Number((draft[product] ?? '').replace(/[^\d]/g, '')) || 0
+      if (count > 0) next[product] = count
+    }
+    if (JSON.stringify(next) !== JSON.stringify(units ?? {})) onCommit(next)
+  }
+
+  const total = PRODUCTS.reduce(
+    (sum, product) => sum + (Number((draft[product] ?? '').replace(/[^\d]/g, '')) || 0),
+    0,
+  )
+
+  return (
+    <div>
+      <span className="text-[11px] text-slate-500">예상 소요량</span>
+      <div className="mt-0.5 flex items-center gap-1.5">
+        {PRODUCTS.map((product) => (
+          <label key={product} className="flex min-w-0 flex-1 items-center gap-1">
+            <span className="shrink-0 text-[11px] whitespace-nowrap text-slate-500">{product}</span>
+            <input
+              inputMode="numeric"
+              value={draft[product] ?? ''}
+              onChange={(e) =>
+                setDraft((current) => ({
+                  ...current,
+                  [product]: e.target.value.replace(/[^\d]/g, ''),
+                }))
+              }
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+              }}
+              placeholder="0"
+              className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-1 py-1 text-right text-[11px] text-slate-700 focus:border-violet-400 focus:outline-none"
+            />
+            <span className="shrink-0 text-[11px] whitespace-nowrap text-slate-400">개</span>
+          </label>
+        ))}
+      </div>
+      <p className="mt-0.5 text-[11px] text-slate-500">
+        총 {formatNumber(total)}개{' '}
+        {targetRevenue > 0 && total > 0 && (
+          <span className="ml-1 text-slate-400">
+            · 개당 {formatNumber(Math.round(targetRevenue / total))}원
+          </span>
+        )}
+      </p>
+    </div>
   )
 }
 
@@ -354,16 +431,10 @@ export default function StageActions({
           value={collab.targetRevenue}
           onCommit={(value) => patch({ targetRevenue: value })}
         />
-        <AmountRow
-          label="예상 소요량"
-          unit="개"
-          value={collab.plannedUnits}
-          hint={
-            collab.targetRevenue > 0 && collab.plannedUnits > 0
-              ? `개당 ${formatNumber(Math.round(collab.targetRevenue / collab.plannedUnits))}원`
-              : undefined
-          }
-          onCommit={(value) => patch({ plannedUnits: value })}
+        <UnitsRow
+          units={collab.plannedUnits}
+          targetRevenue={collab.targetRevenue}
+          onCommit={(units) => patch({ plannedUnits: units })}
         />
 
         <button

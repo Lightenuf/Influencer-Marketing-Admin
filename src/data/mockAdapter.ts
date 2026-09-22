@@ -1,3 +1,4 @@
+import { PRODUCTS } from './types'
 import type { MetaUploadPreset } from './metaTypes'
 import type {
   CollabInput,
@@ -77,7 +78,11 @@ function migrate(db: Database): Database {
     testFeedback: collab.testFeedback ?? null,
     memo: collab.memo ?? '',
     targetRevenue: collab.targetRevenue ?? 0,
-    plannedUnits: collab.plannedUnits ?? 0,
+    // 맛을 나누기 전에는 숫자 하나였다. 그 값은 첫 맛으로 옮긴다.
+    plannedUnits:
+      typeof collab.plannedUnits === 'number'
+        ? { [PRODUCTS[0]]: collab.plannedUnits }
+        : (collab.plannedUnits ?? {}),
     sortOrder: collab.sortOrder ?? 0,
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
@@ -266,7 +271,7 @@ export const mockAdapter: DataRepository = {
       id: uid(),
       memo: '',
       targetRevenue: 0,
-      plannedUnits: 0,
+      plannedUnits: {},
       sortOrder: 0,
       stageEnteredAt: now(),
       isOnHold: false,

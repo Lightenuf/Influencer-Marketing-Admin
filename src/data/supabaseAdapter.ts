@@ -118,7 +118,7 @@ const toCollab = (row: Row): Collab => ({
   contentLinks: row.content_links ?? [],
   memo: row.memo ?? '',
   targetRevenue: row.target_revenue ?? 0,
-  plannedUnits: row.planned_units ?? 0,
+  plannedUnits: row.planned_units_by_product ?? {},
   sortOrder: row.sort_order ?? 0,
   isOnHold: row.is_on_hold ?? false,
   holdReason: row.hold_reason,
@@ -159,7 +159,7 @@ const collabColumns = (
   if (input.contentLinks !== undefined) row.content_links = input.contentLinks
   if (input.memo !== undefined) row.memo = input.memo
   if (input.targetRevenue !== undefined) row.target_revenue = input.targetRevenue
-  if (input.plannedUnits !== undefined) row.planned_units = input.plannedUnits
+  if (input.plannedUnits !== undefined) row.planned_units_by_product = input.plannedUnits
   return row
 }
 
