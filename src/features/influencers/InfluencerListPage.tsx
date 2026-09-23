@@ -204,6 +204,7 @@ export default function InfluencerListPage() {
       lastContactedAt: null,
       meetingAt: null,
       marketDate: null,
+      marketEndDate: null,
       marketRevenue: 0,
       marketUnits: 0,
       isSettled: false,

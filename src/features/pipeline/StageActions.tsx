@@ -289,8 +289,8 @@ export default function StageActions({
             {left > 0
               ? `마켓 D-${left}`
               : left === 0
-                ? '오늘 마켓'
-                : `마켓일이 ${-left}일 지났습니다`}
+                ? '오늘 마켓 시작'
+                : `시작일이 ${-left}일 지났습니다`}
           </p>
         )}
 

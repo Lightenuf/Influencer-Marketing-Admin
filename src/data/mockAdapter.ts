@@ -89,6 +89,7 @@ function migrate(db: Database): Database {
     lastContactedAt: collab.lastContactedAt ?? null,
     meetingAt: collab.meetingAt ?? null,
     marketDate: collab.marketDate ?? null,
+    marketEndDate: collab.marketEndDate ?? null,
     marketRevenue: collab.marketRevenue ?? 0,
     marketUnits: collab.marketUnits ?? 0,
     isSettled: collab.isSettled ?? false,

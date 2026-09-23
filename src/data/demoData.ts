@@ -7,7 +7,13 @@ const dateOnly = (n: number) => new Date(Date.now() - n * 86_400_000).toISOStrin
 
 type InfluencerSeed = Pick<
   Influencer,
-  'name' | 'snsPlatform' | 'snsHandle' | 'followerCount' | 'categories' | 'avgRevenueBand' | 'status'
+  | 'name'
+  | 'snsPlatform'
+  | 'snsHandle'
+  | 'followerCount'
+  | 'categories'
+  | 'avgRevenueBand'
+  | 'status'
 > &
   Partial<Influencer>
 
@@ -120,7 +126,12 @@ export function buildDemoDatabase(): Database {
   const dncAuditLog: DncAuditEntry[] = []
 
   // 취소 이력이 있는 두 명은 연락 금지 상태로 시작한다.
-  const blockDnc = (influencerIndex: number, reason: DncAuditEntry['reason'], detail: string, ago: number) => {
+  const blockDnc = (
+    influencerIndex: number,
+    reason: DncAuditEntry['reason'],
+    detail: string,
+    ago: number,
+  ) => {
     const influencer = influencers[influencerIndex]
     influencer.doNotContact = true
     influencer.dncReason = reason
@@ -163,6 +174,7 @@ export function buildDemoDatabase(): Database {
       lastContactedAt: null,
       meetingAt: dateOnly(-2),
       marketDate: null,
+      marketEndDate: null,
       marketRevenue: 0,
       marketUnits: 0,
       isSettled: false,
@@ -202,6 +214,7 @@ export function buildDemoDatabase(): Database {
       lastContactedAt: null,
       meetingAt: null,
       marketDate: null,
+      marketEndDate: null,
       marketRevenue: 0,
       marketUnits: 0,
       isSettled: false,
@@ -241,6 +254,7 @@ export function buildDemoDatabase(): Database {
       lastContactedAt: null,
       meetingAt: null,
       marketDate: null,
+      marketEndDate: null,
       marketRevenue: 0,
       marketUnits: 0,
       isSettled: false,
@@ -280,6 +294,7 @@ export function buildDemoDatabase(): Database {
       lastContactedAt: null,
       meetingAt: null,
       marketDate: dateOnly(-14),
+      marketEndDate: dateOnly(-14),
       marketRevenue: 0,
       marketUnits: 0,
       isSettled: false,
@@ -319,6 +334,7 @@ export function buildDemoDatabase(): Database {
       lastContactedAt: null,
       meetingAt: null,
       marketDate: null,
+      marketEndDate: null,
       marketRevenue: 0,
       marketUnits: 0,
       isSettled: false,

@@ -169,8 +169,10 @@ export interface Collab {
   lastContactedAt: string | null
   /** 미팅 확정 — 미팅 날짜 */
   meetingAt: string | null
-  /** 마켓 준비 중 — 마켓 여는 날짜 */
+  /** 마켓 준비 중 — 마켓 시작 예정일. 마켓을 마치면 실제 진행일이 된다. */
   marketDate: string | null
+  /** 마켓 준비 중 — 마켓 종료 예정일 */
+  marketEndDate: string | null
   /** 마켓 준비 중 — 이 마켓에서 내려는 매출(원). 끝나면 실제와 견준다. */
   targetRevenue: number
   /**

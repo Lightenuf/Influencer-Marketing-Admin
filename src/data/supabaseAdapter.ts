@@ -113,6 +113,7 @@ const toCollab = (row: Row): Collab => ({
   lastContactedAt: row.last_contacted_at,
   meetingAt: row.meeting_at,
   marketDate: row.market_date,
+  marketEndDate: row.market_end_date,
   marketRevenue: row.market_revenue ?? 0,
   marketUnits: row.market_units ?? 0,
   isSettled: row.is_settled ?? false,
@@ -157,6 +158,7 @@ const collabColumns = (
   if (input.lastContactedAt !== undefined) row.last_contacted_at = input.lastContactedAt
   if (input.meetingAt !== undefined) row.meeting_at = input.meetingAt
   if (input.marketDate !== undefined) row.market_date = input.marketDate
+  if (input.marketEndDate !== undefined) row.market_end_date = input.marketEndDate
   if (input.marketRevenue !== undefined) row.market_revenue = input.marketRevenue
   if (input.marketUnits !== undefined) row.market_units = input.marketUnits
   if (input.isSettled !== undefined) row.is_settled = input.isSettled

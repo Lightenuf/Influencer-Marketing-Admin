@@ -4,7 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Card, Spinner } from '@/components/ui'
 import { useCollabs, useInfluencers } from '@/hooks/queries'
 
-type EventKind = '마켓' | '미팅' | '샘플 발송' | '협업 시작' | '협업 종료' | '콘텐츠 마감'
+/**
+ * 캘린더에는 마켓만 남긴다.
+ * 미팅·샘플 발송 같은 일정은 카드에서 보고, 여기서는 언제 마켓이 열리는지만 본다.
+ */
+type EventKind = '마켓 예정' | '마켓 진행'
 
 interface CalendarEvent {
   date: string
@@ -14,13 +18,8 @@ interface CalendarEvent {
 }
 
 const kindTone: Record<EventKind, string> = {
-  마켓: 'bg-emerald-100 text-emerald-700',
-  미팅: 'bg-violet-100 text-violet-700',
-  '샘플 발송': 'bg-teal-100 text-teal-700',
-  // 아래 셋은 지금 흐름에서는 쓰지 않지만, 예전에 입력해 둔 기록을 위해 남긴다.
-  '협업 시작': 'bg-slate-200 text-slate-600',
-  '협업 종료': 'bg-slate-200 text-slate-600',
-  '콘텐츠 마감': 'bg-amber-100 text-amber-700',
+  '마켓 예정': 'bg-violet-100 text-violet-700',
+  '마켓 진행': 'bg-emerald-100 text-emerald-700',
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -41,24 +40,30 @@ export default function CalendarPage({
   const events = useMemo(() => {
     const nameOf = (id: string) => influencers.find((i) => i.id === id)?.name ?? '?'
     const list: CalendarEvent[] = []
+
     for (const collab of collabs ?? []) {
-      if (collab.isCancelled) continue
+      if (collab.isCancelled || !collab.marketDate) continue
       const name = nameOf(collab.influencerId)
-      const push = (date: string | null, kind: EventKind) => {
-        if (date)
-          list.push({
-            date: date.slice(0, 10),
-            kind,
-            label: name,
-            influencerId: collab.influencerId,
-          })
+      // 마친 마켓은 실제 진행한 날, 준비 중인 마켓은 예정일로 본다.
+      const kind: EventKind = collab.stage === '마켓 완료' ? '마켓 진행' : '마켓 예정'
+
+      // 며칠에 걸쳐 여는 마켓은 그 기간을 모두 칠한다.
+      const start = collab.marketDate.slice(0, 10)
+      const end = (collab.marketEndDate ?? collab.marketDate).slice(0, 10)
+      const cursor = new Date(`${start}T00:00:00Z`)
+      const last = new Date(`${end}T00:00:00Z`)
+
+      while (cursor <= last) {
+        list.push({
+          date: cursor.toISOString().slice(0, 10),
+          kind,
+          label: name,
+          influencerId: collab.influencerId,
+        })
+        cursor.setUTCDate(cursor.getUTCDate() + 1)
+        // 날짜를 거꾸로 적은 기록이 있어도 끝없이 돌지 않게 한다.
+        if (list.length > 2000) break
       }
-      push(collab.marketDate, '마켓')
-      push(collab.meetingAt, '미팅')
-      push(collab.sampleShipDate, '샘플 발송')
-      push(collab.startDate, '협업 시작')
-      push(collab.endDate, '협업 종료')
-      push(collab.contentDueDate, '콘텐츠 마감')
     }
     return list
   }, [collabs, influencers])
@@ -94,7 +99,7 @@ export default function CalendarPage({
         <div>
           <h1 className="text-xl font-bold text-slate-900">캘린더</h1>
           <p className="mt-1 text-sm text-slate-500">
-            마켓 예정일, 미팅 날짜, 샘플 배송일을 한눈에 확인하세요.
+            마켓 예정일과 실제 진행한 날을 한눈에 확인하세요.
           </p>
         </div>
       )}

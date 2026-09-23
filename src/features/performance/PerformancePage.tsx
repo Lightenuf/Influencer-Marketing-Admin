@@ -68,6 +68,15 @@ function ContentLinks({ collab }: { collab: Collab }) {
   )
 }
 
+/** 시작일부터 종료일까지 며칠인지. 시작일만 있으면 세지 않는다. */
+function marketDays(collab: Collab): number | null {
+  if (!collab.marketDate || !collab.marketEndDate) return null
+  const start = new Date(`${collab.marketDate.slice(0, 10)}T00:00:00`).getTime()
+  const end = new Date(`${collab.marketEndDate.slice(0, 10)}T00:00:00`).getTime()
+  const days = Math.round((end - start) / 86_400_000) + 1
+  return days > 0 ? days : null
+}
+
 /** 목표 매출 — 만원 단위로 적고 원으로 저장한다 */
 function TargetRevenueCell({ collab }: { collab: Collab }) {
   const update = useUpdateCollab()
@@ -249,7 +258,7 @@ export default function PerformancePage() {
       done.map((collab) => {
         const influencer = nameOf(collab.influencerId)
         return {
-          크리에이터: influencer?.name ?? '',
+          셀러: influencer?.name ?? '',
           계정: influencer?.snsHandle ?? '',
           마켓일: formatDate(collab.marketDate),
           매출: collab.marketRevenue,
@@ -356,7 +365,7 @@ export default function PerformancePage() {
             <table className="w-full text-sm">
               <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="px-5 py-2.5 text-left font-medium">크리에이터</th>
+                  <th className="px-5 py-2.5 text-left font-medium">셀러</th>
                   <th className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
                     마켓 예정일
                   </th>
@@ -380,23 +389,31 @@ export default function PerformancePage() {
                           to={`/influencers/${collab.influencerId}/edit`}
                           className="font-medium text-slate-900 hover:text-violet-600"
                         >
-                          {influencer?.name ?? '삭제된 크리에이터'}
+                          {influencer?.name ?? '삭제된 셀러'}
                         </Link>
                         {influencer && (
                           <div className="text-xs text-slate-400">@{influencer.snsHandle}</div>
                         )}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-slate-600">
-                        {formatDate(collab.marketDate)}{' '}
+                        <span>
+                          {formatDate(collab.marketDate)}
+                          {collab.marketEndDate && ` → ${formatDate(collab.marketEndDate)}`}
+                        </span>
                         {left !== null && (
                           <span
                             className={
                               left <= 3 && left >= 0
-                                ? 'ml-1 text-xs font-medium text-amber-600'
-                                : 'ml-1 text-xs text-slate-400'
+                                ? 'ml-1.5 text-xs font-medium text-amber-600'
+                                : 'ml-1.5 text-xs text-slate-400'
                             }
                           >
                             {left > 0 ? `D-${left}` : left === 0 ? '오늘' : `${-left}일 지남`}
+                          </span>
+                        )}
+                        {marketDays(collab) !== null && (
+                          <span className="ml-1.5 text-xs text-slate-400">
+                            {marketDays(collab)}일간
                           </span>
                         )}
                       </td>
@@ -421,7 +438,7 @@ export default function PerformancePage() {
       </Card>
 
       <Card>
-        <CardHeader title="크리에이터별 성과" description="매출이 큰 순서" />
+        <CardHeader title="셀러별 성과" description="매출이 큰 순서" />
         {done.length === 0 ? (
           <EmptyState
             title={monthKey ? '이 달에 마친 마켓이 없습니다' : '아직 마친 마켓이 없습니다'}
@@ -432,8 +449,10 @@ export default function PerformancePage() {
             <table className="w-full text-sm">
               <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="px-5 py-2.5 text-left font-medium">크리에이터</th>
-                  <th className="px-3 py-2.5 text-left font-medium">마켓일</th>
+                  <th className="px-5 py-2.5 text-left font-medium">셀러</th>
+                  <th className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
+                    마켓 진행일
+                  </th>
                   <th className="px-3 py-2.5 text-right font-medium">매출</th>
                   <th className="px-3 py-2.5 text-right font-medium">수량</th>
                   <th className="px-3 py-2.5 text-right font-medium">정산액</th>
@@ -455,7 +474,7 @@ export default function PerformancePage() {
                           to={`/influencers/${collab.influencerId}/edit`}
                           className="font-medium text-slate-900 hover:text-violet-600"
                         >
-                          {influencer?.name ?? '삭제된 크리에이터'}
+                          {influencer?.name ?? '삭제된 셀러'}
                         </Link>
                         {influencer && (
                           <div className="text-xs text-slate-400">
@@ -474,7 +493,15 @@ export default function PerformancePage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-slate-500">{formatDate(collab.marketDate)}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-500">
+                        {formatDate(collab.marketDate)}
+                        {collab.marketEndDate && ` → ${formatDate(collab.marketEndDate)}`}
+                        {marketDays(collab) !== null && (
+                          <span className="ml-1.5 text-xs text-slate-400">
+                            {marketDays(collab)}일간
+                          </span>
+                        )}
+                      </td>
                       <td className="tabular px-3 py-3 text-right font-medium text-slate-900">
                         {formatNumber(collab.marketRevenue)}
                       </td>
@@ -514,9 +541,7 @@ export default function PerformancePage() {
 
       <div className="border-t border-slate-200 pt-6">
         <h2 className="text-lg font-bold text-slate-900">캘린더</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          마켓 예정일, 미팅 날짜, 샘플 배송일을 한눈에 봅니다.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">마켓 예정일과 실제 진행한 날을 한눈에 봅니다.</p>
       </div>
 
       <CalendarPage embedded />
