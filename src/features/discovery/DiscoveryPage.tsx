@@ -168,7 +168,7 @@ export default function DiscoveryPage() {
         '',
         "6. 몇 명을 찾았고 그중 '발굴 대상'이 몇 명인지 알려줘.",
         '   조건에 못 미쳐 뺀 사람이 있으면 왜 뺐는지도 한 줄로 알려줘.',
-        '   컨택 리스트로 옮기는 건 내가 직접 할 테니 옮기지는 말아줘.',
+        '   셀러 리스트로 옮기는 건 내가 직접 할 테니 옮기지는 말아줘.',
         '',
         '7. 2번의 검색은 맨 위 몇 개만 보고 끝내지 말 것.',
         '   검색 결과를 스크롤해서 충분히 내려본다.',
@@ -267,7 +267,7 @@ export default function DiscoveryPage() {
     if (current) {
       await updateRequest.mutateAsync({
         id: current.id,
-        patch: { note: `${selected.length}명 컨택 리스트로 옮김` },
+        patch: { note: `${selected.length}명 셀러 리스트로 옮김` },
       })
     }
   }
@@ -277,9 +277,9 @@ export default function DiscoveryPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">인플루언서 발굴</h1>
+        <h1 className="text-xl font-bold text-slate-900">셀러 발굴</h1>
         <p className="mt-1 text-sm text-slate-500">
-          키워드로 찾은 후보를 조건에 맞춰 걸러내고, 확인한 사람만 컨택 리스트로 옮깁니다.
+          키워드로 찾은 후보를 조건에 맞춰 걸러내고, 확인한 사람만 셀러 리스트로 옮깁니다.
         </p>
       </div>
 
@@ -467,7 +467,7 @@ export default function DiscoveryPage() {
       {raw.trim() !== '' && (
         <Card>
           <CardHeader
-            title={`인플루언서 발굴 결과 ${formatNumber(rows.length)}명`}
+            title={`셀러 발굴 결과 ${formatNumber(rows.length)}명`}
             description={`발굴 대상 ${formatNumber(targets.length)}명 · 조건 미달 ${formatNumber(
               rows.filter((r) => r.verdict === '조건 미달').length,
             )}명 · 이미 접촉 ${formatNumber(
@@ -589,7 +589,7 @@ export default function DiscoveryPage() {
             )}
             <Button onClick={moveToContacts} disabled={selected.length === 0 || progress !== null}>
               {selected.length > 0
-                ? `${selected.length}명 컨택 리스트로 옮기기`
+                ? `${selected.length}명 셀러 리스트로 옮기기`
                 : '옮길 사람을 골라주세요'}
             </Button>
           </div>
@@ -601,7 +601,7 @@ export default function DiscoveryPage() {
         <b>소개글 · 소개글에 걸린 링크(인포크·리틀리 등) · 게시물 캡션</b> 중 한 곳에만 있어도
         발굴 대상으로 봅니다. 신호는 {PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')}{' '}
         또는 날짜(9/15 · 10월 5일 등)입니다. 여기에 위에서 정한 최소 팔로워수를 함께 확인합니다.
-        이미 컨택 리스트에 있거나 거절·연락 금지한 분은 자동으로 걸러집니다.
+        이미 셀러 리스트에 있거나 거절·연락 금지한 분은 자동으로 걸러집니다.
       </p>
     </div>
   )

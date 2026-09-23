@@ -6,7 +6,7 @@ import { formatNumber, toDateInputValue } from '@/utils/format'
 
 /**
  * 마켓이 끝난 뒤 성과를 남기는 창.
- * 여기서 남긴 값이 '마켓 성과' 화면에 쌓여 다음 시딩 대상을 고르는 근거가 된다.
+ * 여기서 남긴 값이 '마켓 관리' 화면에 쌓여 다음 시딩 대상을 고르는 근거가 된다.
  */
 export default function MarketResultDialog({
   collab,
@@ -77,7 +77,7 @@ export default function MarketResultDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title={alreadyDone ? '마켓 성과 수정' : '마켓 완료 처리'}
+      title={alreadyDone ? '마켓 관리 수정' : '마켓 완료 처리'}
       description={
         <>
           <b className="text-slate-700">{influencer?.name}</b>

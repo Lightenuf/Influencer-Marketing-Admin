@@ -7,7 +7,6 @@ import AdsDashboardPage from '@/features/ads/AdsDashboardPage'
 import AdsManagePage from '@/features/ads/AdsManagePage'
 import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
 import CreativeUploadPage from '@/features/ads/CreativeUploadPage'
-import CalendarPage from '@/features/calendar/CalendarPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import DiscoveryPage from '@/features/discovery/DiscoveryPage'
 import RejectedListPage from '@/features/rejected/RejectedListPage'
@@ -36,7 +35,8 @@ export default function App() {
           <Route path="/rejected" element={<RejectedListPage />} />
           {/* 예전 주소로 들어오면 거절 명단으로 보낸다 */}
           <Route path="/do-not-contact" element={<Navigate to="/rejected" replace />} />
-          <Route path="/calendar" element={<CalendarPage />} />
+          {/* 캘린더는 마켓 관리 화면 아래로 들어갔다 */}
+          <Route path="/calendar" element={<Navigate to="/performance" replace />} />
           <Route path="/ads" element={<AdsDashboardPage />} />
           <Route path="/ads/creatives" element={<CreativePerformancePage />} />
           <Route path="/ads/manage" element={<AdsManagePage />} />

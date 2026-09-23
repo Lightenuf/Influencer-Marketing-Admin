@@ -101,7 +101,7 @@ export default function StageActions({
 }: {
   collab: Collab
   stage: CollabStage
-  /** 마켓 성과를 남기는 창을 연다 */
+  /** 마켓 관리를 남기는 창을 연다 */
   onCompleteMarket: () => void
 }) {
   const update = useUpdateCollab()

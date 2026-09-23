@@ -27,7 +27,12 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const toKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
-export default function CalendarPage() {
+export default function CalendarPage({
+  /** 다른 화면 안에 들어갈 때는 제목을 숨긴다 — 그 화면의 제목이 이미 있다 */
+  embedded = false,
+}: {
+  embedded?: boolean
+} = {}) {
   const { data: collabs, isLoading } = useCollabs()
   const { data: influencers = [] } = useInfluencers()
   const navigate = useNavigate()
@@ -40,7 +45,13 @@ export default function CalendarPage() {
       if (collab.isCancelled) continue
       const name = nameOf(collab.influencerId)
       const push = (date: string | null, kind: EventKind) => {
-        if (date) list.push({ date: date.slice(0, 10), kind, label: name, influencerId: collab.influencerId })
+        if (date)
+          list.push({
+            date: date.slice(0, 10),
+            kind,
+            label: name,
+            influencerId: collab.influencerId,
+          })
       }
       push(collab.marketDate, '마켓')
       push(collab.meetingAt, '미팅')
@@ -79,12 +90,14 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">캘린더</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          마켓 예정일, 미팅 날짜, 샘플 배송일을 한눈에 확인하세요.
-        </p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">캘린더</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            마켓 예정일, 미팅 날짜, 샘플 배송일을 한눈에 확인하세요.
+          </p>
+        </div>
+      )}
 
       <Card>
         <div className="flex items-center justify-between px-5 py-4">

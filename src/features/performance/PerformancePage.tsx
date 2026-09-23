@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import MonthPicker, { monthKeyOf } from '@/components/MonthPicker'
 import { Button, Card, CardHeader, EmptyState, Input, Spinner } from '@/components/ui'
 import { PRODUCTS, type Collab } from '@/data/types'
+import CalendarPage from '@/features/calendar/CalendarPage'
 import MarketResultDialog from '@/features/pipeline/MarketResultDialog'
 import { useCollabs, useInfluencers, useUpdateCollab } from '@/hooks/queries'
 import { downloadCsv } from '@/utils/csv'
@@ -266,7 +267,7 @@ export default function PerformancePage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">마켓 성과</h1>
+          <h1 className="text-xl font-bold text-slate-900">마켓 관리</h1>
           <p className="mt-1 text-sm text-slate-500">
             마켓을 마친 협업의 매출을 모아 봅니다. 다음 시딩 대상을 고를 때 기준이 됩니다.
           </p>
@@ -510,6 +511,15 @@ export default function PerformancePage() {
           </div>
         )}
       </Card>
+
+      <div className="border-t border-slate-200 pt-6">
+        <h2 className="text-lg font-bold text-slate-900">캘린더</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          마켓 예정일, 미팅 날짜, 샘플 배송일을 한눈에 봅니다.
+        </p>
+      </div>
+
+      <CalendarPage embedded />
 
       <MarketResultDialog
         collab={editing}

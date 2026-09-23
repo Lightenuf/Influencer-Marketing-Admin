@@ -12,12 +12,11 @@ const navGroups = [
     title: '인플루언서 마케팅',
     items: [
       { to: '/dashboard', label: '대시보드', icon: '📊' },
-      { to: '/discovery', label: '인플루언서 발굴', icon: '🔍' },
-      { to: '/influencers', label: '컨택 리스트', icon: '👥' },
+      { to: '/discovery', label: '셀러 발굴', icon: '🔍' },
+      { to: '/influencers', label: '셀러 리스트', icon: '👥' },
       { to: '/pipeline', label: '협업 파이프라인', icon: '🗂️' },
-      { to: '/performance', label: '마켓 성과', icon: '💰' },
+      { to: '/performance', label: '마켓 관리', icon: '💰' },
       { to: '/rejected', label: '거절 명단', icon: '🚫' },
-      { to: '/calendar', label: '캘린더', icon: '🗓️' },
     ],
   },
   {

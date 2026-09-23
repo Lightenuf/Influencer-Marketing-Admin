@@ -70,7 +70,7 @@ export function useCreateInfluencer(actorId: string) {
   })
 }
 
-/** 메시지 발송 기록 — 컨택 리스트에서 바로 누른다 */
+/** 메시지 발송 기록 — 셀러 리스트에서 바로 누른다 */
 export function useLogContact() {
   const client = useQueryClient()
   const invalidate = useInvalidateInfluencers()
