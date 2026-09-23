@@ -275,9 +275,14 @@ export default function StageActions({
     return (
       <div className="mt-2 space-y-1.5">
         <DateRow
-          label="마켓 예정일"
+          label="시작 예정일"
           value={collab.marketDate}
           onChange={(v) => patch({ marketDate: v })}
+        />
+        <DateRow
+          label="종료 예정일"
+          value={collab.marketEndDate}
+          onChange={(v) => patch({ marketEndDate: v })}
         />
         {left !== null && (
           <p
