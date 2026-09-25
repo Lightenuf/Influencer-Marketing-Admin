@@ -423,6 +423,19 @@ export const mockAdapter: DataRepository = {
     write(db)
   },
 
+  async previewCustomerGroup(_conditions, limit) {
+    // 미리보기 모드에는 실제 회원 자료가 없다. 화면을 눌러 볼 수 있도록 가상의 고객을 보여준다.
+    // 조건은 따지지 않는다 — 실제 집계는 Supabase 쪽에서 한다.
+    const { buildDemoCustomers } = await import('./demoData')
+    const all = buildDemoCustomers()
+    return tick({
+      total: all.length,
+      smsAgreed: all.filter((row) => row.marketingAgreeSms).length,
+      rows: all.slice(0, limit),
+      syncedAt: new Date().toISOString(),
+    })
+  },
+
   async listUploadPresets() {
     const db = read()
     return tick([...(db.uploadPresets ?? [])].reverse())

@@ -22,6 +22,7 @@ import {
 } from '@/data/types'
 import { useCreateCustomerGroup, useCustomerGroups, useUpdateCustomerGroup } from '@/hooks/queries'
 import { formatNumber } from '@/utils/format'
+import CustomerListDialog from './CustomerListDialog'
 
 /** 1단계 수집에서 확인되면 켠다. 자료가 없는 조건을 눌러 봐야 헛일이기 때문. */
 const KAKAO_READY = false
@@ -171,6 +172,8 @@ export default function CustomerGroupEditPage() {
   const [name, setName] = useState('')
   const [conditions, setConditions] = useState<GroupConditions>(emptyConditions)
   const [adding, setAdding] = useState<BehaviorRule['kind'] | ''>('')
+  // 명단 창. 열 때마다 개인정보 안내를 다시 거친다
+  const [listOpen, setListOpen] = useState(false)
 
   useEffect(() => {
     if (existing) {
@@ -510,7 +513,17 @@ export default function CustomerGroupEditPage() {
       </Card>
 
       <Card>
-        <CardHeader title="3. 미리보기" description="지금 조건에 맞는 고객" />
+        <CardHeader
+          title="3. 미리보기"
+          description="지금 조건에 맞는 고객"
+          action={
+            id ? (
+              <Button size="sm" variant="secondary" onClick={() => setListOpen(true)}>
+                명단 보기
+              </Button>
+            ) : undefined
+          }
+        />
         <div className="p-5">
           <p className="text-sm text-slate-500">조건 요약</p>
           <p className="mt-1 text-sm text-slate-800">{summarizeConditions(conditions)}</p>
@@ -532,6 +545,12 @@ export default function CustomerGroupEditPage() {
           </p>
         </div>
       </Card>
+
+      <CustomerListDialog
+        group={listOpen ? { name: name.trim() || '고객군', conditions } : null}
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+      />
 
       <div className="flex justify-end gap-2 pb-4">
         <Button variant="secondary" onClick={() => navigate('/crm/groups')}>

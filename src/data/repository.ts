@@ -1,5 +1,10 @@
 import type { MetaUploadPreset, MetaUploadPresetInput } from './metaTypes'
-import type { CustomerGroup, CustomerGroupInput } from './types'
+import type {
+  CustomerGroup,
+  CustomerGroupInput,
+  CustomerPreview,
+  GroupConditions,
+} from './types'
 import type {
   Collab,
   CollabStage,
@@ -116,6 +121,12 @@ export interface DataRepository {
   createCustomerGroup(input: CustomerGroupInput, actorId: string): Promise<CustomerGroup>
   updateCustomerGroup(id: string, input: CustomerGroupInput): Promise<CustomerGroup>
   deleteCustomerGroup(id: string): Promise<void>
+
+  /**
+   * 조건에 맞는 고객을 세고 명단을 준다.
+   * 명단을 저장해 두지 않고 부를 때마다 다시 세므로 늘 최신이다.
+   */
+  previewCustomerGroup(conditions: GroupConditions, limit: number): Promise<CustomerPreview>
 
   /** 소재 업로드 프리셋 — 자주 쓰는 설정 묶음 */
   listUploadPresets(): Promise<MetaUploadPreset[]>

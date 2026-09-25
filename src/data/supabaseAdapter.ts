@@ -505,6 +505,11 @@ export const supabaseAdapter: DataRepository = {
     if (error) throw new Error(error.message)
   },
 
+  async previewCustomerGroup(_conditions, _limit) {
+    // 아임웹 회원·주문 자료를 이 데이터베이스로 옮기면 여기서 조건대로 센다.
+    return { total: 0, smsAgreed: 0, rows: [], syncedAt: null }
+  },
+
   async listUploadPresets() {
     const db = requireSupabase()
     const rows = unwrap<Row[]>(

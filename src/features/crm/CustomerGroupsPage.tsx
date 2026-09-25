@@ -1,12 +1,17 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, CardHeader, EmptyState, Spinner, linkButtonClass } from '@/components/ui'
+import type { CustomerGroup } from '@/data/types'
 import { summarizeConditions } from '@/data/types'
 import { useCustomerGroups, useDeleteCustomerGroup } from '@/hooks/queries'
 import { formatDateTime, formatNumber } from '@/utils/format'
+import CustomerListDialog from './CustomerListDialog'
 
 export default function CustomerGroupsPage() {
   const { data: groups = [], isLoading } = useCustomerGroups()
   const remove = useDeleteCustomerGroup()
+  // 명단을 열어 둔 그룹. 열 때마다 개인정보 안내를 다시 거치도록 닫으면 비운다
+  const [listing, setListing] = useState<CustomerGroup | null>(null)
 
   if (isLoading) return <Spinner />
 
@@ -80,6 +85,14 @@ export default function CustomerGroupsPage() {
                       {formatDateTime(group.updatedAt)}
                     </td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="mr-1"
+                        onClick={() => setListing(group)}
+                      >
+                        명단 보기
+                      </Button>
                       <Link
                         to={`/crm/groups/${group.id}`}
                         className="mr-1 text-xs text-slate-500 hover:text-violet-600"
@@ -109,6 +122,8 @@ export default function CustomerGroupsPage() {
         <b>대상 고객 수가 아직 '-' 로 보입니다.</b> 아임웹 회원·주문 자료를 데이터베이스로 옮기면
         조건에 맞는 실제 인원이 표시됩니다. 지금은 조건을 만들어 두는 단계입니다.
       </p>
+
+      <CustomerListDialog group={listing} open={!!listing} onClose={() => setListing(null)} />
     </div>
   )
 }

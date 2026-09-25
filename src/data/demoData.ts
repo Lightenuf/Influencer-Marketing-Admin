@@ -1,6 +1,6 @@
 import type { Database } from './mockAdapter'
 import { DEFAULT_REASON_TAGS } from './types'
-import type { Collab, DncAuditEntry, Influencer, Shipment } from './types'
+import type { Collab, CustomerPreviewRow, DncAuditEntry, Influencer, Shipment } from './types'
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 const dateOnly = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10)
@@ -437,4 +437,27 @@ export function buildDemoDatabase(): Database {
       },
     ],
   }
+}
+
+/** 미리보기 모드에서 고객 명단 화면을 눌러 볼 수 있도록 만든 가상의 고객들. 실제 고객이 아니다. */
+const DEMO_SURNAMES = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임']
+const DEMO_GIVEN = ['서연', '지우', '하윤', '민준', '예준', '수아', '지훈', '채원', '도윤', '유진']
+const DEMO_GRADES = ['일반', '단골', 'VIP']
+
+export function buildDemoCustomers(count = 48): CustomerPreviewRow[] {
+  return Array.from({ length: count }, (_, i) => {
+    const name = `${DEMO_SURNAMES[i % 10]}${DEMO_GIVEN[(i * 3) % 10]}`
+    const orderCount = (i % 5) + 1
+    return {
+      memberCode: `demo-${String(i + 1).padStart(4, '0')}`,
+      name,
+      callnum: `010-${String(2000 + ((i * 137) % 8000))}-${String(1000 + ((i * 419) % 9000))}`,
+      email: `demo${i + 1}@example.com`,
+      marketingAgreeSms: i % 3 !== 0,
+      memberGrade: DEMO_GRADES[i % 3],
+      orderCount,
+      totalSpent: orderCount * (29_000 + (i % 4) * 12_000),
+      lastOrderedAt: dateOnly((i * 7) % 180),
+    }
+  })
 }

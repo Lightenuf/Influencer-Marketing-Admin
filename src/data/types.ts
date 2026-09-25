@@ -401,3 +401,28 @@ export function summarizeConditions(conditions: GroupConditions): string {
 
   return parts.length ? parts.join(' · ') : '조건 없음 (전체 고객)'
 }
+
+/** 조건에 맞는 고객 한 명 — 명단 화면에서 쓴다 */
+export interface CustomerPreviewRow {
+  memberCode: string
+  name: string
+  callnum: string
+  email: string
+  marketingAgreeSms: boolean
+  memberGrade: string
+  orderCount: number
+  totalSpent: number
+  /** 마지막 구매일 (YYYY-MM-DD). 산 적이 없으면 null */
+  lastOrderedAt: string | null
+}
+
+export interface CustomerPreview {
+  /** 조건에 맞는 전체 인원 */
+  total: number
+  /** 그중 SMS 수신동의 인원 */
+  smsAgreed: number
+  /** 화면에 보여줄 명단 (요청한 수만큼) */
+  rows: CustomerPreviewRow[]
+  /** 자료를 마지막으로 받아온 때. 없으면 아직 연결 전이다 */
+  syncedAt: string | null
+}
