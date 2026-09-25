@@ -13,6 +13,8 @@ interface AuthContextValue {
   isMockMode: boolean
   signInAsMember: (memberId: string) => void
   signInWithPassword: (email: string, password: string) => Promise<void>
+  /** 회사 구글 계정으로 로그인 — 비밀번호를 따로 두지 않는다 */
+  signInWithGoogle: () => Promise<void>
   signUp: (email: string, password: string, displayName: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -101,6 +103,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.')
   }, [])
 
+  /**
+   * 회사 구글 계정으로 들어온다.
+   *
+   * 도메인은 두 겹으로 막는다.
+   *  - hd 힌트: 구글 계정 고르는 화면에 회사 계정만 보여준다 (편의)
+   *  - DB 트리거: 다른 도메인은 계정 자체가 만들어지지 않는다 (강제)
+   * 힌트만으로는 막을 수 없어, 실제로 막는 쪽은 트리거다.
+   */
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // 로그인을 마치면 지금 보던 주소로 돌아온다.
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        queryParams: { hd: ALLOWED_EMAIL_DOMAIN.replace('@', ''), prompt: 'select_account' },
+      },
+    })
+    if (error) throw new Error(error.message)
+  }, [])
+
   const signUp = useCallback(async (email: string, password: string, displayName: string) => {
     if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.')
     if (!email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
@@ -138,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isMockMode,
         signInAsMember,
         signInWithPassword,
+        signInWithGoogle,
         signUp,
         signOut,
       }}
