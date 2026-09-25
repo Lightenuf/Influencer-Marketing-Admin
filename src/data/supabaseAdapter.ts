@@ -1,6 +1,6 @@
 import { requireSupabase } from '@/lib/supabase'
 import type { MetaUploadPreset } from './metaTypes'
-import { emptyConditions, type CustomerGroup } from './types'
+import { emptyConditions, type CustomerGroup, type CustomerPreview } from './types'
 import type {
   CollabInput,
   DataRepository,
@@ -505,9 +505,21 @@ export const supabaseAdapter: DataRepository = {
     if (error) throw new Error(error.message)
   },
 
-  async previewCustomerGroup(_conditions, _limit) {
-    // 아임웹 회원·주문 자료를 이 데이터베이스로 옮기면 여기서 조건대로 센다.
-    return { total: 0, smsAgreed: 0, rows: [], syncedAt: null }
+  async previewCustomerGroup(conditions, limit) {
+    const db = requireSupabase()
+    // 세는 규칙은 DB 함수 한곳에 있다. 조건을 SQL로 옮기지 않고 그대로 넘긴다.
+    const { data, error } = await db.rpc('preview_customer_group', {
+      conditions,
+      row_limit: limit,
+    })
+    if (error) throw new Error(error.message)
+    const result = (data ?? {}) as Partial<CustomerPreview>
+    return {
+      total: result.total ?? 0,
+      smsAgreed: result.smsAgreed ?? 0,
+      rows: result.rows ?? [],
+      syncedAt: result.syncedAt ?? null,
+    }
   },
 
   async listUploadPresets() {

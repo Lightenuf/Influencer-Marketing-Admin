@@ -1,11 +1,51 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Card, CardHeader, EmptyState, Spinner, linkButtonClass } from '@/components/ui'
-import type { CustomerGroup } from '@/data/types'
+import { repository } from '@/data'
+import type { CustomerGroup, GroupConditions } from '@/data/types'
 import { summarizeConditions } from '@/data/types'
 import { useCustomerGroups, useDeleteCustomerGroup } from '@/hooks/queries'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import CustomerListDialog from './CustomerListDialog'
+
+/**
+ * 조건에 맞는 인원만 세어 온다.
+ * 명단은 받지 않는다(limit 0) — 숫자를 보려고 개인정보까지 내려받을 이유가 없다.
+ */
+function CountCells({ conditions }: { conditions: GroupConditions }) {
+  const count = useQuery({
+    queryKey: ['customerCount', conditions],
+    queryFn: () => repository.previewCustomerGroup(conditions, 0),
+  })
+
+  if (count.isLoading) {
+    return (
+      <>
+        <td className="px-3 py-3 text-right text-slate-300">…</td>
+        <td className="px-3 py-3 text-right text-slate-300">…</td>
+      </>
+    )
+  }
+  if (count.isError || !count.data) {
+    return (
+      <>
+        <td className="px-3 py-3 text-right text-slate-400">-</td>
+        <td className="px-3 py-3 text-right text-slate-400">-</td>
+      </>
+    )
+  }
+  return (
+    <>
+      <td className="tabular px-3 py-3 text-right font-medium text-slate-900">
+        {formatNumber(count.data.total)}명
+      </td>
+      <td className="tabular px-3 py-3 text-right text-slate-600">
+        {formatNumber(count.data.smsAgreed)}명
+      </td>
+    </>
+  )
+}
 
 export default function CustomerGroupsPage() {
   const { data: groups = [], isLoading } = useCustomerGroups()
@@ -33,7 +73,7 @@ export default function CustomerGroupsPage() {
       <Card>
         <CardHeader
           title={`고객 그룹 ${formatNumber(groups.length)}개`}
-          description="대상 고객 수는 아임웹 자료를 연결하면 실제 숫자로 바뀝니다"
+          description="열어볼 때마다 지금 자료로 다시 셉니다"
         />
 
         {groups.length === 0 ? (
@@ -79,8 +119,7 @@ export default function CustomerGroupsPage() {
                     <td className="max-w-md px-3 py-3 text-xs text-slate-500">
                       {summarizeConditions(group.conditions)}
                     </td>
-                    <td className="px-3 py-3 text-right text-slate-400">-</td>
-                    <td className="px-3 py-3 text-right text-slate-400">-</td>
+                    <CountCells conditions={group.conditions} />
                     <td className="px-3 py-3 text-xs whitespace-nowrap text-slate-500">
                       {formatDateTime(group.updatedAt)}
                     </td>
@@ -119,8 +158,9 @@ export default function CustomerGroupsPage() {
       </Card>
 
       <p className="rounded-lg bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-500">
-        <b>대상 고객 수가 아직 '-' 로 보입니다.</b> 아임웹 회원·주문 자료를 데이터베이스로 옮기면
-        조건에 맞는 실제 인원이 표시됩니다. 지금은 조건을 만들어 두는 단계입니다.
+        고객 수가 <b>'-'</b> 로 보이면 아임웹 자료가 아직 올라오지 않은 것입니다. 맥에서{' '}
+        <code className="rounded bg-white px-1 py-0.5">python3 ~/imweb_to_supabase.py</code> 를
+        돌리면 채워집니다. <b>명단 보기</b>를 누르면 누가 해당되는지 이름까지 확인할 수 있습니다.
       </p>
 
       <CustomerListDialog group={listing} open={!!listing} onClose={() => setListing(null)} />

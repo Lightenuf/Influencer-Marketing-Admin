@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCurrentUser } from '@/auth/AuthProvider'
@@ -20,6 +21,7 @@ import {
   type KakaoState,
   type MarketingAgree,
 } from '@/data/types'
+import { repository } from '@/data'
 import { useCreateCustomerGroup, useCustomerGroups, useUpdateCustomerGroup } from '@/hooks/queries'
 import { formatNumber } from '@/utils/format'
 import CustomerListDialog from './CustomerListDialog'
@@ -181,6 +183,13 @@ export default function CustomerGroupEditPage() {
       setConditions(existing.conditions ?? emptyConditions())
     }
   }, [existing])
+
+  // 조건이 바뀌면 다시 센다. 아래 '그룹을 찾을 수 없습니다'보다 위에 있어야 한다 —
+  // 훅은 중간에 건너뛰면 안 되기 때문이다.
+  const count = useQuery({
+    queryKey: ['customerCount', conditions],
+    queryFn: () => repository.previewCustomerGroup(conditions, 0),
+  })
 
   if (isLoading) return <Spinner />
   if (!isNew && !existing) {
@@ -540,18 +549,27 @@ export default function CustomerGroupEditPage() {
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg bg-slate-50 p-4">
               <p className="text-xs text-slate-500">대상 고객</p>
-              <p className="mt-0.5 text-2xl font-bold text-slate-400">-</p>
+              <p className="mt-0.5 text-2xl font-bold text-slate-900">
+                {count.isLoading ? '…' : count.data ? `${formatNumber(count.data.total)}명` : '-'}
+              </p>
             </div>
             <div className="rounded-lg bg-slate-50 p-4">
               <p className="text-xs text-slate-500">SMS 수신동의</p>
-              <p className="mt-0.5 text-2xl font-bold text-slate-400">-</p>
+              <p className="mt-0.5 text-2xl font-bold text-slate-900">
+                {count.isLoading
+                  ? '…'
+                  : count.data
+                    ? `${formatNumber(count.data.smsAgreed)}명`
+                    : '-'}
+              </p>
             </div>
           </div>
 
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
-            아임웹 회원·주문 자료를 데이터베이스로 옮기면 여기에 실제 인원과 샘플 고객
-            {formatNumber(10)}명이 표시됩니다. 지금은 조건을 만들어 두는 단계입니다.
-          </p>
+          {count.isError && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+              인원을 세지 못했습니다. 아임웹 자료가 아직 올라오지 않았을 수 있습니다.
+            </p>
+          )}
         </div>
       </Card>
 
