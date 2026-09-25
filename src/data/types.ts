@@ -378,8 +378,6 @@ export function summarizeConditions(conditions: GroupConditions): string {
   const parts: string[] = []
   const { profile, behaviors } = conditions
 
-  if (profile.marketingAgrees.length)
-    parts.push(profile.marketingAgrees.map((a) => MARKETING_AGREE_LABELS[a]).join('·'))
   if (profile.grades.length) parts.push(`등급 ${profile.grades.join('·')}`)
   if (profile.genders.length) parts.push(profile.genders.map((g) => GENDER_LABELS[g]).join('·'))
   if (profile.ageBands.length) parts.push(profile.ageBands.map((b) => AGE_BAND_LABELS[b]).join('·'))

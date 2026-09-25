@@ -10,8 +10,6 @@ import {
   GENDER_LABELS,
   KAKAO_STATES,
   KAKAO_STATE_LABELS,
-  MARKETING_AGREES,
-  MARKETING_AGREE_LABELS,
   emptyConditions,
   summarizeConditions,
   type AgeBand,
@@ -19,7 +17,6 @@ import {
   type GenderFilter,
   type GroupConditions,
   type KakaoState,
-  type MarketingAgree,
 } from '@/data/types'
 import { repository } from '@/data'
 import { useCreateCustomerGroup, useCustomerGroups, useUpdateCustomerGroup } from '@/hooks/queries'
@@ -262,21 +259,10 @@ export default function CustomerGroupEditPage() {
       <Card>
         <CardHeader title="1. 고객 정보" description="비워 두면 그 항목은 따지지 않습니다" />
         <div className="space-y-5 p-5">
-          <PickMany<MarketingAgree>
-            label="마케팅 수신 동의"
-            options={MARKETING_AGREES}
-            labels={MARKETING_AGREE_LABELS}
-            picked={profile.marketingAgrees}
-            onChange={(next) => setProfile({ marketingAgrees: next })}
-            hint="지금 아임웹 회원은 전원 '아니오'입니다 — 켜면 0명이 됩니다"
-          />
-
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
-            수신 동의를 비워 두면 동의 여부를 따지지 않고 조건에 맞는 분을 모두 셉니다.{' '}
-            <b className="text-slate-700">
-              동의가 없어도 누가 해당되는지 명단으로 확인할 수 있습니다.
-            </b>{' '}
-            다만 실제 문자·이메일 발송은 동의하신 분에게만 할 수 있습니다.
+            <b className="text-slate-700">마케팅 수신 동의로는 거르지 않습니다.</b> 동의 여부는 보낼
+            수 있느냐의 문제이지, 누가 해당되느냐의 문제가 아니기 때문입니다. 조건에 맞는 분을 모두
+            세어 보여주고, 그중 동의하신 분이 몇 명인지는 아래 미리보기에 따로 나옵니다.
           </p>
 
           <PickMany<GenderFilter>
