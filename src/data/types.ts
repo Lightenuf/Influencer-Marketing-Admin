@@ -424,3 +424,100 @@ export interface CustomerPreview {
   /** 자료를 마지막으로 받아온 때. 없으면 아직 연결 전이다 */
   syncedAt: string | null
 }
+
+// ── 문자·알림톡 발송 ──
+
+/** 보낼 수 있는 통로 */
+export const SEND_CHANNELS = ['sms', 'alimtalk'] as const
+export type SendChannel = (typeof SEND_CHANNELS)[number]
+
+export const SEND_CHANNEL_LABELS: Record<SendChannel, string> = {
+  sms: '문자',
+  alimtalk: '알림톡',
+}
+
+/** 보낼 수 있는 사람 한 명 — 이름과 번호만. 발송에 필요 없는 것은 받지 않는다. */
+export interface SendTarget {
+  memberCode: string
+  name: string
+  callnum: string
+}
+
+/**
+ * 조건에 맞는 사람 중 실제로 보낼 수 있는 사람.
+ * 번호가 없거나 수신거부한 분은 빠진다 — 왜 줄었는지 보이게 각각 센다.
+ */
+export interface SendTargets {
+  total: number
+  sendable: number
+  noNumber: number
+  optedOut: number
+  rows: SendTarget[]
+}
+
+/** 보낸 기록 한 건 */
+export interface MessageSend {
+  id: string
+  title: string
+  body: string
+  channel: SendChannel
+  isAd: boolean
+  groupId: string | null
+  groupName: string
+  targetCount: number
+  sentCount: number
+  failedCount: number
+  costWon: number
+  /** draft(준비) · sending(보내는 중) · sent(보냄) · failed(실패) */
+  status: string
+  error: string
+  createdAt: string
+  sentAt: string | null
+}
+
+export interface MessageSendInput {
+  title: string
+  body: string
+  channel: SendChannel
+  isAd: boolean
+  groupId: string | null
+  groupName: string
+  conditions: GroupConditions
+}
+
+/** 수신거부한 사람 */
+export interface CustomerOptout {
+  callnum: string
+  memberCode: string | null
+  channel: string
+  reason: string
+  /** admin(어드민에서 등록) · channeltalk(채널톡에서 넘어옴) · reply(수신거부 회신) */
+  source: string
+  optedOutAt: string
+}
+
+/** 문자 한 건에 담기는 바이트. 한글은 2바이트로 센다. */
+export function messageBytes(text: string): number {
+  let bytes = 0
+  for (const ch of text) bytes += ch.charCodeAt(0) > 0x7f ? 2 : 1
+  return bytes
+}
+
+/** 90바이트를 넘으면 LMS로 바뀌고 요금이 오른다 */
+export const SMS_BYTE_LIMIT = 90
+export const LMS_BYTE_LIMIT = 2000
+
+export type SmsKind = 'SMS' | 'LMS'
+export const smsKindOf = (text: string): SmsKind =>
+  messageBytes(text) > SMS_BYTE_LIMIT ? 'LMS' : 'SMS'
+
+/** 건당 요금(원). 발송사 단가가 바뀌면 여기만 고친다. */
+export const UNIT_COST: Record<string, number> = { SMS: 20, LMS: 50, alimtalk: 10 }
+
+/**
+ * 광고 문자에 법으로 붙여야 하는 것.
+ * 앞에 (광고), 뒤에 무료 수신거부 번호. 빠지면 과태료 대상이라 사람이 잊지 않게 자동으로 붙인다.
+ */
+export const AD_PREFIX = '(광고) '
+export const buildAdBody = (body: string, optoutNumber: string) =>
+  `${AD_PREFIX}${body}\n무료수신거부 ${optoutNumber}`

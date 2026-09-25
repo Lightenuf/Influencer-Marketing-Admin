@@ -409,6 +409,8 @@ export function buildDemoDatabase(): Database {
     discoveryRequests: [],
     uploadPresets: [],
     customerGroups: [],
+    messageSends: [],
+    optouts: [],
     messageTemplates: [],
     reasonTags: DEFAULT_REASON_TAGS.map((label, index) => ({
       id: `tag-default-${index}`,

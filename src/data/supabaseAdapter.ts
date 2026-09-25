@@ -1,6 +1,12 @@
 import { requireSupabase } from '@/lib/supabase'
 import type { MetaUploadPreset } from './metaTypes'
-import { emptyConditions, type CustomerGroup, type CustomerPreview } from './types'
+import {
+  emptyConditions,
+  type CustomerGroup,
+  type CustomerPreview,
+  type MessageSend,
+  type SendTargets,
+} from './types'
 import type {
   CollabInput,
   DataRepository,
@@ -169,6 +175,38 @@ const collabColumns = (
   if (input.targetRevenue !== undefined) row.target_revenue = input.targetRevenue
   if (input.plannedUnits !== undefined) row.planned_units_by_product = input.plannedUnits
   return row
+}
+
+const toMessageSend = (row: Row): MessageSend => ({
+  id: String(row.id),
+  title: String(row.title ?? ''),
+  body: String(row.body ?? ''),
+  channel: (row.channel as MessageSend['channel']) ?? 'sms',
+  isAd: Boolean(row.is_ad),
+  groupId: (row.group_id as string) ?? null,
+  groupName: String(row.group_name ?? ''),
+  targetCount: Number(row.target_count ?? 0),
+  sentCount: Number(row.sent_count ?? 0),
+  failedCount: Number(row.failed_count ?? 0),
+  costWon: Number(row.cost_won ?? 0),
+  status: String(row.status ?? 'draft'),
+  error: String(row.error ?? ''),
+  createdAt: String(row.created_at),
+  sentAt: (row.sent_at as string) ?? null,
+})
+
+/** supabase-js는 오류 본문을 Response에 담아 준다 — 열어서 이유를 꺼낸다 */
+async function readFunctionError(error: unknown): Promise<string | null> {
+  const context = (error as { context?: unknown }).context
+  if (context instanceof Response) {
+    try {
+      const body = await context.json()
+      if (body?.error) return String(body.error)
+    } catch {
+      // 본문이 JSON이 아니면 기본 메시지를 쓴다.
+    }
+  }
+  return null
 }
 
 const toCustomerGroup = (row: Row): CustomerGroup => ({
@@ -520,6 +558,76 @@ export const supabaseAdapter: DataRepository = {
       rows: result.rows ?? [],
       syncedAt: result.syncedAt ?? null,
     }
+  },
+
+  async listSendTargets(conditions, limit) {
+    const db = requireSupabase()
+    const { data, error } = await db.rpc('list_send_targets', {
+      conditions,
+      row_limit: limit,
+    })
+    if (error) throw new Error(error.message)
+    const result = (data ?? {}) as Partial<SendTargets>
+    return {
+      total: result.total ?? 0,
+      sendable: result.sendable ?? 0,
+      noNumber: result.noNumber ?? 0,
+      optedOut: result.optedOut ?? 0,
+      rows: result.rows ?? [],
+    }
+  },
+
+  async listMessageSends() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db.from('message_sends').select('*').order('created_at', { ascending: false }),
+    )
+    return rows.map(toMessageSend)
+  },
+
+  async sendMessage(input, _actorId) {
+    const db = requireSupabase()
+    // 발송사 열쇠는 Edge Function만 쥔다. 브라우저에서 직접 부르지 않는다.
+    const { data, error } = await db.functions.invoke('sms-proxy', {
+      body: { action: 'send', params: input },
+    })
+    if (error) {
+      const detail = await readFunctionError(error)
+      throw new Error(detail ?? '문자를 보내지 못했습니다.')
+    }
+    if (data && typeof data === 'object' && 'error' in data) {
+      throw new Error(String((data as { error: unknown }).error))
+    }
+    return toMessageSend((data as { send: Row }).send)
+  },
+
+  async listOptouts() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db.from('customer_optouts').select('*').order('opted_out_at', { ascending: false }),
+    )
+    return rows.map((row) => ({
+      callnum: String(row.callnum),
+      memberCode: (row.member_code as string) ?? null,
+      channel: String(row.channel ?? 'sms'),
+      reason: String(row.reason ?? ''),
+      source: String(row.source ?? 'admin'),
+      optedOutAt: String(row.opted_out_at),
+    }))
+  },
+
+  async addOptout(callnum, reason) {
+    const db = requireSupabase()
+    const { error } = await db
+      .from('customer_optouts')
+      .upsert({ callnum, reason, source: 'admin' }, { onConflict: 'callnum' })
+    if (error) throw new Error(error.message)
+  },
+
+  async removeOptout(callnum) {
+    const db = requireSupabase()
+    const { error } = await db.from('customer_optouts').delete().eq('callnum', callnum)
+    if (error) throw new Error(error.message)
   },
 
   async listUploadPresets() {

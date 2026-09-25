@@ -2,8 +2,12 @@ import type { MetaUploadPreset, MetaUploadPresetInput } from './metaTypes'
 import type {
   CustomerGroup,
   CustomerGroupInput,
+  CustomerOptout,
   CustomerPreview,
   GroupConditions,
+  MessageSend,
+  MessageSendInput,
+  SendTargets,
 } from './types'
 import type {
   Collab,
@@ -127,6 +131,26 @@ export interface DataRepository {
    * 명단을 저장해 두지 않고 부를 때마다 다시 세므로 늘 최신이다.
    */
   previewCustomerGroup(conditions: GroupConditions, limit: number): Promise<CustomerPreview>
+
+  /**
+   * 조건에 맞는 사람 중 실제로 보낼 수 있는 사람만 추린다.
+   * 번호가 없거나 수신거부한 분은 빠진다. 발송 대상의 유일한 기준이다.
+   */
+  listSendTargets(conditions: GroupConditions, limit: number): Promise<SendTargets>
+
+  /** 보낸 기록 — 최근 것부터 */
+  listMessageSends(): Promise<MessageSend[]>
+
+  /**
+   * 실제로 보낸다. 되돌릴 수 없다.
+   * 보내기 전에 기록을 먼저 남기고, 결과를 받아 채운다.
+   */
+  sendMessage(input: MessageSendInput, actorId: string): Promise<MessageSend>
+
+  /** 수신거부 명단 */
+  listOptouts(): Promise<CustomerOptout[]>
+  addOptout(callnum: string, reason: string): Promise<void>
+  removeOptout(callnum: string): Promise<void>
 
   /** 소재 업로드 프리셋 — 자주 쓰는 설정 묶음 */
   listUploadPresets(): Promise<MetaUploadPreset[]>

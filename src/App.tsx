@@ -9,6 +9,7 @@ import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
 import CreativeUploadPage from '@/features/ads/CreativeUploadPage'
 import CustomerGroupEditPage from '@/features/crm/CustomerGroupEditPage'
 import CustomerGroupsPage from '@/features/crm/CustomerGroupsPage'
+import MessageSendPage from '@/features/crm/MessageSendPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import DiscoveryPage from '@/features/discovery/DiscoveryPage'
 import RejectedListPage from '@/features/rejected/RejectedListPage'
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/crm/groups" element={<CustomerGroupsPage />} />
           <Route path="/crm/groups/new" element={<CustomerGroupEditPage />} />
           <Route path="/crm/groups/:id" element={<CustomerGroupEditPage />} />
+          <Route path="/crm/send" element={<MessageSendPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

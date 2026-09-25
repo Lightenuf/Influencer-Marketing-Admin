@@ -1,5 +1,5 @@
 import { PRODUCTS } from './types'
-import type { CustomerGroup } from './types'
+import type { CustomerGroup, CustomerOptout, MessageSend } from './types'
 import type { MetaUploadPreset } from './metaTypes'
 import type {
   CollabInput,
@@ -29,6 +29,8 @@ export interface Database {
   discoveryRequests: DiscoveryRequest[]
   uploadPresets: MetaUploadPreset[]
   customerGroups: CustomerGroup[]
+  messageSends: MessageSend[]
+  optouts: CustomerOptout[]
   reasonTags: ReasonTag[]
   messageTemplates: MessageTemplate[]
   influencers: Influencer[]
@@ -48,6 +50,8 @@ const emptyDb = (): Database => ({
   discoveryRequests: [],
   uploadPresets: [],
   customerGroups: [],
+  messageSends: [],
+  optouts: [],
   reasonTags: [],
   messageTemplates: [],
   influencers: [],
@@ -434,6 +438,81 @@ export const mockAdapter: DataRepository = {
       rows: all.slice(0, limit),
       syncedAt: new Date().toISOString(),
     })
+  },
+
+  async listSendTargets(_conditions, limit) {
+    const { buildDemoCustomers } = await import('./demoData')
+    const db = read()
+    const optouts = new Set((db.optouts ?? []).map((o) => o.callnum))
+    const all = buildDemoCustomers().filter((row) => !optouts.has(row.callnum))
+    return tick({
+      total: all.length + optouts.size,
+      sendable: all.length,
+      noNumber: 0,
+      optedOut: optouts.size,
+      rows: all
+        .slice(0, limit)
+        .map((row) => ({ memberCode: row.memberCode, name: row.name, callnum: row.callnum })),
+    })
+  },
+
+  async listMessageSends() {
+    const db = read()
+    return tick([...(db.messageSends ?? [])].reverse())
+  },
+
+  async sendMessage(input, _actorId) {
+    // 미리보기 모드에서는 아무 데도 보내지 않는다. 보낸 척만 하고 기록만 남긴다.
+    const db = read()
+    const targets = await this.listSendTargets(input.conditions, 10_000)
+    const record: MessageSend = {
+      id: crypto.randomUUID(),
+      title: input.title,
+      body: input.body,
+      channel: input.channel,
+      isAd: input.isAd,
+      groupId: input.groupId,
+      groupName: input.groupName,
+      targetCount: targets.sendable,
+      sentCount: targets.sendable,
+      failedCount: 0,
+      costWon: 0,
+      status: 'sent',
+      error: '',
+      createdAt: new Date().toISOString(),
+      sentAt: new Date().toISOString(),
+    }
+    db.messageSends = [...(db.messageSends ?? []), record]
+    write(db)
+    return tick(record)
+  },
+
+  async listOptouts() {
+    const db = read()
+    return tick([...(db.optouts ?? [])].reverse())
+  },
+
+  async addOptout(callnum, reason) {
+    const db = read()
+    const rest = (db.optouts ?? []).filter((o) => o.callnum !== callnum)
+    db.optouts = [
+      ...rest,
+      {
+        callnum,
+        memberCode: null,
+        channel: 'sms',
+        reason,
+        source: 'admin',
+        optedOutAt: new Date().toISOString(),
+      },
+    ]
+    write(db)
+  },
+
+  async removeOptout(callnum) {
+    const db = read()
+    db.optouts = (db.optouts ?? []).filter((o) => o.callnum !== callnum)
+    write(db)
   },
 
   async listUploadPresets() {

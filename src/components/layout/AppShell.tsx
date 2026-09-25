@@ -21,7 +21,10 @@ const navGroups = [
   },
   {
     title: 'CRM 마케팅',
-    items: [{ to: '/crm/groups', label: '고객 행동 관리', icon: '🎯' }],
+    items: [
+      { to: '/crm/groups', label: '고객 행동 관리', icon: '🎯' },
+      { to: '/crm/send', label: '문자·푸시 전송', icon: '💬' },
+    ],
   },
   {
     title: '퍼포먼스 마케팅',
