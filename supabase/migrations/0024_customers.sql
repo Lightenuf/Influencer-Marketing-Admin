@@ -55,3 +55,7 @@ create policy customer_orders_all on public.customer_orders
 
 grant select, insert, update, delete on public.customers to authenticated;
 grant select, insert, update, delete on public.customer_orders to authenticated;
+
+-- 자료를 옮기는 스크립트가 쓰는 역할. 사람이 아니라 맥에서 도는 스크립트다.
+grant select, insert, update, delete on public.customers to service_role;
+grant select, insert, update, delete on public.customer_orders to service_role;
