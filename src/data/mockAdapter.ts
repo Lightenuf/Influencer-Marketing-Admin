@@ -1,4 +1,5 @@
 import { PRODUCTS } from './types'
+import type { CustomerGroup } from './types'
 import type { MetaUploadPreset } from './metaTypes'
 import type {
   CollabInput,
@@ -27,6 +28,7 @@ const STORAGE_KEY = 'breevo-influencer-admin:v1'
 export interface Database {
   discoveryRequests: DiscoveryRequest[]
   uploadPresets: MetaUploadPreset[]
+  customerGroups: CustomerGroup[]
   reasonTags: ReasonTag[]
   messageTemplates: MessageTemplate[]
   influencers: Influencer[]
@@ -45,6 +47,7 @@ const TEAM_MEMBERS: TeamMember[] = [
 const emptyDb = (): Database => ({
   discoveryRequests: [],
   uploadPresets: [],
+  customerGroups: [],
   reasonTags: [],
   messageTemplates: [],
   influencers: [],
@@ -102,6 +105,7 @@ function migrate(db: Database): Database {
         : []),
   }))
   db.uploadPresets = db.uploadPresets ?? []
+  db.customerGroups = db.customerGroups ?? []
   db.influencers = db.influencers.map((influencer) => ({
     ...influencer,
     followingCount: influencer.followingCount ?? 0,
@@ -383,6 +387,40 @@ export const mockAdapter: DataRepository = {
     db.shipments = db.shipments.map((s) => (s.collabId === id ? { ...s, collabId: null } : s))
     write(db)
     return tick(undefined)
+  },
+
+  async listCustomerGroups() {
+    const db = read()
+    return tick([...(db.customerGroups ?? [])].reverse())
+  },
+
+  async createCustomerGroup(input, actorId) {
+    const db = read()
+    const group = {
+      ...input,
+      id: uid(),
+      createdBy: actorId,
+      createdAt: now(),
+      updatedAt: now(),
+    }
+    db.customerGroups = [...(db.customerGroups ?? []), group]
+    write(db)
+    return tick(group)
+  },
+
+  async updateCustomerGroup(id, input) {
+    const db = read()
+    const group = (db.customerGroups ?? []).find((g) => g.id === id)
+    if (!group) throw new Error('그룹을 찾을 수 없습니다.')
+    Object.assign(group, input, { updatedAt: now() })
+    write(db)
+    return tick(group)
+  },
+
+  async deleteCustomerGroup(id) {
+    const db = read()
+    db.customerGroups = (db.customerGroups ?? []).filter((g) => g.id !== id)
+    write(db)
   },
 
   async listUploadPresets() {

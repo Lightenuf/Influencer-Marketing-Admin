@@ -20,6 +20,10 @@ const navGroups = [
     ],
   },
   {
+    title: 'CRM 마케팅',
+    items: [{ to: '/crm/groups', label: '고객 행동 관리', icon: '🎯' }],
+  },
+  {
     title: '퍼포먼스 마케팅',
     items: [
       { to: '/ads', label: '광고 대시보드', icon: '📈' },

@@ -7,9 +7,10 @@ import type {
   InfluencerInput,
   ShipmentInput,
 } from '@/data/repository'
-import type { Collab, CollabStage, DiscoveryRequest } from '@/data/types'
+import type { Collab, CollabStage, CustomerGroupInput, DiscoveryRequest } from '@/data/types'
 
 export const keys = {
+  customerGroups: ['customerGroups'] as const,
   members: ['members'] as const,
   influencers: ['influencers'] as const,
   influencer: (id: string) => ['influencers', id] as const,
@@ -381,5 +382,37 @@ export function useDemoData() {
     mutationFn: (action: 'load' | 'reset') =>
       action === 'load' ? repository.loadDemoData() : repository.resetAll(),
     onSuccess: () => client.invalidateQueries(),
+  })
+}
+
+/** CRM 고객 그룹 — 조건만 저장하고 볼 때마다 다시 센다 */
+export const useCustomerGroups = () =>
+  useQuery({
+    queryKey: keys.customerGroups,
+    queryFn: () => repository.listCustomerGroups(),
+  })
+
+export function useCreateCustomerGroup(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CustomerGroupInput) => repository.createCustomerGroup(input, actorId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.customerGroups }),
+  })
+}
+
+export function useUpdateCustomerGroup() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: CustomerGroupInput }) =>
+      repository.updateCustomerGroup(id, input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.customerGroups }),
+  })
+}
+
+export function useDeleteCustomerGroup() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => repository.deleteCustomerGroup(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.customerGroups }),
   })
 }

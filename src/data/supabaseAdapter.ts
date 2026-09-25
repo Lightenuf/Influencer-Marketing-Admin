@@ -1,5 +1,6 @@
 import { requireSupabase } from '@/lib/supabase'
 import type { MetaUploadPreset } from './metaTypes'
+import { emptyConditions, type CustomerGroup } from './types'
 import type {
   CollabInput,
   DataRepository,
@@ -169,6 +170,15 @@ const collabColumns = (
   if (input.plannedUnits !== undefined) row.planned_units_by_product = input.plannedUnits
   return row
 }
+
+const toCustomerGroup = (row: Row): CustomerGroup => ({
+  id: row.id,
+  name: row.name,
+  conditions: row.conditions ?? emptyConditions(),
+  createdBy: row.created_by,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+})
 
 const toUploadPreset = (row: Row): MetaUploadPreset => ({
   id: row.id,
@@ -453,6 +463,45 @@ export const supabaseAdapter: DataRepository = {
   async deleteCollab(id) {
     const db = requireSupabase()
     const { error } = await db.from('collabs').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async listCustomerGroups() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db.from('customer_groups').select('*').order('updated_at', { ascending: false }),
+    )
+    return rows.map(toCustomerGroup)
+  },
+
+  async createCustomerGroup(input, actorId) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('customer_groups')
+        .insert({ name: input.name, conditions: input.conditions, created_by: actorId })
+        .select()
+        .single(),
+    )
+    return toCustomerGroup(row)
+  },
+
+  async updateCustomerGroup(id, input) {
+    const db = requireSupabase()
+    const row = unwrap(
+      await db
+        .from('customer_groups')
+        .update({ name: input.name, conditions: input.conditions })
+        .eq('id', id)
+        .select()
+        .single(),
+    )
+    return toCustomerGroup(row)
+  },
+
+  async deleteCustomerGroup(id) {
+    const db = requireSupabase()
+    const { error } = await db.from('customer_groups').delete().eq('id', id)
     if (error) throw new Error(error.message)
   },
 

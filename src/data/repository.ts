@@ -1,4 +1,5 @@
 import type { MetaUploadPreset, MetaUploadPresetInput } from './metaTypes'
+import type { CustomerGroup, CustomerGroupInput } from './types'
 import type {
   Collab,
   CollabStage,
@@ -109,6 +110,12 @@ export interface DataRepository {
   /** 보류를 풀고 원래 단계로 되돌린다. */
   resumeCollab(id: string): Promise<Collab>
   deleteCollab(id: string): Promise<void>
+
+  /** CRM 고객 그룹 — 조건만 저장하고 볼 때마다 다시 센다 */
+  listCustomerGroups(): Promise<CustomerGroup[]>
+  createCustomerGroup(input: CustomerGroupInput, actorId: string): Promise<CustomerGroup>
+  updateCustomerGroup(id: string, input: CustomerGroupInput): Promise<CustomerGroup>
+  deleteCustomerGroup(id: string): Promise<void>
 
   /** 소재 업로드 프리셋 — 자주 쓰는 설정 묶음 */
   listUploadPresets(): Promise<MetaUploadPreset[]>

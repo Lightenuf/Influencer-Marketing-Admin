@@ -264,3 +264,140 @@ export interface CommunicationLog {
   note: string
   loggedAt: string
 }
+
+/**
+ * CRM — 고객 그룹.
+ *
+ * 명단을 저장하지 않고 '조건'만 저장한다. 볼 때마다 최신 자료로 다시 세므로,
+ * 어제 만든 그룹도 오늘 기준으로 맞는 사람을 가리킨다.
+ * 나중에 채널톡 발송을 붙일 때 이 그룹을 그대로 보낼 대상으로 쓴다.
+ */
+
+export const MARKETING_AGREES = ['sms', 'email', 'none'] as const
+export type MarketingAgree = (typeof MARKETING_AGREES)[number]
+export const MARKETING_AGREE_LABELS: Record<MarketingAgree, string> = {
+  sms: 'SMS 수신 동의',
+  email: '이메일 수신 동의',
+  none: '동의 안 함',
+}
+
+export const GENDERS = ['M', 'F', 'unknown'] as const
+export type GenderFilter = (typeof GENDERS)[number]
+export const GENDER_LABELS: Record<GenderFilter, string> = {
+  M: '남',
+  F: '여',
+  unknown: '미입력',
+}
+
+export const AGE_BANDS = ['under20', '20s', '30s', '40s', 'over50', 'unknown'] as const
+export type AgeBand = (typeof AGE_BANDS)[number]
+export const AGE_BAND_LABELS: Record<AgeBand, string> = {
+  under20: '20대 미만',
+  '20s': '20대',
+  '30s': '30대',
+  '40s': '40대',
+  over50: '50대 이상',
+  unknown: '미입력',
+}
+
+export const KAKAO_STATES = ['friend', 'not_friend', 'unknown'] as const
+export type KakaoState = (typeof KAKAO_STATES)[number]
+export const KAKAO_STATE_LABELS: Record<KakaoState, string> = {
+  friend: '친구',
+  not_friend: '친구 아님',
+  unknown: '미확인',
+}
+
+/** 고객 정보로 거르는 조건 — 비워 두면 그 항목은 따지지 않는다 */
+export interface ProfileFilter {
+  marketingAgrees: MarketingAgree[]
+  grades: string[]
+  genders: GenderFilter[]
+  ageBands: AgeBand[]
+  joinedFrom: string | null
+  joinedTo: string | null
+  kakao: KakaoState | null
+}
+
+/** 기간을 고르는 방법 — 프리셋이거나, 직접 고른 날짜거나, 'N일 전부터 오늘까지' */
+export interface PeriodPick {
+  kind: 'preset' | 'range' | 'lastDays'
+  /** preset: 7 · 14 · 30 */
+  days?: number
+  from?: string | null
+  to?: string | null
+}
+
+export type BehaviorRule =
+  /** 그 기간에 산 적이 있다 / 없다 */
+  | { kind: 'purchased'; has: boolean; period: PeriodPick }
+  /** 마지막 구매 후 며칠 지났는지 (min 이상 max 미만) */
+  | { kind: 'sinceLastPurchase'; minDays: number | null; maxDays: number | null }
+  /** 구매 횟수 */
+  | { kind: 'orderCount'; min: number | null; max: number | null }
+  /** 누적 구매 금액(원) */
+  | { kind: 'totalSpent'; min: number | null; max: number | null }
+  /** 특정 상품을 샀는지 */
+  | { kind: 'boughtProduct'; prodNos: string[]; has: boolean }
+  /** 쿠폰을 받고 썼는지 */
+  | { kind: 'couponUsed'; couponCode: string | null; used: boolean }
+  /** 첫 구매가 어디서 들어왔는지 (추천인 코드·UTM) */
+  | { kind: 'firstChannel'; codes: string[] }
+
+export interface GroupConditions {
+  profile: ProfileFilter
+  behaviors: BehaviorRule[]
+}
+
+export interface CustomerGroup {
+  id: string
+  name: string
+  conditions: GroupConditions
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CustomerGroupInput = Pick<CustomerGroup, 'name' | 'conditions'>
+
+export const emptyConditions = (): GroupConditions => ({
+  profile: {
+    marketingAgrees: [],
+    grades: [],
+    genders: [],
+    ageBands: [],
+    joinedFrom: null,
+    joinedTo: null,
+    kakao: null,
+  },
+  behaviors: [],
+})
+
+/** 목록에서 한 줄로 보여줄 조건 요약 */
+export function summarizeConditions(conditions: GroupConditions): string {
+  const parts: string[] = []
+  const { profile, behaviors } = conditions
+
+  if (profile.marketingAgrees.length)
+    parts.push(profile.marketingAgrees.map((a) => MARKETING_AGREE_LABELS[a]).join('·'))
+  if (profile.grades.length) parts.push(`등급 ${profile.grades.join('·')}`)
+  if (profile.genders.length) parts.push(profile.genders.map((g) => GENDER_LABELS[g]).join('·'))
+  if (profile.ageBands.length) parts.push(profile.ageBands.map((b) => AGE_BAND_LABELS[b]).join('·'))
+  if (profile.joinedFrom || profile.joinedTo)
+    parts.push(`가입 ${profile.joinedFrom ?? ''}~${profile.joinedTo ?? ''}`)
+  if (profile.kakao) parts.push(`카카오 ${KAKAO_STATE_LABELS[profile.kakao]}`)
+
+  for (const rule of behaviors) {
+    if (rule.kind === 'purchased') parts.push(rule.has ? '기간 내 구매' : '기간 내 구매 없음')
+    if (rule.kind === 'sinceLastPurchase')
+      parts.push(`마지막 구매 ${rule.minDays ?? 0}~${rule.maxDays ?? '∞'}일 경과`)
+    if (rule.kind === 'orderCount') parts.push(`구매 ${rule.min ?? 0}~${rule.max ?? '∞'}회`)
+    if (rule.kind === 'totalSpent') parts.push('누적 구매액 조건')
+    if (rule.kind === 'boughtProduct')
+      parts.push(rule.has ? `상품 ${rule.prodNos.length}개 구매` : '해당 상품 미구매')
+    if (rule.kind === 'couponUsed') parts.push(rule.used ? '쿠폰 사용' : '쿠폰 미사용')
+    if (rule.kind === 'firstChannel') parts.push(`유입 ${rule.codes.join('·')}`)
+  }
+
+  return parts.length ? parts.join(' · ') : '조건 없음 (전체 고객)'
+}
