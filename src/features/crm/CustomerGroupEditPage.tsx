@@ -50,7 +50,7 @@ function PickMany<T extends string>({
     <div>
       <p className="text-sm font-medium text-slate-700">
         {label}
-        {disabled && <span className="ml-1.5 text-xs font-normal text-amber-600">{hint}</span>}
+        {hint && <span className="ml-1.5 text-xs font-normal text-amber-600">{hint}</span>}
       </p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {options.map((option) => {
@@ -259,7 +259,16 @@ export default function CustomerGroupEditPage() {
             labels={MARKETING_AGREE_LABELS}
             picked={profile.marketingAgrees}
             onChange={(next) => setProfile({ marketingAgrees: next })}
+            hint="지금 아임웹 회원은 전원 '아니오'입니다 — 켜면 0명이 됩니다"
           />
+
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+            수신 동의를 비워 두면 동의 여부를 따지지 않고 조건에 맞는 분을 모두 셉니다.{' '}
+            <b className="text-slate-700">
+              동의가 없어도 누가 해당되는지 명단으로 확인할 수 있습니다.
+            </b>{' '}
+            다만 실제 문자·이메일 발송은 동의하신 분에게만 할 수 있습니다.
+          </p>
 
           <PickMany<GenderFilter>
             label="성별"

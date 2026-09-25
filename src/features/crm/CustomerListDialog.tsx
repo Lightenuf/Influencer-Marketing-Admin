@@ -105,6 +105,13 @@ export default function CustomerListDialog({
           개인정보가 담긴 화면입니다. 필요한 만큼만 보고, 내려받은 파일은 다 쓴 뒤 지워주세요.
         </p>
 
+        {data && rows.length > 0 && data.smsAgreed === 0 && (
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+            이 명단에는 <b className="text-slate-800">마케팅 수신에 동의한 분이 없습니다.</b> 누가
+            해당되는지 확인하는 데는 문제가 없지만, 실제 문자·이메일 발송은 할 수 없습니다.
+          </p>
+        )}
+
         {preview.isLoading ? (
           <Spinner />
         ) : rows.length === 0 ? (
