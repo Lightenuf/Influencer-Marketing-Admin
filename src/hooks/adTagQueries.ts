@@ -39,6 +39,14 @@ export const useOpsSettings = () =>
     staleTime: LONG,
   })
 
+/** 자사몰 실매출 — 하루에 한 번만 바뀌므로 오래 두고 쓴다 */
+export const useShopRevenue = (from: string, to: string) =>
+  useQuery({
+    queryKey: ['adTags', 'shopRevenue', from, to] as const,
+    queryFn: () => adTagRepository.getShopRevenue(from, to),
+    staleTime: LONG,
+  })
+
 export function useSaveAdTags(actorId: string) {
   const client = useQueryClient()
   return useMutation({

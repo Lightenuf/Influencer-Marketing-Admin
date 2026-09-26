@@ -34,6 +34,7 @@ const navGroups = [
       { to: '/ads/creatives', label: '소재 성과', icon: '🎬' },
       { to: '/ads/manage', label: '광고 관리', icon: '🎛️' },
       { to: '/ads/upload', label: '소재 업로드', icon: '⬆️' },
+      { to: '/ads/insights', label: '성과 분석', icon: '🔬' },
       { to: '/ads/tagging', label: '광고 태깅', icon: '🏷️' },
       { to: '/ads/settings', label: '설정', icon: '⚙️' },
     ],

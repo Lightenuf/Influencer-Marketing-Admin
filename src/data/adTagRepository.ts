@@ -30,6 +30,21 @@ export interface AdTagRepository {
 
   getOpsSettings(): Promise<OpsSettings>
   saveOpsSettings(patch: Partial<OpsSettings>): Promise<void>
+
+  /**
+   * 자사몰 실매출 — MER과 신규 구매 비중에 쓴다.
+   * 메타가 말하는 매출은 메타 기준이라, 실제로 번 돈은 주문에서 직접 센다.
+   */
+  getShopRevenue(from: string, to: string): Promise<ShopRevenue>
+}
+
+export interface ShopRevenue {
+  revenue: number
+  orders: number
+  buyers: number
+  newOrders: number
+  newRevenue: number
+  syncedAt: string | null
 }
 
 type Row = Record<string, unknown>
@@ -173,6 +188,21 @@ const supabaseAdTags: AdTagRepository = {
     return ops as unknown as OpsSettings
   },
 
+  async getShopRevenue(from, to) {
+    const db = requireDb()
+    const { data, error } = await db.rpc('shop_revenue', { from_day: from, to_day: to })
+    if (error) throw new Error(error.message)
+    const row = (data ?? {}) as Partial<ShopRevenue>
+    return {
+      revenue: row.revenue ?? 0,
+      orders: row.orders ?? 0,
+      buyers: row.buyers ?? 0,
+      newOrders: row.newOrders ?? 0,
+      newRevenue: row.newRevenue ?? 0,
+      syncedAt: row.syncedAt ?? null,
+    }
+  },
+
   async saveOpsSettings(patch) {
     const db = requireDb()
     const rows = Object.entries(patch).map(([key, value]) => ({
@@ -302,6 +332,18 @@ const mockAdTags: AdTagRepository = {
 
   async getOpsSettings() {
     return tick({ ...DEFAULT_OPS, ...readLocal().ops })
+  },
+
+  async getShopRevenue(_from, _to) {
+    // 미리보기 모드에는 주문 자료가 없다. 카드는 숨겨진다.
+    return tick({
+      revenue: 0,
+      orders: 0,
+      buyers: 0,
+      newOrders: 0,
+      newRevenue: 0,
+      syncedAt: null,
+    })
   },
 
   async saveOpsSettings(patch) {
