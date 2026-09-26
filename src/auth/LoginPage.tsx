@@ -1,9 +1,14 @@
 import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
 import { Button, Card, Field, Input, Select } from '@/components/ui'
 
 export default function LoginPage() {
+  const location = useLocation()
+  // 로그인 전에 가려던 곳. 슬랙 알림 링크를 눌렀는데 대시보드로 떨어지면 다시 찾아가야 한다.
+  const from = (location.state as { from?: { pathname: string; search: string } } | null)?.from
+  const goBackTo = from ? `${from.pathname}${from.search ?? ''}` : '/dashboard'
+
   const {
     user,
     members,
@@ -21,7 +26,7 @@ export default function LoginPage() {
   const [googlePending, setGooglePending] = useState(false)
 
   if (loading) return null
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) return <Navigate to={goBackTo} replace />
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()

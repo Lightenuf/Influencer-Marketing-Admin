@@ -17,6 +17,14 @@
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 
+/**
+ * 어드민 화면 주소.
+ *
+ * 해시(#/)를 붙이면 안 된다 — 이 앱은 경로 방식(BrowserRouter)이라
+ * 해시는 무시되고 첫 화면으로 떨어진다. 한 번 그렇게 내보낸 적이 있다.
+ */
+const HOME = 'https://lightenuf.github.io/Influencer-Marketing-Admin/'
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-key',
@@ -376,7 +384,6 @@ async function saveAndNotify(
     }
   }
 
-  const home = 'https://lightenuf.github.io/Influencer-Marketing-Admin/'
   const text = fresh
     .map((alert) => {
       const evidence = evidenceLine(alert)
@@ -399,7 +406,7 @@ async function saveAndNotify(
         '',
         text,
         '',
-        `<${home}#/ads/actions|오늘의 액션> · <${home}#/ads/insights|성과 분석>`,
+        `<${HOME}ads/actions|오늘의 액션> · <${HOME}ads/insights|성과 분석>`,
       ].join('\n'),
     }),
   })
@@ -464,8 +471,6 @@ function mondayOf(day: string): string {
   return date.toISOString().slice(0, 10)
 }
 
-const HOME = 'https://lightenuf.github.io/Influencer-Marketing-Admin/'
-
 /** 기간 집계 — 계정 전체 */
 async function totals(from: string, to: string) {
   const account = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
@@ -518,7 +523,7 @@ async function dailySummary(settings: Record<string, unknown>) {
         body,
         '',
         open > 0 ? `오늘 볼 제안 ${open}개` : '새 제안은 없습니다',
-        `<${HOME}#/ads/actions|오늘의 액션>`,
+        `<${HOME}ads/actions|오늘의 액션>`,
       ].join('\n'),
     )
     return { sent: true }
@@ -551,7 +556,7 @@ async function approvalRequests(settings: Record<string, unknown>) {
       lines.join('\n'),
       '',
       '가드레일에 걸려 바로 실행되지 않았습니다. 승인 권한이 있는 분이 확인해주세요.',
-      `<${HOME}#/ads/actions|오늘의 액션에서 보기>`,
+      `<${HOME}ads/actions|오늘의 액션에서 보기>`,
     ].join('\n'),
   )
 
@@ -720,7 +725,7 @@ async function weeklyReport(settings: Record<string, unknown>) {
         `실행한 액션 ${done.length}건 · 진행 중 실험 ${running.length}개 · 열린 제안 ${open}개`,
         narrative ? `\n${narrative}` : '',
         '',
-        `<${HOME}#/ads/insights|성과 분석> · <${HOME}#/ads/actions|오늘의 액션>`,
+        `<${HOME}ads/insights|성과 분석> · <${HOME}ads/actions|오늘의 액션>`,
       ]
         .filter((line) => line !== '')
         .join('\n'),
