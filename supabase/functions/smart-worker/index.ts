@@ -293,7 +293,10 @@ async function detect(): Promise<Alert[]> {
 }
 
 /** 이미 열려 있는 것은 다시 알리지 않는다 */
-async function saveAndNotify(alerts: Alert[]): Promise<{ saved: number; notified: number }> {
+async function saveAndNotify(
+  alerts: Alert[],
+  notify = true,
+): Promise<{ saved: number; notified: number }> {
   const openResponse = await fetch(
     `${DB}/rest/v1/ad_alerts?resolved_at=is.null&select=fingerprint`,
     { headers: dbHeaders() },
@@ -306,7 +309,7 @@ async function saveAndNotify(alerts: Alert[]): Promise<{ saved: number; notified
   if (fresh.length === 0) return { saved: 0, notified: 0 }
 
   const now = new Date().toISOString()
-  const webhook = (Deno.env.get('SLACK_WEBHOOK_URL') ?? '').trim()
+  const webhook = notify ? (Deno.env.get('SLACK_WEBHOOK_URL') ?? '').trim() : ''
 
   await fetch(`${DB}/rest/v1/ad_alerts`, {
     method: 'POST',
@@ -382,6 +385,317 @@ async function saveAndNotify(alerts: Alert[]): Promise<{ saved: number; notified
   return { saved: fresh.length, notified: fresh.length }
 }
 
+/** 슬랙으로 보낸다. 웹훅이 없으면 조용히 넘어간다 */
+async function toSlack(text: string): Promise<boolean> {
+  const webhook = (Deno.env.get('SLACK_WEBHOOK_URL') ?? '').trim()
+  if (!webhook) return false
+  await fetch(webhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  return true
+}
+
+/**
+ * 같은 것을 두 번 보내지 않는다.
+ * 스케줄러가 두 번 돌거나 사람이 버튼을 또 눌러도 한 번만 가야 한다.
+ * 표의 유니크 제약이 막아주므로, 넣는 데 성공했을 때만 보낸다.
+ */
+async function claimOnce(kind: string, periodKey: string): Promise<boolean> {
+  const response = await fetch(`${DB}/rest/v1/notification_log`, {
+    method: 'POST',
+    headers: { ...dbHeaders(), Prefer: 'return=minimal' },
+    body: JSON.stringify({ kind, period_key: periodKey }),
+  })
+  return response.ok
+}
+
+const won = (value: number) => `${Math.round(value).toLocaleString()}원`
+const ratio = (value: number) => value.toFixed(2)
+
+/** 한국 날짜 */
+function seoulDay(offset = 0): string {
+  const now = new Date()
+  now.setUTCHours(now.getUTCHours() + 9 + offset * 24)
+  return now.toISOString().slice(0, 10)
+}
+
+/** 그 주 월요일 — 주간 리포트를 한 주에 한 번만 보내기 위한 열쇠 */
+function mondayOf(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`)
+  const shift = (date.getUTCDay() + 6) % 7
+  date.setUTCDate(date.getUTCDate() - shift)
+  return date.toISOString().slice(0, 10)
+}
+
+const HOME = 'https://lightenuf.github.io/Influencer-Marketing-Admin/'
+
+/** 기간 집계 — 계정 전체 */
+async function totals(from: string, to: string) {
+  const account = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
+  const rows = await graph(`act_${account}/insights`, {
+    fields: 'spend,impressions,inline_link_clicks,actions,action_values',
+    time_range: JSON.stringify({ since: from, until: to }),
+    limit: '100',
+  })
+  const sum = { spend: 0, revenue: 0, results: 0, impressions: 0, linkClicks: 0 }
+  for (const row of rows) {
+    sum.spend += Number(row.spend ?? 0)
+    sum.revenue += pick(row.action_values, PURCHASE)
+    sum.results += pick(row.actions, PURCHASE)
+    sum.impressions += Number(row.impressions ?? 0)
+    sum.linkClicks += Number(row.inline_link_clicks ?? 0)
+  }
+  return {
+    ...sum,
+    roas: sum.spend > 0 ? sum.revenue / sum.spend : 0,
+    cpa: sum.results > 0 ? sum.spend / sum.results : 0,
+  }
+}
+
+async function countOpenSuggestions(): Promise<number> {
+  const response = await fetch(
+    `${DB}/rest/v1/action_suggestions?status=eq.open&select=id`,
+    { headers: { ...dbHeaders(), Prefer: 'count=exact' } },
+  )
+  const rows = (await response.json()) as unknown[]
+  return rows.length
+}
+
+/** ── 일일 요약 (매일 09:00) ── */
+async function dailySummary(settings: Record<string, unknown>) {
+  if (settings.notifyDaily === false) return { sent: false, why: '설정에서 꺼져 있습니다' }
+  const day = seoulDay(-1)
+  if (!(await claimOnce('daily', day))) return { sent: false, why: '오늘 이미 보냈습니다' }
+
+  const t = await totals(day, day)
+  const open = await countOpenSuggestions()
+
+  const body =
+    t.spend === 0
+      ? '어제는 광고가 돌지 않았습니다.'
+      : [
+          `지출 ${won(t.spend)} · 매출 ${won(t.revenue)}`,
+          `ROAS ${ratio(t.roas)} · 전환 ${t.results}건 · CPA ${t.results > 0 ? won(t.cpa) : '-'}`,
+        ].join('\n')
+
+  await toSlack(
+    [
+      `*어제 광고 요약* · ${day}`,
+      '',
+      body,
+      '',
+      open > 0 ? `오늘 볼 제안 ${open}개` : '새 제안은 없습니다',
+      `<${HOME}#/ads/actions|오늘의 액션>`,
+    ].join('\n'),
+  )
+  return { sent: true }
+}
+
+/** ── 승인 요청 (발생 즉시) ── */
+async function approvalRequests(settings: Record<string, unknown>) {
+  if (settings.notifyApproval === false) return { sent: 0, why: '설정에서 꺼져 있습니다' }
+
+  const response = await fetch(
+    `${DB}/rest/v1/action_suggestions?status=eq.open&needs_approval=is.true&notified_at=is.null&select=id,kind,target_name,evidence,effect`,
+    { headers: dbHeaders() },
+  )
+  const rows = (await response.json()) as Row[]
+  if (rows.length === 0) return { sent: 0 }
+
+  const lines = rows.map((row) => {
+    const effect = (row.effect ?? {}) as { from?: number; to?: number }
+    const change =
+      effect.from && effect.to ? ` — 일예산 ${won(effect.from)} → ${won(effect.to)}` : ''
+    return `• ${row.target_name}${change}`
+  })
+
+  await toSlack(
+    [
+      `*승인이 필요한 예산 변경 ${rows.length}건*`,
+      '',
+      lines.join('\n'),
+      '',
+      '가드레일에 걸려 바로 실행되지 않았습니다. 승인 권한이 있는 분이 확인해주세요.',
+      `<${HOME}#/ads/actions|오늘의 액션에서 보기>`,
+    ].join('\n'),
+  )
+
+  await fetch(`${DB}/rest/v1/action_suggestions?id=in.(${rows.map((r) => r.id).join(',')})`, {
+    method: 'PATCH',
+    headers: dbHeaders(),
+    body: JSON.stringify({ notified_at: new Date().toISOString() }),
+  })
+  return { sent: rows.length }
+}
+
+/**
+ * ── 주간 리포트 (월요일 09:00) ──
+ *
+ * 숫자는 집계값만 쓴다. 서술만 Claude 가 쓴다 —
+ * 모델이 숫자를 지어내면 그 리포트는 못 믿을 것이 된다.
+ */
+async function weeklyReport(settings: Record<string, unknown>) {
+  if (settings.notifyWeekly === false) return { sent: false, why: '설정에서 꺼져 있습니다' }
+
+  const thisMonday = mondayOf(seoulDay(0))
+  if (!(await claimOnce('weekly', thisMonday))) return { sent: false, why: '이번 주에 이미 보냈습니다' }
+
+  const shift = (day: string, by: number) => {
+    const date = new Date(`${day}T00:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + by)
+    return date.toISOString().slice(0, 10)
+  }
+  const lastFrom = shift(thisMonday, -7)
+  const lastTo = shift(thisMonday, -1)
+  const beforeFrom = shift(thisMonday, -14)
+  const beforeTo = shift(thisMonday, -8)
+
+  const now = await totals(lastFrom, lastTo)
+  const before = await totals(beforeFrom, beforeTo)
+
+  // 태그별 성과 — 광고별 지표에 어드민 태그를 붙여 묶는다
+  const account = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
+  const adRows = await graph(`act_${account}/insights`, {
+    level: 'ad',
+    fields: 'ad_id,spend,actions,action_values',
+    time_range: JSON.stringify({ since: lastFrom, until: lastTo }),
+    limit: '500',
+  })
+  const tagResponse = await fetch(`${DB}/rest/v1/ad_tags?select=ad_id,angle,format`, {
+    headers: dbHeaders(),
+  })
+  const tags = new Map(
+    ((await tagResponse.json()) as Row[]).map((row) => [
+      String(row.ad_id),
+      { angle: String(row.angle ?? ''), format: String(row.format ?? '') },
+    ]),
+  )
+
+  const group = (key: 'angle' | 'format') => {
+    const map = new Map<string, { spend: number; revenue: number }>()
+    for (const row of adRows) {
+      const tag = tags.get(String(row.ad_id))?.[key]
+      if (!tag) continue
+      const cur = map.get(tag) ?? { spend: 0, revenue: 0 }
+      map.set(tag, {
+        spend: cur.spend + Number(row.spend ?? 0),
+        revenue: cur.revenue + pick(row.action_values, PURCHASE),
+      })
+    }
+    return [...map.entries()]
+      .filter(([, v]) => v.spend > 0)
+      .map(([name, v]) => ({ name, spend: v.spend, roas: v.revenue / v.spend }))
+      .sort((a, b) => b.roas - a.roas)
+  }
+
+  const angles = group('angle')
+  const formats = group('format')
+
+  // 지난주에 실행한 것과 결과
+  const logResponse = await fetch(
+    `${DB}/rest/v1/action_logs?created_at=gte.${lastFrom}&select=kind,action,target_name,outcome`,
+    { headers: dbHeaders() },
+  )
+  const logs = (await logResponse.json()) as Row[]
+  const done = logs.filter((row) => row.action === 'executed')
+
+  // 실험
+  const expResponse = await fetch(
+    `${DB}/rest/v1/experiments?select=name,status,verdict,learning`,
+    { headers: dbHeaders() },
+  )
+  const experiments = (await expResponse.json()) as Row[]
+  const running = experiments.filter((row) => row.status === 'running')
+  const finished = experiments.filter((row) => row.status === 'done' && row.verdict)
+
+  const open = await countOpenSuggestions()
+
+  // 여기까지가 숫자다. 아래 서술만 Claude 가 쓴다.
+  const facts = [
+    `기간: ${lastFrom} ~ ${lastTo}`,
+    `지출 ${won(now.spend)} (전주 ${won(before.spend)})`,
+    `매출 ${won(now.revenue)} (전주 ${won(before.revenue)})`,
+    `ROAS ${ratio(now.roas)} (전주 ${ratio(before.roas)})`,
+    `전환 ${now.results}건 (전주 ${before.results}건)`,
+    `CPA ${now.results > 0 ? won(now.cpa) : '-'}`,
+    '',
+    `앵글 상위: ${angles.slice(0, 3).map((a) => `${a.name} ROAS ${ratio(a.roas)}`).join(', ') || '없음'}`,
+    `앵글 하위: ${angles.slice(-2).map((a) => `${a.name} ROAS ${ratio(a.roas)}`).join(', ') || '없음'}`,
+    `포맷: ${formats.map((f) => `${f.name} ROAS ${ratio(f.roas)}`).join(', ') || '없음'}`,
+    '',
+    `실행한 액션 ${done.length}건`,
+    `진행 중 실험 ${running.length}개 · 끝난 실험 ${finished.length}개`,
+    `열린 제안 ${open}개`,
+  ].join('\n')
+
+  let narrative = ''
+  const claudeKey = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').trim()
+  if (claudeKey) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: 700,
+          system:
+            '너는 브리보의 퍼포먼스 마케터다. 주간 리포트의 해설을 쓴다.\n' +
+            '주어진 숫자만 쓴다. 없는 숫자를 지어내지 마라.\n' +
+            '3~4문장으로, 무엇이 달라졌고 이번 주에 무엇을 볼지 적어라.\n' +
+            '인사말이나 머리말 없이 본문만 쓴다.',
+          messages: [{ role: 'user', content: facts }],
+        }),
+      })
+      const body = await response.json()
+      narrative = (body.content ?? [])
+        .filter((part: { type: string }) => part.type === 'text')
+        .map((part: { text: string }) => part.text)
+        .join('')
+        .trim()
+    } catch {
+      // 해설을 못 써도 숫자는 보낸다
+    }
+  }
+
+  await toSlack(
+    [
+      `*지난주 광고 리포트* · ${lastFrom} ~ ${lastTo}`,
+      '',
+      `지출 ${won(now.spend)} · 매출 ${won(now.revenue)} · ROAS ${ratio(now.roas)} · 전환 ${now.results}건`,
+      `전주 대비 지출 ${arrow(now.spend, before.spend)} · ROAS ${arrow(now.roas, before.roas)}`,
+      '',
+      angles.length > 0
+        ? `앵글 상위 — ${angles.slice(0, 3).map((a) => `${a.name} ${ratio(a.roas)}`).join(' · ')}`
+        : '앵글별로 볼 자료가 아직 없습니다 (태깅이 필요합니다)',
+      formats.length > 0
+        ? `포맷 — ${formats.map((f) => `${f.name} ${ratio(f.roas)}`).join(' · ')}`
+        : '',
+      '',
+      `실행한 액션 ${done.length}건 · 진행 중 실험 ${running.length}개 · 열린 제안 ${open}개`,
+      narrative ? `\n${narrative}` : '',
+      '',
+      `<${HOME}#/ads/insights|성과 분석> · <${HOME}#/ads/actions|오늘의 액션>`,
+    ]
+      .filter((line) => line !== '')
+      .join('\n'),
+  )
+  return { sent: true }
+}
+
+/** 전주 대비 오르내림 */
+function arrow(now: number, before: number): string {
+  if (before === 0) return '견줄 수 없음'
+  const change = ((now - before) / before) * 100
+  if (Math.abs(change) < 0.5) return '그대로'
+  return `${change > 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(0)}%`
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -394,6 +708,21 @@ Deno.serve(async (request) => {
   }
 
   try {
+    const body = await request.json().catch(() => ({}))
+    const job = String(body?.job ?? 'alerts')
+    const settings = await loadSettings()
+
+    if (job === 'daily') return json(await dailySummary(settings))
+    if (job === 'weekly') return json(await weeklyReport(settings))
+    if (job === 'approvals') return json(await approvalRequests(settings))
+
+    if (settings.notifyAlerts === false) {
+      // 알림은 꺼져 있어도 감지는 한다. 화면에는 떠야 하기 때문이다.
+      const alerts = await detect()
+      const result = await saveAndNotify(alerts, false)
+      return json({ found: alerts.length, ...result, alerts })
+    }
+
     const alerts = await detect()
     const result = await saveAndNotify(alerts)
     return json({ found: alerts.length, ...result, alerts })

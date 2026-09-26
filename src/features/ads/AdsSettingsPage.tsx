@@ -69,7 +69,7 @@ export default function AdsSettingsPage() {
       {tab === 'tags' && <TagsTab />}
       {/* 태깅 화면을 그대로 끼운다 — 새로 짜지 않는다 */}
       {tab === 'tagging' && <AdTaggingPage embedded />}
-      {tab === 'alerts' && <LaterTab title="알림" phase="Phase 6" />}
+      {tab === 'alerts' && <AlertsTab />}
       {tab === 'guardrails' && <LaterTab title="가드레일" phase="Phase 3" />}
     </div>
   )
@@ -316,6 +316,76 @@ function Derived({ label, value, note }: { label: string; value: string; note: s
       <p className="mt-0.5 text-lg font-bold text-slate-900">{value}</p>
       <p className="text-xs text-slate-400">{note}</p>
     </div>
+  )
+}
+
+const NOTIFY_ITEMS = [
+  {
+    key: 'notifyAlerts' as const,
+    label: '이상 감지',
+    when: '감지 즉시',
+    what: '지출 멈춤, 급증, ROAS 급락, 계정 문제, 광고 반려, 토큰 만료 임박',
+  },
+  {
+    key: 'notifyDaily' as const,
+    label: '일일 요약',
+    when: '매일 오전 9시',
+    what: '어제 지출·매출·ROAS·전환과 오늘 볼 제안 수',
+  },
+  {
+    key: 'notifyWeekly' as const,
+    label: '주간 리포트',
+    when: '월요일 오전 9시',
+    what: '지난주 성과와 전주 대비, 앵글·포맷 상하위, 실행한 액션, 실험 현황',
+  },
+  {
+    key: 'notifyApproval' as const,
+    label: '승인 요청',
+    when: '발생 즉시',
+    what: '가드레일에 걸려 바로 실행되지 않은 예산 변경',
+  },
+]
+
+function AlertsTab() {
+  const { data: ops, isLoading } = useOpsSettings()
+  const save = useSaveOpsSettings()
+
+  if (isLoading || !ops) return <Spinner />
+
+  return (
+    <Card>
+      <CardHeader
+        title="슬랙 알림"
+        description="끄면 슬랙으로 보내지 않습니다. 화면에는 그대로 뜹니다"
+      />
+      <div className="divide-y divide-slate-100">
+        {NOTIFY_ITEMS.map((item) => (
+          <label
+            key={item.key}
+            className="flex cursor-pointer items-start gap-3 p-5 hover:bg-slate-50"
+          >
+            <input
+              type="checkbox"
+              checked={ops[item.key] !== false}
+              onChange={(e) => save.mutate({ [item.key]: e.target.checked })}
+              className="mt-1"
+            />
+            <div className="min-w-0">
+              <p className="font-medium text-slate-900">
+                {item.label}
+                <span className="ml-2 text-xs font-normal text-slate-400">{item.when}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">{item.what}</p>
+            </div>
+          </label>
+        ))}
+      </div>
+      <p className="border-t border-slate-100 px-5 py-4 text-xs leading-relaxed text-slate-500">
+        보내는 곳은 Supabase Secret 의{' '}
+        <code className="rounded bg-slate-100 px-1">SLACK_WEBHOOK_URL</code> 입니다. 채널을 바꾸려면
+        그 값을 바꾸세요. 자동 실행은 GitHub Actions 가 매일 아침 9시에 돌립니다.
+      </p>
+    </Card>
   )
 }
 

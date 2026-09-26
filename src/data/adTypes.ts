@@ -127,6 +127,12 @@ export interface OpsSettings {
   maxCombos: number
   /** 카피를 만들 때 넘기는 브랜드 사실 */
   brandFacts: string
+
+  // ── 슬랙 알림 (⚙️ 설정 > 알림) ──
+  notifyAlerts: boolean
+  notifyDaily: boolean
+  notifyWeekly: boolean
+  notifyApproval: boolean
 }
 
 export const DEFAULT_OPS: OpsSettings = {
@@ -175,6 +181,10 @@ export const DEFAULT_OPS: OpsSettings = {
   subheadMaxChars: 30,
   bodyMaxChars: 125,
   maxCombos: 30,
+  notifyAlerts: true,
+  notifyDaily: true,
+  notifyWeekly: true,
+  notifyApproval: true,
   brandFacts:
     '브리보: 카페인 프리, 저당, 식물성 프리바이오틱 탄산음료, 355ml 캔, 사과·복숭아.\n식물 유래 원료만 사용. 합성감미료(아스파탐·수크랄로스·에리스리톨) 미사용.\n식이섬유 표기는 4g만 허용.\n톤: 제로/프리프럼이 아닌 더하는 식품(+플러스), 원료·원가 투명성, 맛있어서 매일 마시는 음료. 다이어트 제품처럼 보이지 않게.',
 }
