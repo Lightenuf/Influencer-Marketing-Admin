@@ -40,6 +40,20 @@ interface Row {
   [key: string]: unknown
 }
 
+/**
+ * 표에서 줄을 읽는다.
+ * 읽지 못해도 빈 목록을 준다 — 표 하나가 없다고 리포트 전체가 죽으면 안 된다.
+ */
+async function rows(path: string): Promise<Row[]> {
+  try {
+    const response = await fetch(`${DB}/rest/v1/${path}`, { headers: dbHeaders() })
+    const body = await response.json()
+    return Array.isArray(body) ? body : []
+  } catch {
+    return []
+  }
+}
+
 async function graph(path: string, params: Record<string, string> = {}): Promise<Row[]> {
   const token = Deno.env.get('META_ACCESS_TOKEN') ?? ''
   const url = new URL(`${GRAPH}/${path}`)
@@ -78,12 +92,10 @@ interface Alert {
 
 /** 운영 기준에서 숫자를 읽는다. 코드에 박지 않는다 */
 async function loadSettings(): Promise<Record<string, unknown>> {
-  const response = await fetch(`${DB}/rest/v1/ops_settings?select=key,value`, {
-    headers: dbHeaders(),
-  })
-  const rows = (await response.json()) as { key: string; value: unknown }[]
   const out: Record<string, unknown> = {}
-  for (const row of rows) out[row.key] = row.value
+  for (const row of await rows('ops_settings?select=key,value')) {
+    out[String(row.key)] = row.value
+  }
   return out
 }
 
@@ -297,12 +309,10 @@ async function saveAndNotify(
   alerts: Alert[],
   notify = true,
 ): Promise<{ saved: number; notified: number }> {
-  const openResponse = await fetch(
-    `${DB}/rest/v1/ad_alerts?resolved_at=is.null&select=fingerprint`,
-    { headers: dbHeaders() },
-  )
   const open = new Set(
-    ((await openResponse.json()) as { fingerprint: string }[]).map((row) => row.fingerprint),
+    (await rows('ad_alerts?resolved_at=is.null&select=fingerprint')).map((row) =>
+      String(row.fingerprint),
+    ),
   )
 
   const fresh = alerts.filter((alert) => !open.has(alert.fingerprint))
@@ -455,12 +465,7 @@ async function totals(from: string, to: string) {
 }
 
 async function countOpenSuggestions(): Promise<number> {
-  const response = await fetch(
-    `${DB}/rest/v1/action_suggestions?status=eq.open&select=id`,
-    { headers: { ...dbHeaders(), Prefer: 'count=exact' } },
-  )
-  const rows = (await response.json()) as unknown[]
-  return rows.length
+  return (await rows('action_suggestions?status=eq.open&select=id')).length
 }
 
 /** ── 일일 요약 (매일 09:00) ── */
@@ -497,14 +502,12 @@ async function dailySummary(settings: Record<string, unknown>) {
 async function approvalRequests(settings: Record<string, unknown>) {
   if (settings.notifyApproval === false) return { sent: 0, why: '설정에서 꺼져 있습니다' }
 
-  const response = await fetch(
-    `${DB}/rest/v1/action_suggestions?status=eq.open&needs_approval=is.true&notified_at=is.null&select=id,kind,target_name,evidence,effect`,
-    { headers: dbHeaders() },
+  const pending = await rows(
+    'action_suggestions?status=eq.open&needs_approval=is.true&notified_at=is.null&select=id,kind,target_name,evidence,effect',
   )
-  const rows = (await response.json()) as Row[]
-  if (rows.length === 0) return { sent: 0 }
+  if (pending.length === 0) return { sent: 0 }
 
-  const lines = rows.map((row) => {
+  const lines = pending.map((row) => {
     const effect = (row.effect ?? {}) as { from?: number; to?: number }
     const change =
       effect.from && effect.to ? ` — 일예산 ${won(effect.from)} → ${won(effect.to)}` : ''
@@ -513,7 +516,7 @@ async function approvalRequests(settings: Record<string, unknown>) {
 
   await toSlack(
     [
-      `*승인이 필요한 예산 변경 ${rows.length}건*`,
+      `*승인이 필요한 예산 변경 ${pending.length}건*`,
       '',
       lines.join('\n'),
       '',
@@ -522,12 +525,12 @@ async function approvalRequests(settings: Record<string, unknown>) {
     ].join('\n'),
   )
 
-  await fetch(`${DB}/rest/v1/action_suggestions?id=in.(${rows.map((r) => r.id).join(',')})`, {
+  await fetch(`${DB}/rest/v1/action_suggestions?id=in.(${pending.map((r) => r.id).join(',')})`, {
     method: 'PATCH',
     headers: dbHeaders(),
     body: JSON.stringify({ notified_at: new Date().toISOString() }),
   })
-  return { sent: rows.length }
+  return { sent: pending.length }
 }
 
 /**
@@ -563,11 +566,9 @@ async function weeklyReport(settings: Record<string, unknown>) {
     time_range: JSON.stringify({ since: lastFrom, until: lastTo }),
     limit: '500',
   })
-  const tagResponse = await fetch(`${DB}/rest/v1/ad_tags?select=ad_id,angle,format`, {
-    headers: dbHeaders(),
-  })
+  const tagRows = await rows('ad_tags?select=ad_id,angle,format')
   const tags = new Map(
-    ((await tagResponse.json()) as Row[]).map((row) => [
+    tagRows.map((row) => [
       String(row.ad_id),
       { angle: String(row.angle ?? ''), format: String(row.format ?? '') },
     ]),
@@ -594,19 +595,13 @@ async function weeklyReport(settings: Record<string, unknown>) {
   const formats = group('format')
 
   // 지난주에 실행한 것과 결과
-  const logResponse = await fetch(
-    `${DB}/rest/v1/action_logs?created_at=gte.${lastFrom}&select=kind,action,target_name,outcome`,
-    { headers: dbHeaders() },
+  const logs = await rows(
+    `action_logs?created_at=gte.${lastFrom}&select=kind,action,target_name,outcome`,
   )
-  const logs = (await logResponse.json()) as Row[]
   const done = logs.filter((row) => row.action === 'executed')
 
   // 실험
-  const expResponse = await fetch(
-    `${DB}/rest/v1/experiments?select=name,status,verdict,learning`,
-    { headers: dbHeaders() },
-  )
-  const experiments = (await expResponse.json()) as Row[]
+  const experiments = await rows('experiments?select=name,status,verdict,learning')
   const running = experiments.filter((row) => row.status === 'running')
   const finished = experiments.filter((row) => row.status === 'done' && row.verdict)
 
