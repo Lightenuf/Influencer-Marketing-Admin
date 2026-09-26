@@ -79,6 +79,10 @@ export default function ActionsPage() {
     queryKey: ['adActions', 'logs'],
     queryFn: () => adTagRepository.listActionLogs(),
   })
+  const experiments = useQuery({
+    queryKey: ['experiments'],
+    queryFn: () => adTagRepository.listExperiments(),
+  })
   const alerts = useQuery({
     queryKey: ['adActions', 'alerts'],
     queryFn: () => adTagRepository.listAlerts(),
@@ -133,6 +137,16 @@ export default function ActionsPage() {
       breakEven,
       minSpend: derived.minSpend,
       phase,
+      // 판정이 끝나고 아직 안 올린 실험만
+      wonExperiments: (experiments.data ?? [])
+        .filter((row) => row.verdict === 'win' && row.status === 'done')
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          variable: row.variable,
+          winner: String((row.result as { winner?: string }).winner ?? ''),
+        }))
+        .filter((row) => row.winner),
     }),
     [
       settings,
@@ -148,6 +162,7 @@ export default function ActionsPage() {
       breakEven,
       derived.minSpend,
       phase,
+      experiments.data,
     ],
   )
 
@@ -483,6 +498,7 @@ function SuggestionCard({
     marketCut: 'bg-indigo-100 text-indigo-700',
     marketRestore: 'bg-indigo-100 text-indigo-700',
     marketUgc: 'bg-indigo-100 text-indigo-700',
+    experimentWin: 'bg-violet-100 text-violet-700',
   }[kind]
 
   return (

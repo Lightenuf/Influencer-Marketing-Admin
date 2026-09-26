@@ -26,6 +26,7 @@ export const RULE_KINDS = [
   'marketCut',
   'marketRestore',
   'marketUgc',
+  'experimentWin',
 ] as const
 export type RuleKind = (typeof RULE_KINDS)[number]
 
@@ -41,6 +42,7 @@ export const RULE_LABELS: Record<RuleKind, string> = {
   marketCut: '공구 대비 감액',
   marketRestore: '공구 후 증액',
   marketUgc: '공구 영상 활용',
+  experimentWin: '실험 승자 승격',
 }
 
 /** 손실을 막는 것이 먼저, 기회가 다음, 유지보수가 마지막 (7-2) */
@@ -51,12 +53,14 @@ const RULE_ORDER: Record<RuleKind, number> = {
   marketCut: 3,
   marketRestore: 4,
   marketUgc: 5,
-  increase: 6,
-  promote: 7,
-  scaleTest: 8,
-  replace: 9,
-  fatigue: 10,
-  thinAdSet: 11,
+  // 실험으로 이미 검증된 것이라 확신이 높다. 일반 증액보다 앞에 둔다
+  experimentWin: 6,
+  increase: 7,
+  promote: 8,
+  scaleTest: 9,
+  replace: 10,
+  fatigue: 11,
+  thinAdSet: 12,
 }
 
 export interface Suggestion {
@@ -94,6 +98,8 @@ export interface RuleInput {
   minSpend: number
   /** 공구 일정 — 없으면 평소대로 판단한다 */
   phase: MarketPhase
+  /** 판정이 끝난 실험 — 이긴 값을 본 캠페인으로 올리라고 짚어 준다 (9-2) */
+  wonExperiments: { id: string; name: string; variable: string; winner: string }[]
 }
 
 const won = (value: number | null) => (value == null ? 0 : value)
@@ -345,6 +351,23 @@ export function buildSuggestions(input: RuleInput): Suggestion[] {
         needsApproval: false,
       })
     }
+  }
+
+  // ── 실험 승자 승격 ──
+  // 실험에서 이긴 값은 이미 검증된 것이다. 본 캠페인으로 올려야 값이 난다.
+  for (const won of input.wonExperiments) {
+    if (!won.winner) continue
+    out.push({
+      kind: 'experimentWin',
+      targetLevel: 'adset',
+      targetId: won.id,
+      targetName: won.name,
+      title: `실험에서 이긴 '${won.winner}' 을(를) 본 캠페인으로 올리세요`,
+      evidence: { 실험: won.name, 이긴_값: won.winner },
+      effect: null,
+      confident: true,
+      needsApproval: false,
+    })
   }
 
   // ── 공구 영상 활용 ──

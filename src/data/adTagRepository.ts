@@ -54,6 +54,36 @@ export interface AdTagRepository {
   resolveAlert(id: string, actorId: string): Promise<void>
   /** 지금 다시 살펴본다 */
   runAlertCheck(): Promise<{ found: number }>
+
+  // ── 실험 ──
+  listExperiments(): Promise<Experiment[]>
+  saveExperiment(input: Partial<Experiment>, actorId: string): Promise<Experiment>
+  updateExperiment(id: string, patch: Partial<Experiment>): Promise<void>
+  deleteExperiment(id: string): Promise<void>
+}
+
+export interface Experiment {
+  id: string
+  name: string
+  hypothesis: string
+  variable: string
+  variants: string[]
+  fixed: Record<string, string>
+  adsetId: string
+  adsetName: string
+  dailyBudget: number
+  plannedDays: number
+  metric: 'roas' | 'cpa'
+  target: number | null
+  minSpend: number
+  status: string
+  startedAt: string | null
+  endedAt: string | null
+  verdict: string
+  result: Record<string, unknown>
+  learning: string
+  source: string
+  createdAt: string
 }
 
 export interface AdAlert {
@@ -212,6 +242,60 @@ const toActionLog = (row: Row): ActionLog => ({
   createdAt: String(row.created_at),
   measuredAt: (row.measured_at as string) ?? null,
 })
+
+const toExperiment = (row: Row): Experiment => ({
+  id: String(row.id),
+  name: String(row.name ?? ''),
+  hypothesis: String(row.hypothesis ?? ''),
+  variable: String(row.variable ?? 'angle'),
+  variants: (row.variants as string[]) ?? [],
+  fixed: (row.fixed as Record<string, string>) ?? {},
+  adsetId: String(row.adset_id ?? ''),
+  adsetName: String(row.adset_name ?? ''),
+  dailyBudget: Number(row.daily_budget ?? 0),
+  plannedDays: Number(row.planned_days ?? 7),
+  metric: (row.metric as 'roas' | 'cpa') ?? 'roas',
+  target: row.target == null ? null : Number(row.target),
+  minSpend: Number(row.min_spend ?? 0),
+  status: String(row.status ?? 'draft'),
+  startedAt: (row.started_at as string) ?? null,
+  endedAt: (row.ended_at as string) ?? null,
+  verdict: String(row.verdict ?? ''),
+  result: (row.result as Record<string, unknown>) ?? {},
+  learning: String(row.learning ?? ''),
+  source: String(row.source ?? 'admin'),
+  createdAt: String(row.created_at),
+})
+
+const experimentRow = (patch: Partial<Experiment>): Row => {
+  const map: Record<string, string> = {
+    name: 'name',
+    hypothesis: 'hypothesis',
+    variable: 'variable',
+    variants: 'variants',
+    fixed: 'fixed',
+    adsetId: 'adset_id',
+    adsetName: 'adset_name',
+    dailyBudget: 'daily_budget',
+    plannedDays: 'planned_days',
+    metric: 'metric',
+    target: 'target',
+    minSpend: 'min_spend',
+    status: 'status',
+    startedAt: 'started_at',
+    endedAt: 'ended_at',
+    verdict: 'verdict',
+    result: 'result',
+    learning: 'learning',
+    source: 'source',
+  }
+  const row: Row = {}
+  for (const [key, column] of Object.entries(map)) {
+    const value = (patch as Record<string, unknown>)[key]
+    if (value !== undefined) row[column] = value as Row[string]
+  }
+  return row
+}
 
 const supabaseAdTags: AdTagRepository = {
   async listTagOptions() {
@@ -435,6 +519,39 @@ const supabaseAdTags: AdTagRepository = {
     return { found: Number((data as { found?: number })?.found ?? 0) }
   },
 
+  async listExperiments() {
+    const db = requireDb()
+    const { data, error } = await db
+      .from('experiments')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(toExperiment)
+  },
+
+  async saveExperiment(input, actorId) {
+    const db = requireDb()
+    const { data, error } = await db
+      .from('experiments')
+      .insert({ created_by: actorId, ...experimentRow(input) })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return toExperiment(data as Row)
+  },
+
+  async updateExperiment(id, patch) {
+    const db = requireDb()
+    const { error } = await db.from('experiments').update(experimentRow(patch)).eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async deleteExperiment(id) {
+    const db = requireDb()
+    const { error } = await db.from('experiments').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
   async saveOpsSettings(patch) {
     const db = requireDb()
     const rows = Object.entries(patch).map(([key, value]) => ({
@@ -460,6 +577,7 @@ interface LocalDb {
   ops: Partial<OpsSettings>
   suggestions?: StoredSuggestion[]
   logs?: ActionLog[]
+  experiments?: Experiment[]
 }
 
 const readLocal = (): LocalDb => {
@@ -649,6 +767,55 @@ const mockAdTags: AdTagRepository = {
 
   async runAlertCheck() {
     return tick({ found: 0 })
+  },
+
+  async listExperiments() {
+    return tick(readLocal().experiments ?? [])
+  },
+
+  async saveExperiment(input, _actorId) {
+    const db = readLocal()
+    const made = {
+      id: crypto.randomUUID(),
+      name: '',
+      hypothesis: '',
+      variable: 'angle',
+      variants: [],
+      fixed: {},
+      adsetId: '',
+      adsetName: '',
+      dailyBudget: 0,
+      plannedDays: 7,
+      metric: 'roas' as const,
+      target: null,
+      minSpend: 0,
+      status: 'draft',
+      startedAt: null,
+      endedAt: null,
+      verdict: '',
+      result: {},
+      learning: '',
+      source: 'admin',
+      createdAt: new Date().toISOString(),
+      ...input,
+    } as Experiment
+    db.experiments = [made, ...(db.experiments ?? [])]
+    writeLocal(db)
+    return tick(made)
+  },
+
+  async updateExperiment(id, patch) {
+    const db = readLocal()
+    db.experiments = (db.experiments ?? []).map((row) =>
+      row.id === id ? { ...row, ...patch } : row,
+    )
+    writeLocal(db)
+  },
+
+  async deleteExperiment(id) {
+    const db = readLocal()
+    db.experiments = (db.experiments ?? []).filter((row) => row.id !== id)
+    writeLocal(db)
   },
 
   async saveOpsSettings(patch) {
