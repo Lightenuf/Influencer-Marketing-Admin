@@ -13,6 +13,7 @@ import type {
   GroupConditions,
   OptionKind,
   SendTargets,
+  TestSendInput,
 } from './types'
 import type {
   Collab,
@@ -162,6 +163,12 @@ export interface DataRepository {
    * draftOnly면 보내지 않고 임시저장만 한다.
    */
   sendCampaign(input: CampaignSendInput, actorId: string): Promise<Campaign>
+
+  /**
+   * 한 번호로만 보내 본다.
+   * 캠페인 기록을 남기지 않는다 — 테스트가 성과 비교에 섞이면 안 된다.
+   */
+  sendTestMessage(input: TestSendInput): Promise<void>
 
   /**
    * 받은 사람 중 발송 뒤 windowDays 안에 주문한 것을 센다.

@@ -688,6 +688,20 @@ export const supabaseAdapter: DataRepository = {
     return toCampaign((data as { campaign: Row }).campaign)
   },
 
+  async sendTestMessage(input) {
+    const db = requireSupabase()
+    const { data, error } = await db.functions.invoke('sms-proxy', {
+      body: { action: 'test', params: input },
+    })
+    if (error) {
+      const detail = await readFunctionError(error)
+      throw new Error(detail ?? '테스트 발송에 실패했습니다.')
+    }
+    if (data && typeof data === 'object' && 'error' in data) {
+      throw new Error(String((data as { error: unknown }).error))
+    }
+  },
+
   async campaignConversion(id, windowDays) {
     const db = requireSupabase()
     const { data, error } = await db.rpc('campaign_conversion', {

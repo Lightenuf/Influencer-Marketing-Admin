@@ -162,10 +162,49 @@ Deno.serve(async (request) => {
 
   try {
     const { action, params } = await request.json()
-    if (action !== 'send') return json({ error: '알 수 없는 요청입니다.' }, 400)
+    if (action !== 'send' && action !== 'test') {
+      return json({ error: '알 수 없는 요청입니다.' }, 400)
+    }
 
     if (!API_KEY || !API_SECRET || !SENDER) {
       return json({ error: '발송 설정이 아직 없습니다. 솔라피 열쇠와 발신번호를 넣어주세요.' }, 400)
+    }
+
+    // 테스트 발송 — 한 번호로만 보내고 아무 기록도 남기지 않는다.
+    // 테스트가 캠페인 성과에 섞이면 비교가 틀어진다.
+    if (action === 'test') {
+      const to = String(params?.number ?? '').replace(/[^0-9]/g, '')
+      if (!/^01[016789][0-9]{7,8}$/.test(to)) {
+        return json({ error: '보낼 수 있는 휴대폰 번호가 아닙니다.' }, 400)
+      }
+      const testBody = String(params?.messageBody ?? '')
+      if (!testBody.trim()) return json({ error: '보낼 내용이 비어 있습니다.' }, 400)
+
+      // 수신거부한 번호로는 테스트라도 보내지 않는다
+      const checked = await rpc<{ sendable: number }>('check_send_numbers', { numbers: [to] })
+      if ((checked.sendable ?? 0) === 0) {
+        return json({ error: '이 번호는 수신거부한 번호입니다.' }, 400)
+      }
+
+      const response = await fetch(`${SOLAPI}/messages/v4/send-many/detail`, {
+        method: 'POST',
+        headers: { Authorization: await authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            {
+              to,
+              from: SENDER,
+              text: testBody,
+              ...(params?.title ? { subject: String(params.title) } : {}),
+            },
+          ],
+        }),
+      })
+      const sentResult = await response.json()
+      if (!response.ok) {
+        return json({ error: sentResult?.errorMessage ?? `테스트 발송 실패 (${response.status})` }, 400)
+      }
+      return json({ ok: true })
     }
 
     const {

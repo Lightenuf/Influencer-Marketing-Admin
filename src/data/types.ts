@@ -565,6 +565,15 @@ export interface CampaignSendInput {
   draftOnly?: boolean
 }
 
+/** 내 번호로 한 번 보내 보는 것 */
+export interface TestSendInput {
+  title: string
+  messageBody: string
+  channel: Channel
+  messageType: string
+  number: string
+}
+
 /** 캠페인에서 나중에 고치는 것 — 사후 태깅과 성과 숫자 */
 export interface CampaignPatch {
   title?: string

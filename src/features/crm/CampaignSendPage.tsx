@@ -16,6 +16,7 @@ import {
   buildAdBody,
   emptyConditions,
   formatPhone,
+  isSendableNumber,
   messageBytes,
   parseNumbers,
   smsKindOf,
@@ -56,6 +57,10 @@ export default function CampaignSendPage() {
   const [hypothesis, setHypothesis] = useState('')
 
   const [confirming, setConfirming] = useState(false)
+  // 테스트 번호는 매번 다시 치기 번거로우니 이 브라우저에 기억해 둔다
+  const [testNumber, setTestNumber] = useState(
+    () => localStorage.getItem('breevo:testNumber') ?? '',
+  )
 
   const group = groups.find((g) => g.id === segmentId)
 
@@ -108,6 +113,19 @@ export default function CampaignSendPage() {
       setConfirming(false)
       client.invalidateQueries({ queryKey: ['campaigns'] })
       navigate(`/crm/campaigns/${made.id}`)
+    },
+  })
+
+  const test = useMutation({
+    mutationFn: () => {
+      localStorage.setItem('breevo:testNumber', testNumber)
+      return repository.sendTestMessage({
+        title: title.trim(),
+        messageBody: finalBody,
+        channel,
+        messageType: kind,
+        number: testNumber,
+      })
     },
   })
 
@@ -474,7 +492,50 @@ export default function CampaignSendPage() {
       </Card>
 
       <Card>
-        <CardHeader title="4. 보내기" description="보내고 나면 되돌릴 수 없습니다" />
+        <CardHeader
+          title="4. 테스트 발송"
+          description="내 번호로 먼저 보내 실제로 어떻게 보이는지 확인하세요"
+        />
+        <div className="space-y-3 p-5">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[200px] flex-1">
+              <Field label="테스트로 받을 번호">
+                <Input
+                  value={testNumber}
+                  onChange={(e) => setTestNumber(e.target.value)}
+                  placeholder="010-0000-0000"
+                />
+              </Field>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => test.mutate()}
+              disabled={!isSendableNumber(testNumber) || !body.trim() || test.isPending}
+            >
+              {test.isPending ? '보내는 중...' : '테스트 발송'}
+            </Button>
+          </div>
+
+          {test.isSuccess && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              {formatPhone(testNumber)} 로 보냈습니다. 휴대폰에서 확인해보세요.
+            </p>
+          )}
+          {test.isError && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              {(test.error as Error).message}
+            </p>
+          )}
+
+          <p className="text-xs text-slate-500">
+            테스트도 실제로 문자가 나가고 요금이 듭니다({formatNumber(unit)}원). 캠페인 기록에는
+            남지 않습니다 — 테스트가 성과 비교에 섞이면 안 되기 때문입니다.
+          </p>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="5. 보내기" description="보내고 나면 되돌릴 수 없습니다" />
         <div className="flex flex-wrap items-center justify-between gap-3 p-5">
           <div className="text-sm text-slate-600">
             {missing.length > 0 ? (

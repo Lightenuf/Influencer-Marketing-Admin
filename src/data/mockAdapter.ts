@@ -545,6 +545,11 @@ export const mockAdapter: DataRepository = {
     return tick(made)
   },
 
+  async sendTestMessage(_input) {
+    // 미리보기 모드에서는 아무 데도 보내지 않는다.
+    return tick(undefined)
+  },
+
   async campaignConversion(_id, _windowDays) {
     // 미리보기 모드에는 주문 자료가 없다.
     return tick({ purchaseCount: 0, purchaseAmount: 0, buyers: 0 })
