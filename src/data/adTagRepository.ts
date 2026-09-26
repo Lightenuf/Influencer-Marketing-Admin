@@ -120,6 +120,9 @@ export interface ShopRevenue {
 
 type Row = Record<string, unknown>
 
+/** 이상 감지 함수가 배포된 이름 */
+const ALERTS_FUNCTION = 'smart-worker'
+
 const requireDb = () => {
   if (!supabase) throw new Error('로그인 정보가 없습니다. 다시 로그인해주세요.')
   return supabase
@@ -426,7 +429,8 @@ const supabaseAdTags: AdTagRepository = {
 
   async runAlertCheck() {
     const db = requireDb()
-    const { data, error } = await db.functions.invoke('ads-alerts', { body: {} })
+    // 배포된 함수 이름. 대시보드에서 다른 이름으로 올렸으면 여기만 맞추면 된다.
+    const { data, error } = await db.functions.invoke(ALERTS_FUNCTION, { body: {} })
     if (error) throw new Error('이상 감지를 돌리지 못했습니다. 함수가 배포됐는지 확인해주세요.')
     return { found: Number((data as { found?: number })?.found ?? 0) }
   },

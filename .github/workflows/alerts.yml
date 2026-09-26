@@ -19,7 +19,7 @@ jobs:
       - name: 이상 감지 실행
         run: |
           code=$(curl -s -o /tmp/out.json -w "%{http_code}" \
-            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/ads-alerts" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/smart-worker" \
             -H "x-cron-key: ${{ secrets.ALERTS_CRON_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{}')
