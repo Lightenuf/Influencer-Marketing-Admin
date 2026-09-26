@@ -2,6 +2,7 @@ import type { OpsSettings } from '@/data/adTypes'
 import type { MetaAd, MetaAdSet, MetaCampaign, MetaDayPoint, MetaInsight } from '@/data/metaTypes'
 import { metaCostPerResult, metaCtr, metaRoas, sumInsights } from '@/data/metaTypes'
 import type { AdRow } from './adAggregate'
+import type { MarketPhase } from './marketWindow'
 
 /**
  * 제안 규칙 (요청서 7-1).
@@ -21,6 +22,10 @@ export const RULE_KINDS = [
   'replace',
   'fatigue',
   'thinAdSet',
+  // 공구 일정에 맞춘 것들
+  'marketCut',
+  'marketRestore',
+  'marketUgc',
 ] as const
 export type RuleKind = (typeof RULE_KINDS)[number]
 
@@ -33,18 +38,25 @@ export const RULE_LABELS: Record<RuleKind, string> = {
   replace: '교체 후보',
   fatigue: '피로도',
   thinAdSet: '세트 소재 부족',
+  marketCut: '공구 대비 감액',
+  marketRestore: '공구 후 증액',
+  marketUgc: '공구 영상 활용',
 }
 
 /** 손실을 막는 것이 먼저, 기회가 다음, 유지보수가 마지막 (7-2) */
 const RULE_ORDER: Record<RuleKind, number> = {
   off: 1,
   decrease: 2,
-  increase: 3,
-  promote: 4,
-  scaleTest: 5,
-  replace: 6,
-  fatigue: 7,
-  thinAdSet: 8,
+  // 공구는 날짜가 정해져 있어 놓치면 만회할 수 없다. 앞에 세운다.
+  marketCut: 3,
+  marketRestore: 4,
+  marketUgc: 5,
+  increase: 6,
+  promote: 7,
+  scaleTest: 8,
+  replace: 9,
+  fatigue: 10,
+  thinAdSet: 11,
 }
 
 export interface Suggestion {
@@ -80,6 +92,8 @@ export interface RuleInput {
   /** 파생값 */
   breakEven: number
   minSpend: number
+  /** 공구 일정 — 없으면 평소대로 판단한다 */
+  phase: MarketPhase
 }
 
 const won = (value: number | null) => (value == null ? 0 : value)
@@ -88,8 +102,11 @@ const won = (value: number | null) => (value == null ? 0 : value)
 export const excludeToday = (day: string) => day < new Date().toISOString().slice(0, 10)
 
 export function buildSuggestions(input: RuleInput): Suggestion[] {
-  const { ops, rows, adsets, ads, breakEven, minSpend } = input
+  const { ops, rows, adsets, ads, breakEven, minSpend, phase } = input
   const out: Suggestion[] = []
+
+  // 공구 기간에는 셀러 채널이 매출을 만든다. 광고로 겹쳐 태우지 않는다.
+  const holdIncrease = phase.kind === 'running' || phase.kind === 'soon'
 
   const insightOf = (list: MetaInsight[], id: string) => list.find((row) => row.id === id)
   const daysSince = (iso: string | undefined) =>
@@ -130,8 +147,52 @@ export function buildSuggestions(input: RuleInput): Suggestion[] {
     const roas = metaRoas(insight)
     const changed = daysSince(input.lastBudgetChange.get(`${target.level}:${target.id}`))
 
+    // 공구 대비 감액 — 곧 시작하거나 하는 중인데 아직 예산이 크다
+    if (holdIncrease && target.budget > ops.marketFloorWon) {
+      const market = 'market' in phase ? phase.market : null
+      out.push({
+        kind: 'marketCut',
+        targetLevel: target.level,
+        targetId: target.id,
+        targetName: target.name,
+        title: `${target.name} 예산을 공구용 최소로 낮추세요`,
+        evidence: {
+          공구: market?.sellerName ?? '',
+          기간: market ? `${market.start} ~ ${market.end}` : '',
+          지금_예산: target.budget,
+          최소_예산: ops.marketFloorWon,
+        },
+        effect: { kind: 'budget', from: target.budget, to: ops.marketFloorWon },
+        confident: true,
+        needsApproval: false,
+      })
+      continue
+    }
+
+    // 공구 후 증액 — 공구가 끝났는데 아직 최소 예산에 머물러 있다
+    if (phase.kind === 'justEnded' && target.budget <= ops.marketFloorWon && roas >= breakEven) {
+      const next = Math.round(target.budget * (1 + ops.increaseStep))
+      out.push({
+        kind: 'marketRestore',
+        targetLevel: target.level,
+        targetId: target.id,
+        targetName: target.name,
+        title: `${target.name} 예산을 다시 올리세요 — ${phase.market.sellerName} 공구가 끝났습니다`,
+        evidence: {
+          공구_종료: phase.market.end,
+          지출: Math.round(insight.spend),
+          ROAS: Number(roas.toFixed(2)),
+          손익분기: Number(breakEven.toFixed(2)),
+        },
+        effect: { kind: 'budget', from: target.budget, to: next },
+        confident: insight.spend >= minSpend,
+        needsApproval: next - target.budget >= ops.approvalAmountWon,
+      })
+      continue
+    }
+
     // 증액 — 손익분기를 넉넉히 넘고, 마지막 조정 후 충분히 지났을 때
-    if (roas >= breakEven * 1.2 && changed >= ops.increaseIntervalDays) {
+    if (!holdIncrease && roas >= breakEven * 1.2 && changed >= ops.increaseIntervalDays) {
       const next = Math.round(target.budget * (1 + ops.increaseStep))
       out.push({
         kind: 'increase',
@@ -284,6 +345,28 @@ export function buildSuggestions(input: RuleInput): Suggestion[] {
         needsApproval: false,
       })
     }
+  }
+
+  // ── 공구 영상 활용 ──
+  // 공구가 끝나면 그때 만들어진 영상이 남는다. 파트너십 광고로 돌리면
+  // 이미 반응이 검증된 소재를 새로 만드는 비용 없이 쓸 수 있다.
+  if (phase.kind === 'justEnded') {
+    const ugcLive = rows.filter((row) => row.ad.isPartnership && row.ad.status === 'ACTIVE').length
+    out.push({
+      kind: 'marketUgc',
+      targetLevel: 'adset',
+      targetId: phase.market.collabId,
+      targetName: phase.market.sellerName,
+      title: `${phase.market.sellerName} 공구 영상을 파트너십 광고로 올리세요`,
+      evidence: {
+        공구_종료: phase.market.end,
+        지난_날: `${phase.daysSince}일`,
+        지금_켜진_파트너십_광고: ugcLive,
+      },
+      effect: null,
+      confident: true,
+      needsApproval: false,
+    })
   }
 
   // ── 세트 소재 부족 ──

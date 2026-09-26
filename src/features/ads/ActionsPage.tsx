@@ -17,7 +17,9 @@ import {
   useSetAdStatus,
   useSetDailyBudget,
 } from '@/hooks/metaQueries'
+import { useCollabs, useInfluencers } from '@/hooks/queries'
 import { buildRows } from '@/utils/adAggregate'
+import { describePhase, marketPhase, marketWindows } from '@/utils/marketWindow'
 import { RULE_LABELS, buildSuggestions, whyEmpty, type RuleKind } from '@/utils/adRules'
 import { formatNumber, formatRatio, formatWon } from '@/utils/format'
 
@@ -54,6 +56,9 @@ export default function ActionsPage() {
   const campaignInsights = useMetaInsights('campaign', period)
   const adsetInsights = useMetaInsights('adset', period)
   const tags = useAdTags()
+  // 공구 일정은 협업 파이프라인이 이미 알고 있다. 읽기만 한다.
+  const collabs = useCollabs()
+  const influencers = useInfluencers()
 
   // 피로도는 켜져 있고 돈이 나간 광고만 보면 된다 — 306개를 다 부를 이유가 없다
   const fatigueIds = useMemo(
@@ -89,6 +94,16 @@ export default function ActionsPage() {
   const derived = derivedOps(settings, total.revenue, total.results)
   const breakEven = derived.effectiveRoas
 
+  const phase = useMemo(
+    () =>
+      marketPhase(
+        marketWindows(collabs.data ?? [], influencers.data ?? []),
+        settings.marketPrepDays,
+        settings.marketBoostDays,
+      ),
+    [collabs.data, influencers.data, settings.marketPrepDays, settings.marketBoostDays],
+  )
+
   const ruleInput = useMemo(
     () => ({
       ops: settings,
@@ -108,6 +123,7 @@ export default function ActionsPage() {
       ),
       breakEven,
       minSpend: derived.minSpend,
+      phase,
     }),
     [
       settings,
@@ -122,6 +138,7 @@ export default function ActionsPage() {
       logs.data,
       breakEven,
       derived.minSpend,
+      phase,
     ],
   )
 
@@ -228,6 +245,11 @@ export default function ActionsPage() {
         </p>
       )}
 
+      {phase.kind !== 'none' && (
+        <p className="rounded-lg bg-indigo-50 px-4 py-2.5 text-sm text-indigo-800">
+          📣 {describePhase(phase)}
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-4">
         <Mini
           label="판단 기간"
@@ -384,6 +406,9 @@ function SuggestionCard({
     replace: 'bg-amber-100 text-amber-700',
     fatigue: 'bg-amber-100 text-amber-700',
     thinAdSet: 'bg-slate-100 text-slate-600',
+    marketCut: 'bg-indigo-100 text-indigo-700',
+    marketRestore: 'bg-indigo-100 text-indigo-700',
+    marketUgc: 'bg-indigo-100 text-indigo-700',
   }[kind]
 
   return (

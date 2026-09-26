@@ -106,6 +106,14 @@ export interface OpsSettings {
   minAdsPerAdSet: number
   /** 실행 뒤 며칠 있다가 결과를 재는지 */
   measureAfterDays: number
+
+  // ── 공구 기간 운영 ──
+  /** 공구 중에 유지할 최소 일예산 */
+  marketFloorWon: number
+  /** 공구 시작 며칠 전부터 예산을 줄일지 */
+  marketPrepDays: number
+  /** 공구가 끝난 뒤 며칠 동안 '올릴 때'로 볼지 */
+  marketBoostDays: number
 }
 
 export const DEFAULT_OPS: OpsSettings = {
@@ -128,6 +136,9 @@ export const DEFAULT_OPS: OpsSettings = {
   approverIds: [],
   minAdsPerAdSet: 3,
   measureAfterDays: 7,
+  marketFloorWon: 20_000,
+  marketPrepDays: 2,
+  marketBoostDays: 7,
 }
 
 /**

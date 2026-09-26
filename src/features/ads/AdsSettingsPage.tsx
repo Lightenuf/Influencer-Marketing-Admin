@@ -215,6 +215,18 @@ function OpsTab() {
               onChange={(e) => set('decreaseStep', Number(e.target.value))}
             />
           </Field>
+
+          <Field
+            label="메타 집계 보정치"
+            hint="1이면 보정 없음. 메타가 매출을 적게 잡는 만큼 손익분기를 낮춘다"
+          >
+            <Input
+              type="number"
+              step="0.01"
+              value={draft.metaAttributionFactor}
+              onChange={(e) => set('metaAttributionFactor', Number(e.target.value))}
+            />
+          </Field>
         </div>
 
         <div className="border-t border-slate-100 bg-slate-50 px-5 py-4">
@@ -246,6 +258,38 @@ function OpsTab() {
               기다리세요.
             </p>
           )}
+        </div>
+
+        <div className="border-t border-slate-100 p-5">
+          <p className="text-sm font-medium text-slate-700">공구 기간 운영</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            공구 일정은 협업 파이프라인의 시작·종료 예정일을 그대로 읽습니다. 따로 적지 않으셔도
+            됩니다.
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+            <Field label="공구 중 최소 일예산(원)">
+              <Input
+                type="number"
+                step="1000"
+                value={draft.marketFloorWon}
+                onChange={(e) => set('marketFloorWon', Number(e.target.value))}
+              />
+            </Field>
+            <Field label="며칠 전부터 줄일지">
+              <Input
+                type="number"
+                value={draft.marketPrepDays}
+                onChange={(e) => set('marketPrepDays', Number(e.target.value))}
+              />
+            </Field>
+            <Field label="끝난 뒤 며칠 동안 올릴지">
+              <Input
+                type="number"
+                value={draft.marketBoostDays}
+                onChange={(e) => set('marketBoostDays', Number(e.target.value))}
+              />
+            </Field>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 p-5">
