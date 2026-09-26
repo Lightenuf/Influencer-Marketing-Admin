@@ -31,7 +31,9 @@ import {
   useUploadCreative,
   useUploadPresets,
 } from '@/hooks/metaQueries'
+import { studioRepository } from '@/data/studioRepository'
 import { formatNumber } from '@/utils/format'
+import ApprovedPicker from './studio/ApprovedPicker'
 
 type Stage = '대기' | '올리는 중' | '완료' | '실패'
 
@@ -48,6 +50,8 @@ interface Item {
   size: string
   stage: Stage
   message: string
+  /** 조합·검수에서 가져온 것이면 그 조합 id — 올린 뒤 표시를 남기려고 들고 있는다 */
+  draftId?: string
 }
 
 /** 확장자만 뗀 파일 이름 */
@@ -127,6 +131,7 @@ export default function CreativeUploadPage() {
   const [isPartnership, setIsPartnership] = useState(false)
   const [partnerInstagramId, setPartnerInstagramId] = useState('')
   const [running, setRunning] = useState(false)
+  const [picking, setPicking] = useState(false)
   const [presetName, setPresetName] = useState('')
 
   // 새 광고 세트 만들기
@@ -178,13 +183,15 @@ export default function CreativeUploadPage() {
     return campaign ? `${campaign.name} › ${adset.name}` : adset.name
   }
 
-  const addFiles = async (files: FileList | null) => {
-    if (!files) return
+  /** 컴퓨터에서 고른 파일이든 승인 소재에서 가져온 것이든 같은 자리로 들어온다 */
+  const addAll = async (rows: { file: File; draftId?: string }[]) => {
+    if (rows.length === 0) return
     const added = await Promise.all(
-      [...files].map(async (file) => {
+      rows.map(async ({ file, draftId }) => {
         const { width, height } = await readSize(file)
         return {
           file,
+          draftId,
           name: niceName(file.name),
           slot: slotOfRatio(width, height),
           size: width && height ? `${width}×${height}` : '',
@@ -230,7 +237,7 @@ export default function CreativeUploadPage() {
           creatives.push({ ref, slot: item.slot })
         }
 
-        await createAd.mutateAsync({
+        const made = await createAd.mutateAsync({
           adsetId,
           name: group.name,
           primaryText,
@@ -240,6 +247,17 @@ export default function CreativeUploadPage() {
           isPartnership,
           partnerInstagramId: isPartnership ? partnerInstagramId.trim() : undefined,
         })
+
+        // 승인 소재에서 가져온 것이면 '이미 올림' 표시를 남긴다 — 두 번 올리지 않게.
+        // 광고는 이미 만들어졌으니, 이 표시가 실패해도 업로드를 실패로 보지 않는다.
+        for (const { item } of group.items) {
+          if (!item.draftId) continue
+          try {
+            await studioRepository.updateDraft(item.draftId, { uploadedAdId: made.id })
+          } catch {
+            /* 표시만 못 남긴 것이다 */
+          }
+        }
 
         const where =
           creatives.length > 1
@@ -341,9 +359,18 @@ export default function CreativeUploadPage() {
             type="file"
             multiple
             accept="image/*,video/*"
-            onChange={(e) => addFiles(e.target.files)}
+            onChange={(e) => addAll([...(e.target.files ?? [])].map((file) => ({ file })))}
             className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-violet-700"
           />
+
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>
+              승인한 소재에서 가져오기
+            </Button>
+            <span className="text-xs text-slate-500">
+              조합·검수에서 승인한 것을 파일로 내려받지 않고 바로 씁니다
+            </span>
+          </div>
 
           {groups.length > 0 && (
             <div className="space-y-3">
@@ -717,6 +744,12 @@ export default function CreativeUploadPage() {
               )}개 만들기`}
         </Button>
       </div>
+
+      <ApprovedPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        onPick={(picked) => addAll(picked)}
+      />
     </div>
   )
 }
