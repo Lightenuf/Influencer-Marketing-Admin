@@ -13,7 +13,12 @@ import {
   Select,
   Spinner,
 } from '@/components/ui'
-import { studioRepository, type AdAsset, type AdCopy } from '@/data/studioRepository'
+import {
+  studioRepository,
+  type AdAsset,
+  type AdCopy,
+  type GeneratedCopy,
+} from '@/data/studioRepository'
 import { DEFAULT_OPS } from '@/data/adTypes'
 import { useOpsSettings, useTagOptions } from '@/hooks/adTagQueries'
 import { isBlocked, reviewCopy, type CopyFlag } from '@/utils/copyReview'
@@ -23,6 +28,7 @@ import { RATIOS, TEMPLATES, ratioOf, templateOf, type RatioKey } from './studio/
 
 const TABS = [
   { key: 'assets', label: '에셋' },
+  { key: 'generate', label: '생성' },
   { key: 'copies', label: '카피' },
   { key: 'review', label: '조합·검수' },
   { key: 'upload', label: '업로드' },
@@ -66,6 +72,7 @@ export default function StudioPage() {
       </div>
 
       {tab === 'assets' && <AssetsTab />}
+      {tab === 'generate' && <GenerateTab />}
       {tab === 'copies' && <CopiesTab />}
       {tab === 'review' && <ReviewTab />}
       {/* 기존 업로드 화면을 그대로 끼운다 — 새로 짜지 않는다 */}
@@ -244,6 +251,286 @@ function readSize(file: File): Promise<{ width: number; height: number }> {
     image.onerror = () => resolve({ width: 0, height: 0 })
     image.src = url
   })
+}
+
+/**
+ * 카피 대량 생산 (8-3).
+ *
+ * 만든 것을 바로 저장하지 않는다. 사람이 보고 고른 것만 카피 목록에 들어간다 —
+ * 수십 개가 검수 없이 쌓이면 나중에 무엇이 쓸 만한지 알 수 없게 된다.
+ */
+function GenerateTab() {
+  const user = useCurrentUser()
+  const client = useQueryClient()
+  const options = useTagOptions()
+  const ops = useOpsSettings()
+  const settings = ops.data ?? DEFAULT_OPS
+  const copies = useQuery({
+    queryKey: ['studio', 'copies'],
+    queryFn: () => studioRepository.listCopies(),
+  })
+
+  const [segment, setSegment] = useState('')
+  const [angles, setAngles] = useState<string[]>([])
+  const [hooks, setHooks] = useState<string[]>([])
+  const [offerType, setOfferType] = useState('없음')
+  const [offerValue, setOfferValue] = useState('')
+  const [perCombo, setPerCombo] = useState(3)
+  const [made, setMade] = useState<GeneratedCopy[]>([])
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+
+  const rules = useMemo(
+    () => ({
+      bannedWords: settings.bannedWords,
+      fiberGram: settings.fiberGram,
+      headlineMaxChars: settings.headlineMaxChars,
+      subheadMaxChars: settings.subheadMaxChars,
+      bodyMaxChars: settings.bodyMaxChars,
+    }),
+    [settings],
+  )
+
+  const generate = useMutation({
+    mutationFn: () => {
+      // 자주 반려된 이유를 다음 생성에 넘긴다 (8-5)
+      const avoid = [
+        ...new Set(
+          (copies.data ?? [])
+            .filter((row) => row.status === 'rejected' && row.rejectReason)
+            .map((row) => row.rejectReason),
+        ),
+      ].slice(0, 5)
+
+      // 승인된 카피 몇 개를 참고로 넘긴다
+      const reference = (copies.data ?? [])
+        .filter((row) => row.status === 'approved')
+        .slice(0, 3)
+        .map((row) => `- ${row.headline} / ${row.body}`)
+        .join('\n')
+
+      return studioRepository.generateCopies({
+        segment,
+        angles,
+        hooks,
+        offerType,
+        offerValue,
+        perCombo,
+        reference,
+        avoid,
+      })
+    },
+    onSuccess: (rows) => {
+      setMade(rows)
+      // 규제에 걸리지 않는 것만 미리 골라 둔다
+      setPicked(
+        new Set(
+          rows
+            .map((row, index) => ({ row, index }))
+            .filter(({ row }) => !isBlocked(reviewCopy(row, rules)))
+            .map(({ index }) => index),
+        ),
+      )
+    },
+  })
+
+  const save = useMutation({
+    mutationFn: () =>
+      studioRepository.addCopies(
+        [...picked].map((index) => {
+          const row = made[index]
+          return { ...row, source: 'claude', flags: reviewCopy(row, rules) }
+        }),
+        user.id,
+      ),
+    onSuccess: () => {
+      setMade([])
+      setPicked(new Set())
+      client.invalidateQueries({ queryKey: ['studio', 'copies'] })
+    },
+  })
+
+  if (options.isLoading) return <Spinner />
+
+  const pick = (dimension: string) =>
+    (options.data ?? []).filter((o) => o.dimension === dimension && o.active)
+
+  const toggle = (list: string[], set: (next: string[]) => void, label: string) =>
+    set(list.includes(label) ? list.filter((v) => v !== label) : [...list, label])
+
+  const combos = Math.max(1, angles.length) * Math.max(1, hooks.length) * perCombo
+  const tooMany = combos > settings.maxCombos
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader
+          title="카피 만들기"
+          description="브랜드 사실과 금지 표현을 미리 알려주고 씁니다. 만든 것은 확인 후 저장됩니다"
+        />
+        <div className="space-y-5 p-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="세그먼트">
+              <Select value={segment} onChange={(e) => setSegment(e.target.value)}>
+                <option value="">전체</option>
+                {pick('segment').map((o) => (
+                  <option key={o.id} value={o.label}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="오퍼 유형">
+              <Select value={offerType} onChange={(e) => setOfferType(e.target.value)}>
+                {pick('offer').map((o) => (
+                  <option key={o.id} value={o.label}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="오퍼 값">
+              <Input
+                value={offerValue}
+                onChange={(e) => setOfferValue(e.target.value)}
+                disabled={offerType === '없음'}
+                placeholder="예) 15"
+              />
+            </Field>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-slate-700">
+              앵글{' '}
+              <span className="text-xs font-normal text-slate-400">여러 개 고를 수 있습니다</span>
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {pick('angle').map((o) => (
+                <Chip
+                  key={o.id}
+                  label={o.label}
+                  on={angles.includes(o.label)}
+                  onClick={() => toggle(angles, setAngles, o.label)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-slate-700">훅</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {pick('hook').map((o) => (
+                <Chip
+                  key={o.id}
+                  label={o.label}
+                  on={hooks.includes(o.label)}
+                  onClick={() => toggle(hooks, setHooks, o.label)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <Field label="조합당 몇 개">
+              <Input
+                type="number"
+                min={1}
+                max={5}
+                value={perCombo}
+                onChange={(e) => setPerCombo(Number(e.target.value))}
+                className="w-24"
+              />
+            </Field>
+            <div className="flex-1 text-sm text-slate-600">
+              앵글 {angles.length || '자유'} × 훅 {hooks.length || '자유'} × {perCombo} ={' '}
+              <b className={tooMany ? 'text-rose-600' : 'text-slate-900'}>{combos}개</b>
+              {tooMany && (
+                <span className="ml-2 text-xs text-rose-600">
+                  한 번에 {settings.maxCombos}개까지만 만들 수 있습니다
+                </span>
+              )}
+            </div>
+            <Button onClick={() => generate.mutate()} disabled={tooMany || generate.isPending}>
+              {generate.isPending ? '쓰는 중...' : '카피 만들기'}
+            </Button>
+          </div>
+
+          {generate.isError && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              {(generate.error as Error).message}
+            </p>
+          )}
+        </div>
+      </Card>
+
+      {made.length > 0 && (
+        <Card>
+          <CardHeader
+            title={`만든 카피 ${made.length}개`}
+            description="규제에 걸리는 것은 미리 빼두었습니다. 쓸 것만 골라 저장하세요"
+            action={
+              <Button onClick={() => save.mutate()} disabled={picked.size === 0 || save.isPending}>
+                {save.isPending ? '저장 중...' : `${picked.size}개 저장`}
+              </Button>
+            }
+          />
+          <div className="divide-y divide-slate-100">
+            {made.map((row, index) => {
+              const flags = reviewCopy(row, rules)
+              const blocked = isBlocked(flags)
+              return (
+                <div key={index} className="flex gap-3 p-5">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(index)}
+                    disabled={blocked}
+                    onChange={() =>
+                      setPicked((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(index)) next.delete(index)
+                        else next.add(index)
+                        return next
+                      })
+                    }
+                    className="mt-1"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900">{row.headline}</p>
+                    {row.subhead && <p className="text-sm text-slate-600">{row.subhead}</p>}
+                    {row.body && <p className="mt-1 text-xs text-slate-500">{row.body}</p>}
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {[row.angle, row.hook].filter(Boolean).join(' · ')}
+                      {row.badge && ` · 배지 ${row.badge}`}
+                    </p>
+                    {flags.length > 0 && (
+                      <div className="mt-2">
+                        <FlagList flags={flags} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+        on
+          ? 'border-violet-500 bg-violet-500 text-white'
+          : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300'
+      }`}
+    >
+      {label}
+    </button>
+  )
 }
 
 const emptyCopy = () => ({

@@ -72,6 +72,32 @@ export interface StudioRepository {
   updateDraft(id: string, patch: Partial<CreativeDraft>): Promise<void>
   /** 만들어진 이미지를 보관함에 올린다 */
   saveRendered(draftId: string, blob: Blob): Promise<string>
+
+  /** Claude 로 카피를 여러 벌 만든다 (8-3). 저장하지 않고 돌려만 준다 */
+  generateCopies(input: GenerateInput): Promise<GeneratedCopy[]>
+}
+
+export interface GenerateInput {
+  segment: string
+  angles: string[]
+  hooks: string[]
+  offerType: string
+  offerValue: string
+  perCombo: number
+  /** 성과가 좋았던 카피를 참고로 넘긴다 */
+  reference: string
+  /** 지난번 반려 사유 — 되풀이하지 않게 */
+  avoid: string[]
+}
+
+export interface GeneratedCopy {
+  headline: string
+  subhead: string
+  badge: string
+  body: string
+  linkTitle: string
+  angle: string
+  hook: string
 }
 
 type Row = Record<string, unknown>
@@ -250,6 +276,26 @@ const supabaseStudio: StudioRepository = {
     if (error) throw new Error(error.message)
   },
 
+  async generateCopies(input) {
+    const db = requireDb()
+    const { data, error } = await db.functions.invoke('claude-proxy', {
+      body: { action: 'copies', params: input },
+    })
+    if (error) throw new Error('카피를 만들지 못했습니다. 잠시 뒤 다시 해보세요.')
+    if (data && typeof data === 'object' && 'error' in data) {
+      throw new Error(String((data as { error: unknown }).error))
+    }
+    return ((data as { copies?: GeneratedCopy[] })?.copies ?? []).map((row) => ({
+      headline: row.headline ?? '',
+      subhead: row.subhead ?? '',
+      badge: row.badge ?? '',
+      body: row.body ?? '',
+      linkTitle: row.linkTitle ?? '',
+      angle: row.angle ?? '',
+      hook: row.hook ?? '',
+    }))
+  },
+
   async saveRendered(draftId, blob) {
     const db = requireDb()
     const path = `rendered/${draftId}.png`
@@ -373,6 +419,11 @@ const mockStudio: StudioRepository = {
 
   async updateDraft(id, patch) {
     mem.drafts = mem.drafts.map((row) => (row.id === id ? { ...row, ...patch } : row))
+  },
+
+  async generateCopies(_input) {
+    // 미리보기 모드에서는 Claude 를 부르지 않는다
+    return tick([])
   },
 
   async saveRendered(draftId, blob) {

@@ -60,6 +60,17 @@ export interface AdTagRepository {
   saveExperiment(input: Partial<Experiment>, actorId: string): Promise<Experiment>
   updateExperiment(id: string, patch: Partial<Experiment>): Promise<void>
   deleteExperiment(id: string): Promise<void>
+
+  /** 지난 실험과 태그 성과로 다음 가설을 받는다 (9-3). 사람이 골라야 실험이 된다 */
+  suggestExperiments(history: string, tagPerformance: string): Promise<ExperimentIdea[]>
+}
+
+export interface ExperimentIdea {
+  name: string
+  hypothesis: string
+  variable: string
+  variants: string[]
+  why: string
 }
 
 export interface Experiment {
@@ -552,6 +563,24 @@ const supabaseAdTags: AdTagRepository = {
     if (error) throw new Error(error.message)
   },
 
+  async suggestExperiments(history, tagPerformance) {
+    const db = requireDb()
+    const { data, error } = await db.functions.invoke('claude-proxy', {
+      body: { action: 'nextExperiments', params: { history, tagPerformance } },
+    })
+    if (error) throw new Error('제안을 받지 못했습니다. 잠시 뒤 다시 해보세요.')
+    if (data && typeof data === 'object' && 'error' in data) {
+      throw new Error(String((data as { error: unknown }).error))
+    }
+    return ((data as { ideas?: ExperimentIdea[] })?.ideas ?? []).map((row) => ({
+      name: row.name ?? '',
+      hypothesis: row.hypothesis ?? '',
+      variable: row.variable ?? 'angle',
+      variants: row.variants ?? [],
+      why: row.why ?? '',
+    }))
+  },
+
   async saveOpsSettings(patch) {
     const db = requireDb()
     const rows = Object.entries(patch).map(([key, value]) => ({
@@ -816,6 +845,11 @@ const mockAdTags: AdTagRepository = {
     const db = readLocal()
     db.experiments = (db.experiments ?? []).filter((row) => row.id !== id)
     writeLocal(db)
+  },
+
+  async suggestExperiments(_history, _tagPerformance) {
+    // 미리보기 모드에서는 Claude 를 부르지 않는다
+    return tick([])
   },
 
   async saveOpsSettings(patch) {

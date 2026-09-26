@@ -12,7 +12,7 @@ import {
   Select,
   Spinner,
 } from '@/components/ui'
-import { adTagRepository, type Experiment } from '@/data/adTagRepository'
+import { adTagRepository, type Experiment, type ExperimentIdea } from '@/data/adTagRepository'
 import { DEFAULT_OPS, derivedOps } from '@/data/adTypes'
 import { sumInsights } from '@/data/metaTypes'
 import { useAdTags, useOpsSettings, useTagOptions } from '@/hooks/adTagQueries'
@@ -54,6 +54,7 @@ export default function ExperimentsPage() {
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as TabKey) ?? 'running'
   const [adding, setAdding] = useState(false)
+  const [seed, setSeed] = useState<ExperimentIdea | null>(null)
 
   const ops = useOpsSettings()
   const settings = ops.data ?? DEFAULT_OPS
@@ -85,6 +86,43 @@ export default function ExperimentsPage() {
     () => buildRows(ads.data ?? [], insights.data ?? [], tags.data ?? []),
     [ads.data, insights.data, tags.data],
   )
+
+  // 9-3 — 지난 실험과 태그 성과를 넘겨 다음 가설을 받는다
+  const suggest = useMutation({
+    mutationFn: () => {
+      const done = (experiments.data ?? []).filter((row) => row.status === 'done')
+      const history = done
+        .map((row) => {
+          const winner = String((row.result as { winner?: string }).winner ?? '')
+          return `- ${row.name}: ${VARIABLE_LABELS[row.variable as Variable] ?? row.variable} 비교 (${row.variants.join(' vs ')}) → ${
+            winner ? `${winner} 이김` : row.verdict === 'inconclusive' ? '판단 불가' : '결과 없음'
+          }${row.learning ? ` · 배운 것: ${row.learning}` : ''}`
+        })
+        .join('\n')
+
+      // 태그별 성과는 지금 보이는 자료로 만든다
+      const byAngle = new Map<string, { spend: number; revenue: number }>()
+      for (const row of rows) {
+        const angle = row.tags?.angle
+        if (!angle) continue
+        const cur = byAngle.get(angle) ?? { spend: 0, revenue: 0 }
+        byAngle.set(angle, {
+          spend: cur.spend + row.insight.spend,
+          revenue: cur.revenue + row.insight.revenue,
+        })
+      }
+      const tagPerformance = [...byAngle.entries()]
+        .filter(([, value]) => value.spend > 0)
+        .sort((a, b) => b[1].spend - a[1].spend)
+        .map(
+          ([angle, value]) =>
+            `- ${angle}: 지출 ${Math.round(value.spend).toLocaleString()}원, ROAS ${(value.revenue / value.spend).toFixed(2)}`,
+        )
+        .join('\n')
+
+      return adTagRepository.suggestExperiments(history, tagPerformance)
+    },
+  })
 
   const save = useMutation({
     mutationFn: (input: Partial<Experiment>) => adTagRepository.saveExperiment(input, user.id),
@@ -174,6 +212,9 @@ export default function ExperimentsPage() {
           >
             {importPast.isPending ? '가져오는 중...' : '과거 오디션 가져오기'}
           </Button>
+          <Button variant="secondary" onClick={() => suggest.mutate()} disabled={suggest.isPending}>
+            {suggest.isPending ? '생각하는 중...' : '다음 실험 제안받기'}
+          </Button>
           <Button onClick={() => setAdding(true)}>+ 새 실험</Button>
         </div>
       </div>
@@ -202,12 +243,56 @@ export default function ExperimentsPage() {
         ))}
       </div>
 
+      {(suggest.data ?? []).length > 0 && (
+        <Card>
+          <CardHeader
+            title="다음에 해볼 실험"
+            description="초안입니다. 고르고 고쳐야 실험이 됩니다"
+          />
+          <div className="divide-y divide-slate-100">
+            {(suggest.data ?? []).map((idea, index) => (
+              <div key={index} className="flex flex-wrap items-start justify-between gap-3 p-5">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900">{idea.name}</p>
+                  <p className="mt-0.5 text-sm text-slate-600">{idea.hypothesis}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {VARIABLE_LABELS[idea.variable as Variable] ?? idea.variable} ·{' '}
+                    {idea.variants.join(' vs ')}
+                  </p>
+                  {idea.why && <p className="mt-1 text-xs text-violet-700">{idea.why}</p>}
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setSeed(idea)
+                    setAdding(true)
+                  }}
+                >
+                  이걸로 만들기
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {suggest.isError && (
+        <p className="rounded-lg bg-rose-50 px-4 py-2.5 text-xs text-rose-700">
+          {(suggest.error as Error).message}
+        </p>
+      )}
+
       {adding && (
         <NewExperiment
+          seed={seed}
           options={options.data ?? []}
           adsets={(adsets.data ?? []).map((set) => ({ id: set.id, name: set.name }))}
           testAdSetIds={settings.testAdSetIds}
-          onCancel={() => setAdding(false)}
+          onCancel={() => {
+            setAdding(false)
+            setSeed(null)
+          }}
           onSave={(input) => save.mutate(input)}
           saving={save.isPending}
         />
@@ -264,6 +349,7 @@ export default function ExperimentsPage() {
 }
 
 function NewExperiment({
+  seed,
   options,
   adsets,
   testAdSetIds,
@@ -271,6 +357,7 @@ function NewExperiment({
   onSave,
   saving,
 }: {
+  seed: ExperimentIdea | null
   options: { id: string; dimension: string; label: string; active: boolean }[]
   adsets: { id: string; name: string }[]
   testAdSetIds: string[]
@@ -278,10 +365,11 @@ function NewExperiment({
   onSave: (input: Partial<Experiment>) => void
   saving: boolean
 }) {
-  const [name, setName] = useState('')
-  const [hypothesis, setHypothesis] = useState('')
-  const [variable, setVariable] = useState<Variable>('angle')
-  const [variants, setVariants] = useState<string[]>([])
+  // 제안에서 왔으면 그 값으로 채워 둔다. 사람이 고칠 수 있다
+  const [name, setName] = useState(seed?.name ?? '')
+  const [hypothesis, setHypothesis] = useState(seed?.hypothesis ?? '')
+  const [variable, setVariable] = useState<Variable>((seed?.variable as Variable) ?? 'angle')
+  const [variants, setVariants] = useState<string[]>(seed?.variants ?? [])
   const [adsetId, setAdsetId] = useState(testAdSetIds[0] ?? '')
   const [dailyBudget, setDailyBudget] = useState(30_000)
   const [plannedDays, setPlannedDays] = useState(7)
