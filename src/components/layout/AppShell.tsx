@@ -36,6 +36,7 @@ const navGroups = [
       { to: '/ads/upload', label: '소재 업로드', icon: '⬆️' },
       { to: '/ads/actions', label: '오늘의 액션', icon: '✅' },
       { to: '/ads/insights', label: '성과 분석', icon: '🔬' },
+      { to: '/ads/studio', label: '소재', icon: '🎨' },
       { to: '/ads/tagging', label: '광고 태깅', icon: '🏷️' },
       { to: '/ads/settings', label: '설정', icon: '⚙️' },
     ],

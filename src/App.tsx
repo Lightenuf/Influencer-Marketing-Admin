@@ -8,6 +8,7 @@ import AdTaggingPage from '@/features/ads/AdTaggingPage'
 import AdsDashboardPage from '@/features/ads/AdsDashboardPage'
 import AdsSettingsPage from '@/features/ads/AdsSettingsPage'
 import InsightsPage from '@/features/ads/InsightsPage'
+import StudioPage from '@/features/ads/StudioPage'
 import AdsManagePage from '@/features/ads/AdsManagePage'
 import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
 import CreativeUploadPage from '@/features/ads/CreativeUploadPage'
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/ads/upload" element={<CreativeUploadPage />} />
           <Route path="/ads/actions" element={<ActionsPage />} />
           <Route path="/ads/insights" element={<InsightsPage />} />
+          <Route path="/ads/studio" element={<StudioPage />} />
           <Route path="/ads/tagging" element={<AdTaggingPage />} />
           <Route path="/ads/settings" element={<AdsSettingsPage />} />
           <Route path="/crm/groups" element={<CustomerGroupsPage />} />

@@ -114,6 +114,19 @@ export interface OpsSettings {
   marketPrepDays: number
   /** 공구가 끝난 뒤 며칠 동안 '올릴 때'로 볼지 */
   marketBoostDays: number
+
+  // ── 카피 자동 검수 (8-4) ──
+  /** 식품표시광고법에 걸리는 표현. 설정에서 늘린다 */
+  bannedWords: string[]
+  /** 식이섬유는 이 수치로만 적을 수 있다 */
+  fiberGram: number
+  headlineMaxChars: number
+  subheadMaxChars: number
+  bodyMaxChars: number
+  /** 한 번에 만들 수 있는 조합 수 */
+  maxCombos: number
+  /** 카피를 만들 때 넘기는 브랜드 사실 */
+  brandFacts: string
 }
 
 export const DEFAULT_OPS: OpsSettings = {
@@ -139,6 +152,31 @@ export const DEFAULT_OPS: OpsSettings = {
   marketFloorWon: 20_000,
   marketPrepDays: 2,
   marketBoostDays: 7,
+  // SQL(0036)의 초깃값과 같아야 한다
+  bannedWords: [
+    '변비 개선',
+    '변비 해소',
+    '살 빠지',
+    '체지방 감소',
+    '디톡스',
+    '면역력',
+    '혈당 조절',
+    '화학원료 무첨가',
+    '질병',
+    '치료',
+    '예방',
+    '효능',
+    '독소 배출',
+    '붓기 제거',
+    '숙변',
+  ],
+  fiberGram: 4,
+  headlineMaxChars: 18,
+  subheadMaxChars: 30,
+  bodyMaxChars: 125,
+  maxCombos: 30,
+  brandFacts:
+    '브리보: 카페인 프리, 저당, 식물성 프리바이오틱 탄산음료, 355ml 캔, 사과·복숭아.\n식물 유래 원료만 사용. 합성감미료(아스파탐·수크랄로스·에리스리톨) 미사용.\n식이섬유 표기는 4g만 허용.\n톤: 제로/프리프럼이 아닌 더하는 식품(+플러스), 원료·원가 투명성, 맛있어서 매일 마시는 음료. 다이어트 제품처럼 보이지 않게.',
 }
 
 /**
