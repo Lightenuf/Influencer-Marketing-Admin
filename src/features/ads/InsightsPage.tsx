@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import BudgetDialog, { budgetOwner } from './BudgetDialog'
 import {
   CartesianGrid,
   Legend,
@@ -18,6 +19,7 @@ import PeriodPicker, {
 } from '@/components/PeriodPicker'
 import { Card, CardHeader, EmptyState, Select, Spinner } from '@/components/ui'
 import { isMetaMockMode } from '@/data'
+import type { MetaAdSet, MetaCampaign, MetaInsight } from '@/data/metaTypes'
 import {
   AD_BADGE_LABELS,
   DEFAULT_OPS,
@@ -65,6 +67,8 @@ const TABS = [
   { key: 'angle', label: '앵글별' },
   { key: 'format', label: '포맷별' },
   { key: 'creator', label: '크리에이터별' },
+  // 예산은 광고가 아니라 세트/CBO 캠페인에 붙는다. 그래서 자리를 따로 둔다 (6장 148행)
+  { key: 'budget', label: '세트·캠페인' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -88,12 +92,19 @@ export default function InsightsPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set())
   /** 오른쪽에 펼쳐 볼 묶음 */
   const [openKey, setOpenKey] = useState<string | null>(null)
+  /** 예산을 고칠 대상 */
+  const [budgetTarget, setBudgetTarget] = useState<ReturnType<typeof budgetOwner> | null>(null)
+  /** 소재별을 캠페인→세트→소재 트리로 볼지 */
+  const [tree, setTree] = useState(false)
 
   const ops = useOpsSettings()
   const campaigns = useMetaCampaigns()
   const adsets = useMetaAdSets()
   const ads = useMetaAds()
   const insights = useMetaInsights('ad', period)
+  // 예산 표는 세트·캠페인 단위 숫자가 필요하다. 광고 합산으로는 CBO 캠페인을 못 본다
+  const campaignInsights = useMetaInsights('campaign', period)
+  const adsetInsights = useMetaInsights('adset', period)
   const before = useMetaInsights(
     'ad',
     useMemo(() => previousPeriod(period), [period]),
@@ -458,7 +469,7 @@ export default function InsightsPage() {
                 : '태그 단위로 합칩니다. 줄을 누르면 소재별 탭이 그 태그로 걸러집니다'
           }
         />
-        <div className="flex flex-wrap gap-1 border-b border-slate-100 px-5 pb-3">
+        <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-5 pb-3">
           {TABS.map((item) => (
             <button
               key={item.key}
@@ -477,9 +488,33 @@ export default function InsightsPage() {
               {item.label}
             </button>
           ))}
+          {tab === 'creative' && (
+            <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
+              <input type="checkbox" checked={tree} onChange={(e) => setTree(e.target.checked)} />
+              계층 보기
+            </label>
+          )}
         </div>
 
-        {buckets.length === 0 ? (
+        {tab === 'creative' && tree ? (
+          <CreativeTree
+            campaigns={campaigns.data ?? []}
+            adsets={adsets.data ?? []}
+            rows={shown}
+            breakEven={settings.breakEvenRoas}
+            minSpend={derived.minSpend}
+          />
+        ) : tab === 'budget' ? (
+          <BudgetTable
+            campaigns={campaigns.data ?? []}
+            adsets={adsets.data ?? []}
+            rows={shown}
+            campaignInsights={campaignInsights.data ?? []}
+            adsetInsights={adsetInsights.data ?? []}
+            breakEven={settings.breakEvenRoas}
+            onEdit={setBudgetTarget}
+          />
+        ) : buckets.length === 0 ? (
           <EmptyState
             title="해당하는 광고가 없습니다"
             description="필터를 풀거나 '지출 있는 것만'을 꺼보세요."
@@ -631,6 +666,20 @@ export default function InsightsPage() {
         )}
       </Card>
 
+      {budgetTarget && (
+        <BudgetDialog
+          owner={budgetTarget}
+          sharedBy={
+            shown.filter((row) =>
+              budgetTarget.level === 'adset'
+                ? row.ad.adsetId === budgetTarget.id
+                : adsetToCampaign.get(row.ad.adsetId) === budgetTarget.id,
+            ).length
+          }
+          onClose={() => setBudgetTarget(null)}
+        />
+      )}
+
       {open && (
         <Drawer
           bucket={open}
@@ -774,6 +823,234 @@ function Drawer({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 캠페인 → 세트 → 소재 트리 (3장 51행).
+ *
+ * 소재별 표는 같은 소재를 합쳐 세지만, 여기서는 일부러 합치지 않는다 —
+ * 어느 세트에서 어떻게 돌고 있는지를 보려는 화면이기 때문이다.
+ */
+function CreativeTree({
+  campaigns,
+  adsets,
+  rows,
+  breakEven,
+  minSpend,
+}: {
+  campaigns: MetaCampaign[]
+  adsets: MetaAdSet[]
+  rows: AdRow[]
+  breakEven: number
+  minSpend: number
+}) {
+  const byAdset = new Map<string, AdRow[]>()
+  for (const row of rows) {
+    byAdset.set(row.ad.adsetId, [...(byAdset.get(row.ad.adsetId) ?? []), row])
+  }
+
+  const tree = campaigns
+    .map((campaign) => ({
+      campaign,
+      sets: adsets
+        .filter((set) => set.campaignId === campaign.id && byAdset.has(set.id))
+        .map((set) => ({
+          set,
+          rows: [...(byAdset.get(set.id) ?? [])].sort((a, b) => b.insight.spend - a.insight.spend),
+        })),
+    }))
+    .filter((node) => node.sets.length > 0)
+
+  if (tree.length === 0) {
+    return <EmptyState title="해당하는 소재가 없습니다" description="필터를 풀어보세요." />
+  }
+
+  return (
+    <div className="divide-y divide-slate-100">
+      {tree.map(({ campaign, sets }) => {
+        const all = sets.flatMap((node) => node.rows)
+        const insight = sumInsights(
+          all.map((row) => ({ level: 'ad' as const, id: row.ad.id, ...row.insight })),
+        )
+        return (
+          <div key={campaign.id} className="p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-medium text-slate-900">{campaign.name}</p>
+              <p className="text-xs text-slate-500">
+                지출 {formatWon(insight.spend)}원 · ROAS {formatRatio(metaRoas(insight))}
+              </p>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {sets.map(({ set, rows: setRows }) => {
+                const setInsight = sumInsights(
+                  setRows.map((row) => ({ level: 'ad' as const, id: row.ad.id, ...row.insight })),
+                )
+                return (
+                  <div key={set.id} className="rounded-lg border border-slate-200">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
+                      <p className="text-sm text-slate-700">{set.name}</p>
+                      <p className="text-xs text-slate-500">
+                        소재 {formatNumber(setRows.length)}개 · {formatWon(setInsight.spend)}원 ·
+                        ROAS {formatRatio(metaRoas(setInsight))}
+                      </p>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {setRows.map((row) => {
+                        const roas = metaRoas(row.insight)
+                        return (
+                          <div
+                            key={row.ad.id}
+                            className="flex flex-wrap items-center gap-3 px-3 py-2"
+                          >
+                            {row.ad.thumbnailUrl ? (
+                              <img
+                                src={row.ad.thumbnailUrl}
+                                alt=""
+                                className="h-8 w-8 shrink-0 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="h-8 w-8 shrink-0 rounded bg-slate-100" />
+                            )}
+                            <p
+                              className="min-w-0 flex-1 truncate text-sm text-slate-800"
+                              title={row.ad.name}
+                            >
+                              {row.ad.name}
+                            </p>
+                            <span className="tabular text-xs whitespace-nowrap text-slate-600">
+                              {formatWon(row.insight.spend)}원
+                            </span>
+                            <span
+                              className={`tabular text-xs whitespace-nowrap ${
+                                roas >= breakEven ? 'text-emerald-600' : 'text-slate-600'
+                              }`}
+                            >
+                              ROAS {formatRatio(roas)}
+                            </span>
+                            <Badge kind={badgeOf(row.insight.spend, roas, minSpend, breakEven)} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * 세트·캠페인 단위 표 — 예산은 여기서만 고친다.
+ * 메타에서 광고에는 예산 칸이 없다. CBO 캠페인이면 캠페인, 아니면 세트다.
+ */
+function BudgetTable({
+  campaigns,
+  adsets,
+  rows,
+  campaignInsights,
+  adsetInsights,
+  breakEven,
+  onEdit,
+}: {
+  campaigns: MetaCampaign[]
+  adsets: MetaAdSet[]
+  rows: AdRow[]
+  campaignInsights: MetaInsight[]
+  adsetInsights: MetaInsight[]
+  breakEven: number
+  onEdit: (owner: ReturnType<typeof budgetOwner>) => void
+}) {
+  // 지금 필터에 걸린 광고가 속한 세트만 보여준다
+  const liveAdsets = new Set(rows.map((row) => row.ad.adsetId))
+  const shown = adsets.filter((set) => liveAdsets.has(set.id))
+
+  if (shown.length === 0) {
+    return (
+      <EmptyState
+        title="해당하는 세트가 없습니다"
+        description="필터를 풀거나 '지출 있는 것만'을 꺼보세요."
+      />
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[900px] text-sm">
+        <thead className="border-b border-slate-100 bg-slate-50 text-xs text-slate-500">
+          <tr>
+            <th className="px-5 py-2.5 text-left font-medium">캠페인 · 세트</th>
+            <th className="px-2 py-2.5 text-right font-medium whitespace-nowrap">켜진 소재</th>
+            <th className="px-2 py-2.5 text-right font-medium whitespace-nowrap">지출</th>
+            <th className="px-2 py-2.5 text-right font-medium whitespace-nowrap">전환</th>
+            <th className="px-2 py-2.5 text-right font-medium whitespace-nowrap">ROAS</th>
+            <th className="px-5 py-2.5 text-right font-medium whitespace-nowrap">일예산</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {shown.map((set) => {
+            const campaign = campaigns.find((row) => row.id === set.campaignId)
+            if (!campaign) return null
+            const owner = budgetOwner(campaign, set)
+            const insight =
+              adsetInsights.find((row) => row.id === set.id) ??
+              (campaign.isCbo ? campaignInsights.find((row) => row.id === campaign.id) : undefined)
+            const roas = insight ? metaRoas(insight) : 0
+            const live = rows.filter(
+              (row) => row.ad.adsetId === set.id && row.ad.status === 'ACTIVE',
+            ).length
+
+            return (
+              <tr key={set.id} className="hover:bg-slate-50">
+                <td className="max-w-[320px] px-5 py-2.5">
+                  <p className="truncate text-slate-900" title={set.name}>
+                    {set.name}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-400" title={campaign.name}>
+                    {campaign.name}
+                    {campaign.isCbo && ' · CBO'}
+                  </p>
+                </td>
+                <td className="tabular px-2 py-2.5 text-right text-slate-600">
+                  {formatNumber(live)}
+                </td>
+                <td className="tabular px-2 py-2.5 text-right whitespace-nowrap text-slate-700">
+                  {insight ? formatWon(insight.spend) : '-'}
+                </td>
+                <td className="tabular px-2 py-2.5 text-right text-slate-700">
+                  {insight ? formatNumber(insight.results) : '-'}
+                </td>
+                <td
+                  className={`tabular px-2 py-2.5 text-right font-medium ${
+                    roas >= breakEven ? 'text-emerald-600' : 'text-slate-700'
+                  }`}
+                >
+                  {insight ? formatRatio(roas) : '-'}
+                </td>
+                <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                  {owner.won ? (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(owner)}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:border-violet-300"
+                    >
+                      {formatWon(owner.won)}원 / 일
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">예산 없음</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -30,15 +30,10 @@ const navGroups = [
   {
     title: '퍼포먼스 마케팅',
     items: [
-      { to: '/ads', label: '광고 대시보드', icon: '📈' },
-      { to: '/ads/creatives', label: '소재 성과', icon: '🎬' },
-      { to: '/ads/manage', label: '광고 관리', icon: '🎛️' },
-      { to: '/ads/upload', label: '소재 업로드', icon: '⬆️' },
       { to: '/ads/actions', label: '오늘의 액션', icon: '✅' },
       { to: '/ads/insights', label: '성과 분석', icon: '🔬' },
       { to: '/ads/studio', label: '소재', icon: '🎨' },
       { to: '/ads/experiments', label: '실험', icon: '🧪' },
-      { to: '/ads/tagging', label: '광고 태깅', icon: '🏷️' },
       { to: '/ads/settings', label: '설정', icon: '⚙️' },
     ],
   },

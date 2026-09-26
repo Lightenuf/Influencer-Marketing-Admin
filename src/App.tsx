@@ -5,14 +5,10 @@ import SignupPage from '@/auth/SignupPage'
 import AppShell from '@/components/layout/AppShell'
 import ActionsPage from '@/features/ads/ActionsPage'
 import AdTaggingPage from '@/features/ads/AdTaggingPage'
-import AdsDashboardPage from '@/features/ads/AdsDashboardPage'
 import AdsSettingsPage from '@/features/ads/AdsSettingsPage'
 import InsightsPage from '@/features/ads/InsightsPage'
 import ExperimentsPage from '@/features/ads/ExperimentsPage'
 import StudioPage from '@/features/ads/StudioPage'
-import AdsManagePage from '@/features/ads/AdsManagePage'
-import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
-import CreativeUploadPage from '@/features/ads/CreativeUploadPage'
 import CustomerGroupEditPage from '@/features/crm/CustomerGroupEditPage'
 import CustomerGroupsPage from '@/features/crm/CustomerGroupsPage'
 import CampaignDetailPage from '@/features/crm/CampaignDetailPage'
@@ -49,10 +45,14 @@ export default function App() {
           <Route path="/do-not-contact" element={<Navigate to="/rejected" replace />} />
           {/* 캘린더는 마켓 관리 화면 아래로 들어갔다 */}
           <Route path="/calendar" element={<Navigate to="/performance" replace />} />
-          <Route path="/ads" element={<AdsDashboardPage />} />
-          <Route path="/ads/creatives" element={<CreativePerformancePage />} />
-          <Route path="/ads/manage" element={<AdsManagePage />} />
-          <Route path="/ads/upload" element={<CreativeUploadPage />} />
+          {/* 옛 주소는 깨뜨리지 않는다. 북마크와 링크가 남아 있다 (원칙 6) */}
+          <Route path="/ads" element={<Navigate to="/ads/actions" replace />} />
+          <Route
+            path="/ads/creatives"
+            element={<Navigate to="/ads/insights?tab=creative" replace />}
+          />
+          <Route path="/ads/manage" element={<Navigate to="/ads/insights?tab=budget" replace />} />
+          <Route path="/ads/upload" element={<Navigate to="/ads/studio?tab=upload" replace />} />
           <Route path="/ads/actions" element={<ActionsPage />} />
           <Route path="/ads/insights" element={<InsightsPage />} />
           <Route path="/ads/studio" element={<StudioPage />} />
