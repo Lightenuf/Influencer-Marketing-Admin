@@ -4,7 +4,6 @@ import ProtectedRoute from '@/auth/ProtectedRoute'
 import SignupPage from '@/auth/SignupPage'
 import AppShell from '@/components/layout/AppShell'
 import ActionsPage from '@/features/ads/ActionsPage'
-import AdTaggingPage from '@/features/ads/AdTaggingPage'
 import AdsSettingsPage from '@/features/ads/AdsSettingsPage'
 import InsightsPage from '@/features/ads/InsightsPage'
 import ExperimentsPage from '@/features/ads/ExperimentsPage'
@@ -57,7 +56,10 @@ export default function App() {
           <Route path="/ads/insights" element={<InsightsPage />} />
           <Route path="/ads/studio" element={<StudioPage />} />
           <Route path="/ads/experiments" element={<ExperimentsPage />} />
-          <Route path="/ads/tagging" element={<AdTaggingPage />} />
+          <Route
+            path="/ads/tagging"
+            element={<Navigate to="/ads/settings?tab=tagging" replace />}
+          />
           <Route path="/ads/settings" element={<AdsSettingsPage />} />
           <Route path="/crm/groups" element={<CustomerGroupsPage />} />
           <Route path="/crm/groups/new" element={<CustomerGroupEditPage />} />

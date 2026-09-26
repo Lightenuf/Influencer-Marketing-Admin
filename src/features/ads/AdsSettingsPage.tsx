@@ -14,11 +14,13 @@ import {
   useTagOptions,
 } from '@/hooks/adTagQueries'
 import { useMetaInsights } from '@/hooks/metaQueries'
+import AdTaggingPage from './AdTaggingPage'
 import { formatNumber, formatWon } from '@/utils/format'
 
 const TABS = [
   { key: 'ops', label: '운영 기준' },
   { key: 'tags', label: '태그 사전' },
+  { key: 'tagging', label: '광고 태깅' },
   { key: 'alerts', label: '알림' },
   { key: 'guardrails', label: '가드레일' },
 ] as const
@@ -35,7 +37,7 @@ export default function AdsSettingsPage() {
       <div>
         <button
           type="button"
-          onClick={() => navigate('/ads')}
+          onClick={() => navigate('/ads/actions')}
           className="text-sm text-slate-500 hover:text-violet-600"
         >
           ← 퍼포먼스 마케팅
@@ -65,6 +67,8 @@ export default function AdsSettingsPage() {
 
       {tab === 'ops' && <OpsTab />}
       {tab === 'tags' && <TagsTab />}
+      {/* 태깅 화면을 그대로 끼운다 — 새로 짜지 않는다 */}
+      {tab === 'tagging' && <AdTaggingPage embedded />}
       {tab === 'alerts' && <LaterTab title="알림" phase="Phase 6" />}
       {tab === 'guardrails' && <LaterTab title="가드레일" phase="Phase 3" />}
     </div>

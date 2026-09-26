@@ -41,7 +41,8 @@ const emptyTags = (): Record<TagDimension, string> => ({
   offer: '',
 })
 
-export default function AdTaggingPage() {
+/** 설정 안에 끼워 쓸 때는 자기 제목과 뒤로가기를 숨긴다 */
+export default function AdTaggingPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate()
   const user = useCurrentUser()
 
@@ -148,15 +149,19 @@ export default function AdTaggingPage() {
     <div className="space-y-4 pb-24">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <button
-            type="button"
-            onClick={() => navigate('/ads')}
-            className="text-sm text-slate-500 hover:text-violet-600"
-          >
-            ← 퍼포먼스 마케팅
-          </button>
-          <h1 className="mt-1 text-xl font-bold text-slate-900">광고 태깅</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          {!embedded && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/ads/actions')}
+                className="text-sm text-slate-500 hover:text-violet-600"
+              >
+                ← 퍼포먼스 마케팅
+              </button>
+              <h1 className="mt-1 text-xl font-bold text-slate-900">광고 태깅</h1>
+            </>
+          )}
+          <p className={`${embedded ? '' : 'mt-1 '}text-sm text-slate-500`}>
             옛 광고 이름에서 읽어낸 태그입니다. <b>확인하고 저장해야</b> 반영됩니다 — 자동으로
             저장하지 않습니다. 메타의 광고 이름은 바뀌지 않습니다.
           </p>
