@@ -174,9 +174,11 @@ Deno.serve(async (request) => {
       channel,
       messageType,
       isAd,
+      targetMode,
       segmentId,
       segmentName,
       conditions,
+      numbers,
       purpose,
       concepts,
       offerType,
@@ -195,11 +197,16 @@ Deno.serve(async (request) => {
       )
     }
 
-    // 대상은 브라우저가 아니라 DB에서 다시 뽑는다
-    const targets = await rpc<{ rows: Target[] }>('list_send_targets', {
-      conditions,
-      row_limit: 100000,
-    })
+    // 고객군으로 보낼 때는 대상을 브라우저가 아니라 DB에서 다시 뽑는다.
+    // 번호를 직접 넣을 때는 번호 자체가 사람이 넣은 것이라 그대로 쓰되,
+    // 수신거부 거르기는 여기서 한다 — 화면에서만 거르면 우회할 수 있다.
+    const targets =
+      targetMode === 'numbers'
+        ? await rpc<{ rows: Target[] }>('check_send_numbers', { numbers: numbers ?? [] })
+        : await rpc<{ rows: Target[] }>('list_send_targets', {
+            conditions,
+            row_limit: 100000,
+          })
     const rows = targets.rows ?? []
     if (!draftOnly && rows.length === 0) {
       return json({ error: '보낼 수 있는 대상이 없습니다.' }, 400)

@@ -623,6 +623,20 @@ export const supabaseAdapter: DataRepository = {
     }
   },
 
+  async checkSendNumbers(numbers) {
+    const db = requireSupabase()
+    const { data, error } = await db.rpc('check_send_numbers', { numbers })
+    if (error) throw new Error(error.message)
+    const result = (data ?? {}) as Partial<SendTargets>
+    return {
+      total: result.total ?? 0,
+      sendable: result.sendable ?? 0,
+      noNumber: 0,
+      optedOut: result.optedOut ?? 0,
+      rows: result.rows ?? [],
+    }
+  },
+
   async listCampaigns() {
     const db = requireSupabase()
     const rows = unwrap<Row[]>(

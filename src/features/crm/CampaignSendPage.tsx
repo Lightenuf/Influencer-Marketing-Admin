@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCurrentUser } from '@/auth/AuthProvider'
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Spinner } from '@/components/ui'
@@ -10,11 +10,17 @@ import {
   LMS_BYTE_LIMIT,
   MESSAGE_TYPES,
   SMS_BYTE_LIMIT,
+  TARGET_MODES,
+  TARGET_MODE_LABELS,
   UNIT_COST,
   buildAdBody,
+  emptyConditions,
+  formatPhone,
   messageBytes,
+  parseNumbers,
   smsKindOf,
   type Channel,
+  type TargetMode,
 } from '@/data/types'
 import { useCustomerGroups } from '@/hooks/queries'
 import { daysSince, formatNumber } from '@/utils/format'
@@ -34,7 +40,9 @@ export default function CampaignSendPage() {
   const navigate = useNavigate()
   const { data: groups = [], isLoading } = useCustomerGroups()
 
+  const [targetMode, setTargetMode] = useState<TargetMode>('segment')
   const [segmentId, setSegmentId] = useState('')
+  const [numberText, setNumberText] = useState('')
   const [channel, setChannel] = useState<Channel>('sms')
   const [messageType, setMessageType] = useState('SMS')
   const [title, setTitle] = useState('')
@@ -51,6 +59,9 @@ export default function CampaignSendPage() {
 
   const group = groups.find((g) => g.id === segmentId)
 
+  // 붙여넣은 덩어리에서 번호를 뽑는다. 타자마다 다시 하지 않게 기억해 둔다.
+  const parsed = useMemo(() => parseNumbers(numberText), [numberText])
+
   const options = useQuery({
     queryKey: ['campaignOptions'],
     queryFn: () => repository.listCampaignOptions(),
@@ -62,9 +73,12 @@ export default function CampaignSendPage() {
 
   // 조건에 맞는 사람 중 실제로 보낼 수 있는 사람. 명단은 받지 않고 숫자만 본다.
   const targets = useQuery({
-    queryKey: ['sendTargets', group?.conditions],
-    queryFn: () => repository.listSendTargets(group!.conditions, 0),
-    enabled: !!group,
+    queryKey: ['sendTargets', targetMode, group?.conditions, parsed.valid],
+    queryFn: () =>
+      targetMode === 'numbers'
+        ? repository.checkSendNumbers(parsed.valid)
+        : repository.listSendTargets(group!.conditions, 0),
+    enabled: targetMode === 'numbers' ? parsed.valid.length > 0 : !!group,
   })
 
   const send = useMutation({
@@ -76,9 +90,11 @@ export default function CampaignSendPage() {
           channel,
           messageType: channel === 'sms' ? smsKindOf(finalBody) : messageType,
           isAd,
-          segmentId: group?.id ?? null,
-          segmentName: group?.name ?? '',
-          conditions: group!.conditions,
+          targetMode,
+          segmentId: targetMode === 'segment' ? (group?.id ?? null) : null,
+          segmentName: targetMode === 'segment' ? (group?.name ?? '') : '직접 입력한 번호',
+          conditions: group?.conditions ?? emptyConditions(),
+          numbers: targetMode === 'numbers' ? parsed.valid : [],
           purpose,
           concepts,
           offerType,
@@ -119,7 +135,8 @@ export default function CampaignSendPage() {
   const recentCount = groupSends.filter((c) => new Date(c.sentAt!).getTime() >= monthAgo).length
 
   const missing: string[] = []
-  if (!group) missing.push('고객군')
+  if (targetMode === 'segment' && !group) missing.push('고객군')
+  if (targetMode === 'numbers' && parsed.valid.length === 0) missing.push('보낼 번호')
   if (!body.trim()) missing.push('보낼 내용')
   if (!purpose) missing.push('목적')
   if (concepts.length === 0) missing.push('컨셉')
@@ -153,47 +170,125 @@ export default function CampaignSendPage() {
       </div>
 
       <Card>
-        <CardHeader title="1. 누구에게" description="고객 행동 관리에서 만든 고객군을 고릅니다" />
+        <CardHeader
+          title="1. 누구에게"
+          description="고객군으로 보내거나, 번호를 직접 넣어 보냅니다"
+        />
         <div className="space-y-4 p-5">
-          <Field label="고객군">
-            <Select value={segmentId} onChange={(e) => setSegmentId(e.target.value)}>
-              <option value="">선택하지 않음</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <div className="flex flex-wrap gap-4">
+            {TARGET_MODES.map((mode) => (
+              <label key={mode} className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="targetMode"
+                  checked={targetMode === mode}
+                  onChange={() => setTargetMode(mode)}
+                />
+                {TARGET_MODE_LABELS[mode]}
+              </label>
+            ))}
+          </div>
 
-          {group && targets.isLoading && <Spinner label="대상을 세는 중..." />}
+          {targetMode === 'segment' ? (
+            <Field label="고객군">
+              <Select value={segmentId} onChange={(e) => setSegmentId(e.target.value)}>
+                <option value="">선택하지 않음</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <div>
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <p className="text-sm font-medium text-slate-700">보낼 번호</p>
+                <p className="text-xs text-slate-400">
+                  줄바꿈·쉼표·공백 아무거나로 나눠도 됩니다. 엑셀에서 복사해 붙여넣으세요.
+                </p>
+              </div>
+              <textarea
+                value={numberText}
+                onChange={(e) => setNumberText(e.target.value)}
+                rows={6}
+                placeholder={'010-1234-5678\n01098765432\n010 2222 3333'}
+                className="mt-1.5 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-violet-400"
+              />
 
-          {group && targets.data && (
+              {numberText.trim() && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  <span className="text-slate-600">
+                    번호 <b className="text-slate-900">{formatNumber(parsed.valid.length)}개</b>
+                  </span>
+                  {parsed.duplicates > 0 && (
+                    <span className="text-slate-500">
+                      같은 번호 {formatNumber(parsed.duplicates)}개는 하나로 묶었습니다
+                    </span>
+                  )}
+                  {parsed.invalid.length > 0 && (
+                    <span className="text-rose-600">
+                      문자를 보낼 수 없는 것 {formatNumber(parsed.invalid.length)}개 —{' '}
+                      {parsed.invalid.slice(0, 3).join(', ')}
+                      {parsed.invalid.length > 3 && ' ...'}
+                    </span>
+                  )}
+                  {parsed.valid.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setNumberText(parsed.valid.map(formatPhone).join('\n'))}
+                      className="text-violet-600 underline"
+                    >
+                      정리해서 다시 넣기
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <p className="mt-2 text-xs text-slate-500">
+                휴대폰 번호만 받습니다. 유선번호로는 문자가 가지 않습니다. 수신거부하신 분은
+                아래에서 자동으로 빠집니다.
+              </p>
+            </div>
+          )}
+
+          {targets.isLoading && <Spinner label="대상을 세는 중..." />}
+
+          {targets.data && (
             <>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Stat label="조건에 맞는 분" value={`${formatNumber(targets.data.total)}명`} />
+                <Stat
+                  label={targetMode === 'numbers' ? '넣은 번호' : '조건에 맞는 분'}
+                  value={`${formatNumber(targets.data.total)}${targetMode === 'numbers' ? '개' : '명'}`}
+                />
                 <Stat
                   label="보낼 수 있는 분"
                   value={`${formatNumber(targets.data.sendable)}명`}
                   strong
                 />
                 <Stat label="번호 없음" value={`${formatNumber(targets.data.noNumber)}명`} />
-                <Stat label="수신거부" value={`${formatNumber(targets.data.optedOut)}명`} />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
                 <Stat
-                  label="이 고객군에 마지막 발송 후"
-                  value={lastSentAt ? `${daysSince(lastSentAt)}일 전` : '보낸 적 없음'}
-                />
-                <Stat
-                  label="최근 30일 발송 횟수"
-                  value={`${formatNumber(recentCount)}회`}
-                  warn={recentCount >= 4}
+                  label="수신거부"
+                  value={`${formatNumber(targets.data.optedOut)}명`}
+                  warn={targets.data.optedOut > 0}
                 />
               </div>
 
-              {recentCount >= 4 && (
+              {targetMode === 'segment' && group && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Stat
+                    label="이 고객군에 마지막 발송 후"
+                    value={lastSentAt ? `${daysSince(lastSentAt)}일 전` : '보낸 적 없음'}
+                  />
+                  <Stat
+                    label="최근 30일 발송 횟수"
+                    value={`${formatNumber(recentCount)}회`}
+                    warn={recentCount >= 4}
+                  />
+                </div>
+              )}
+
+              {targetMode === 'segment' && recentCount >= 4 && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
                   최근 30일에 벌써 {recentCount}번 보냈습니다. 너무 자주 보내면 수신거부가 늘어
                   나중에 보낼 대상이 줄어듭니다.
@@ -397,11 +492,7 @@ export default function CampaignSendPage() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => send.mutate(true)}
-              disabled={!group || send.isPending}
-            >
+            <Button variant="secondary" onClick={() => send.mutate(true)} disabled={send.isPending}>
               임시저장
             </Button>
             <Button onClick={() => setConfirming(true)} disabled={blocked}>
@@ -425,7 +516,8 @@ export default function CampaignSendPage() {
       >
         <div className="space-y-3 text-sm">
           <Row label="누구에게">
-            {group?.name} · <b className="text-slate-900">{formatNumber(sendable)}명</b>
+            {targetMode === 'segment' ? group?.name : '직접 입력한 번호'} ·{' '}
+            <b className="text-slate-900">{formatNumber(sendable)}명</b>
           </Row>
           <Row label="무엇을">
             {CHANNEL_LABELS[channel]} · {kind} · {formatNumber(bytes)}바이트

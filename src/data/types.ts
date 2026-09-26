@@ -535,6 +535,14 @@ export interface Campaign {
   updatedAt: string
 }
 
+/** 대상을 어떻게 정하나 */
+export const TARGET_MODES = ['segment', 'numbers'] as const
+export type TargetMode = (typeof TARGET_MODES)[number]
+export const TARGET_MODE_LABELS: Record<TargetMode, string> = {
+  segment: '고객군에게 발송',
+  numbers: '번호 입력하여 발송',
+}
+
 /** 새로 보낼 캠페인 */
 export interface CampaignSendInput {
   title: string
@@ -542,9 +550,12 @@ export interface CampaignSendInput {
   channel: Channel
   messageType: string
   isAd: boolean
+  targetMode: TargetMode
   segmentId: string | null
   segmentName: string
   conditions: GroupConditions
+  /** 번호로 보낼 때만 쓴다 */
+  numbers: string[]
   purpose: string
   concepts: string[]
   offerType: string
@@ -639,6 +650,79 @@ export const UNIT_COST: Record<string, number> = {
 export const AD_PREFIX = '(광고) '
 export const buildAdBody = (body: string, optoutNumber: string) =>
   `${AD_PREFIX}${body}\n무료수신거부 ${optoutNumber}`
+
+// ── 전화번호 다루기 ──
+
+/** 하이픈·공백을 떼고 숫자만 남긴다 */
+export const onlyDigits = (text: string) => (text ?? '').replace(/[^0-9]/g, '')
+
+/**
+ * 문자를 보낼 수 있는 번호인지.
+ * 휴대폰(01x)만 받는다 — 유선번호로는 문자가 가지 않는다.
+ */
+export const isSendableNumber = (text: string) => /^01[016789][0-9]{7,8}$/.test(onlyDigits(text))
+
+/** 한 줄 안에 여러 번호가 띄어쓰기로 붙어 있을 때 찾아낸다 */
+const PHONE_IN_TEXT = /01[016789][\s.-]?\d{3,4}[\s.-]?\d{4}/g
+
+/**
+ * 붙여넣은 덩어리에서 번호를 뽑는다.
+ *
+ * 줄바꿈·쉼표·탭으로 먼저 나눈다. 공백으로는 나누지 않는다 —
+ * '010 2222 3333'처럼 띄어 쓴 번호 하나를 세 조각으로 쪼개면 안 되기 때문이다.
+ * 한 조각이 번호 하나로 읽히지 않으면, 그 안에서 번호 모양을 찾아본다.
+ */
+export function parseNumbers(text: string): {
+  valid: string[]
+  invalid: string[]
+  duplicates: number
+} {
+  const pieces = (text ?? '')
+    .split(/[\n\r,;\t]+/)
+    .map((piece) => piece.trim())
+    .filter(Boolean)
+
+  const valid: string[] = []
+  const invalid: string[] = []
+  const seen = new Set<string>()
+  let duplicates = 0
+
+  const take = (digits: string) => {
+    if (seen.has(digits)) {
+      duplicates++
+      return
+    }
+    seen.add(digits)
+    valid.push(digits)
+  }
+
+  for (const piece of pieces) {
+    const digits = onlyDigits(piece)
+    if (isSendableNumber(digits)) {
+      take(digits)
+      continue
+    }
+
+    // 한 줄에 번호를 여러 개 띄어 쓴 경우
+    const found = piece.match(PHONE_IN_TEXT) ?? []
+    if (found.length > 0) {
+      for (const one of found) take(onlyDigits(one))
+      continue
+    }
+
+    invalid.push(piece)
+  }
+
+  return { valid, invalid, duplicates }
+}
+
+/** 01012349778 → 010-1234-9778 */
+export function formatPhone(text: string): string {
+  const digits = onlyDigits(text)
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  return text
+}
 
 // ── 발송 대상 ──
 

@@ -458,6 +458,20 @@ export const mockAdapter: DataRepository = {
     })
   },
 
+  async checkSendNumbers(numbers) {
+    const db = read()
+    const optouts = new Set((db.optouts ?? []).map((o) => o.callnum.replace(/[^0-9]/g, '')))
+    const unique = [...new Set(numbers.map((n) => n.replace(/[^0-9]/g, '')))].filter(Boolean)
+    const sendable = unique.filter((n) => !optouts.has(n))
+    return tick({
+      total: unique.length,
+      sendable: sendable.length,
+      noNumber: 0,
+      optedOut: unique.length - sendable.length,
+      rows: sendable.map((callnum) => ({ memberCode: '', name: '', callnum })),
+    })
+  },
+
   async listCampaigns() {
     const db = read()
     return tick(
@@ -489,7 +503,10 @@ export const mockAdapter: DataRepository = {
   async sendCampaign(input, _actorId) {
     // 미리보기 모드에서는 아무 데도 보내지 않는다. 기록만 남긴다.
     const db = read()
-    const targets = await this.listSendTargets(input.conditions, 0)
+    const targets =
+      input.targetMode === 'numbers'
+        ? await this.checkSendNumbers(input.numbers)
+        : await this.listSendTargets(input.conditions, 0)
     const now = new Date().toISOString()
     const made: Campaign = {
       id: crypto.randomUUID(),

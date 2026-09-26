@@ -143,6 +143,12 @@ export interface DataRepository {
    */
   listSendTargets(conditions: GroupConditions, limit: number): Promise<SendTargets>
 
+  /**
+   * 손으로 넣은 번호를 발송 대상으로 다듬는다.
+   * 수신거부는 여기서 거른다 — 화면에서만 거르면 실수로 나갈 수 있다.
+   */
+  checkSendNumbers(numbers: string[]): Promise<SendTargets>
+
   /** 캠페인 — 최근 것부터. 어드민 발송과 CSV로 올린 예전 기록이 함께 담긴다 */
   listCampaigns(): Promise<Campaign[]>
   getCampaign(id: string): Promise<Campaign | null>
