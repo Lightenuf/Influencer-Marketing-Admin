@@ -1,0 +1,31 @@
+# 광고 이상 감지 — 하루 한 번.
+#
+# 9월 16일에 광고가 멈췄는데 열흘 동안 아무도 몰랐다. 그래서 만들었다.
+#
+# GitHub 의 cron 은 정각을 보장하지 않는다(몇 분~수십 분 늦을 수 있다).
+# 일일 요약이라 몇 분 늦는 것은 문제되지 않는다.
+name: 광고 이상 감지
+
+on:
+  schedule:
+    # 매일 한국시간 09:00 (UTC 00:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 이상 감지 실행
+        run: |
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/ads-alerts" \
+            -H "x-cron-key: ${{ secrets.ALERTS_CRON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          cat /tmp/out.json
+          echo
+          if [ "$code" != "200" ]; then
+            echo "::error::이상 감지가 실패했습니다 (HTTP $code)"
+            exit 1
+          fi

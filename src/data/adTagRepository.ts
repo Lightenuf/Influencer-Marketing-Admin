@@ -46,6 +46,23 @@ export interface AdTagRepository {
   listActionLogs(): Promise<ActionLog[]>
   /** 실행 뒤 재서 결과를 붙인다 */
   attachOutcome(logId: string, after: Record<string, number>, outcome: string): Promise<void>
+
+  // ── 이상 감지 ──
+  /** 아직 닫지 않은 알림 */
+  listAlerts(): Promise<AdAlert[]>
+  /** 사람이 확인했다고 닫는다 */
+  resolveAlert(id: string, actorId: string): Promise<void>
+  /** 지금 다시 살펴본다 */
+  runAlertCheck(): Promise<{ found: number }>
+}
+
+export interface AdAlert {
+  id: string
+  kind: string
+  level: string
+  title: string
+  detail: string
+  createdAt: string
 }
 
 export interface NewSuggestion {
@@ -380,6 +397,40 @@ const supabaseAdTags: AdTagRepository = {
     if (error) throw new Error(error.message)
   },
 
+  async listAlerts() {
+    const db = requireDb()
+    const { data, error } = await db
+      .from('ad_alerts')
+      .select('*')
+      .is('resolved_at', null)
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map((row: Row) => ({
+      id: String(row.id),
+      kind: String(row.kind),
+      level: String(row.level ?? 'warn'),
+      title: String(row.title ?? ''),
+      detail: String(row.detail ?? ''),
+      createdAt: String(row.created_at),
+    }))
+  },
+
+  async resolveAlert(id, actorId) {
+    const db = requireDb()
+    const { error } = await db
+      .from('ad_alerts')
+      .update({ resolved_at: new Date().toISOString(), resolved_by: actorId })
+      .eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async runAlertCheck() {
+    const db = requireDb()
+    const { data, error } = await db.functions.invoke('ads-alerts', { body: {} })
+    if (error) throw new Error('이상 감지를 돌리지 못했습니다. 함수가 배포됐는지 확인해주세요.')
+    return { found: Number((data as { found?: number })?.found ?? 0) }
+  },
+
   async saveOpsSettings(patch) {
     const db = requireDb()
     const rows = Object.entries(patch).map(([key, value]) => ({
@@ -582,6 +633,18 @@ const mockAdTags: AdTagRepository = {
       row.id === logId ? { ...row, after, outcome, measuredAt: new Date().toISOString() } : row,
     )
     writeLocal(db)
+  },
+
+  async listAlerts() {
+    return tick([])
+  },
+
+  async resolveAlert(_id, _actorId) {
+    // 미리보기 모드에는 알림이 없다
+  },
+
+  async runAlertCheck() {
+    return tick({ found: 0 })
   },
 
   async saveOpsSettings(patch) {

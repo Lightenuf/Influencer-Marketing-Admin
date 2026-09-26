@@ -234,6 +234,74 @@ Deno.serve(async (request) => {
         )
       }
 
+      case 'health': {
+        // 광고가 안 나갈 때 왜인지 알려주는 신호들을 한 번에 모은다.
+        // 어드민 화면에서는 '켜짐/꺼짐'만 보이지만, 실제로 전달되는지는
+        // 상위 캠페인 상태·계정 상태·심사 결과까지 봐야 안다.
+        const out: Record<string, unknown> = {}
+
+        // 1) 계정 — 미납·정지
+        try {
+          const [account] = await graph(act, {
+            fields: 'account_status,disable_reason,balance,amount_spent,currency',
+          })
+          out.account = {
+            // 1 활성 · 2 정지 · 3 미납 · 7 검토중 · 9 유예
+            status: Number(account?.account_status ?? 0),
+            disableReason: Number(account?.disable_reason ?? 0),
+            balance: Number(account?.balance ?? 0),
+            currency: String(account?.currency ?? ''),
+          }
+        } catch (error) {
+          out.account = { error: String(error) }
+        }
+
+        // 2) 토큰 만료 — 과거에 실제로 끊긴 적이 있다
+        try {
+          const url = new URL('https://graph.facebook.com/debug_token')
+          url.searchParams.set('input_token', TOKEN)
+          url.searchParams.set('access_token', TOKEN)
+          const body = await (await fetch(url.toString())).json()
+          const data = body?.data ?? {}
+          out.token = {
+            valid: data.is_valid === true,
+            // 0 이면 만료 없음(System User 토큰)
+            expiresAt: Number(data.expires_at ?? 0),
+            scopes: (data.scopes ?? []).length,
+          }
+        } catch (error) {
+          out.token = { error: String(error) }
+        }
+
+        // 3) 광고 — 실제 전달 상태. 상위가 꺼져 있으면 여기에 드러난다
+        try {
+          const rows = await graph(`${act}/ads`, {
+            fields: 'id,name,effective_status,issues_info',
+            limit: '500',
+          })
+          const counts: Record<string, number> = {}
+          const troubled: { id: string; name: string; status: string; issue: string }[] = []
+          for (const row of rows) {
+            const status = String(row.effective_status ?? '')
+            counts[status] = (counts[status] ?? 0) + 1
+            const issues = (row.issues_info ?? []) as GraphRow[]
+            if (issues.length > 0 || status === 'DISAPPROVED' || status === 'WITH_ISSUES') {
+              troubled.push({
+                id: String(row.id),
+                name: String(row.name ?? ''),
+                status,
+                issue: String(issues[0]?.error_summary ?? issues[0]?.error_message ?? ''),
+              })
+            }
+          }
+          out.ads = { counts, troubled: troubled.slice(0, 20) }
+        } catch (error) {
+          out.ads = { error: String(error) }
+        }
+
+        return json(out)
+      }
+
       case 'accounts': {
         // 이름까지 붙여 준다 — 화면에서 번호만 보면 어느 계정인지 알 수 없다
         const rows = await Promise.all(

@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useCurrentUser } from '@/auth/AuthProvider'
 import { Button, Card, CardHeader, EmptyState, Modal, Select, Spinner } from '@/components/ui'
 import { isMetaMockMode } from '@/data'
-import { adTagRepository, type StoredSuggestion } from '@/data/adTagRepository'
+import { adTagRepository, type AdAlert, type StoredSuggestion } from '@/data/adTagRepository'
 import { DEFAULT_OPS, derivedOps } from '@/data/adTypes'
 import { metaCostPerResult, metaRoas, sumInsights } from '@/data/metaTypes'
 import { useAdTags, useOpsSettings } from '@/hooks/adTagQueries'
@@ -78,6 +78,15 @@ export default function ActionsPage() {
   const logs = useQuery({
     queryKey: ['adActions', 'logs'],
     queryFn: () => adTagRepository.listActionLogs(),
+  })
+  const alerts = useQuery({
+    queryKey: ['adActions', 'alerts'],
+    queryFn: () => adTagRepository.listAlerts(),
+  })
+
+  const resolveAlert = useMutation({
+    mutationFn: (id: string) => adTagRepository.resolveAlert(id, user.id),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['adActions', 'alerts'] }),
   })
 
   const setStatus = useSetAdStatus()
@@ -163,6 +172,11 @@ export default function ActionsPage() {
     onSuccess: () => client.invalidateQueries({ queryKey: ['adActions', 'suggestions'] }),
   })
 
+  const checkAlerts = useMutation({
+    mutationFn: () => adTagRepository.runAlertCheck(),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['adActions', 'alerts'] }),
+  })
+
   const decide = useMutation({
     mutationFn: async (input: { suggestion: StoredSuggestion; action: string; reason: string }) => {
       const { suggestion, action, reason } = input
@@ -234,15 +248,37 @@ export default function ActionsPage() {
             규칙이 제안을 만들고, <b>누르셔야 실행됩니다.</b> 저절로 바뀌는 것은 없습니다.
           </p>
         </div>
-        <Button variant="secondary" onClick={() => recalc.mutate()} disabled={recalc.isPending}>
-          {recalc.isPending ? '계산 중...' : '다시 계산'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => checkAlerts.mutate()}
+            disabled={checkAlerts.isPending}
+          >
+            {checkAlerts.isPending ? '살펴보는 중...' : '이상 살펴보기'}
+          </Button>
+          <Button variant="secondary" onClick={() => recalc.mutate()} disabled={recalc.isPending}>
+            {recalc.isPending ? '계산 중...' : '다시 계산'}
+          </Button>
+        </div>
       </div>
 
       {isMetaMockMode && (
         <p className="rounded-lg bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
           예시 데이터 — 메타 계정에 아직 연결되지 않았습니다
         </p>
+      )}
+
+      {(alerts.data ?? []).length > 0 && (
+        <div className="space-y-2">
+          {(alerts.data ?? []).map((alert) => (
+            <AlertBar
+              key={alert.id}
+              alert={alert}
+              onResolve={() => resolveAlert.mutate(alert.id)}
+              busy={resolveAlert.isPending}
+            />
+          ))}
+        </div>
       )}
 
       {phase.kind !== 'none' && (
@@ -377,6 +413,44 @@ export default function ActionsPage() {
           </Button>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+/**
+ * 이상 감지 알림.
+ * 제안보다 위에 둔다 — 광고가 멈췄는데 증액을 고민하고 있으면 안 된다.
+ */
+function AlertBar({
+  alert,
+  onResolve,
+  busy,
+}: {
+  alert: AdAlert
+  onResolve: () => void
+  busy: boolean
+}) {
+  const tone =
+    alert.level === 'critical'
+      ? 'bg-rose-50 text-rose-800 border-rose-200'
+      : alert.level === 'warn'
+        ? 'bg-amber-50 text-amber-800 border-amber-200'
+        : 'bg-slate-50 text-slate-700 border-slate-200'
+  const icon = { critical: '🚨', warn: '⚠️', info: 'ℹ️' }[alert.level] ?? '⚠️'
+
+  return (
+    <div
+      className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border px-4 py-3 ${tone}`}
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-medium">
+          {icon} {alert.title}
+        </p>
+        {alert.detail && <p className="mt-0.5 text-xs leading-relaxed">{alert.detail}</p>}
+      </div>
+      <Button size="sm" variant="ghost" onClick={onResolve} disabled={busy}>
+        확인함
+      </Button>
     </div>
   )
 }
