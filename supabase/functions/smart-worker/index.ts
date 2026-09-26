@@ -1,5 +1,5 @@
 /**
-  * 광고 이상 감지 — 하루 한 번 돌고, 어드민에서 눌러서도 돈다.
+ * 광고 이상 감지 — 하루 한 번 돌고, 어드민에서 눌러서도 돈다.
  *
  * 배포된 이름은 `smart-worker` 다. Supabase 가 붙인 기본 이름을 그대로 쓰고 있다 —
  * 이름을 바꾸려면 함수를 다시 배포해야 해서, 부르는 쪽을 맞췄다.
@@ -99,7 +99,10 @@ async function loadSettings(): Promise<Record<string, unknown>> {
   return out
 }
 
-async function dailySpend(from: string, to: string): Promise<Map<string, { spend: number; revenue: number }>> {
+async function dailySpend(
+  from: string,
+  to: string,
+): Promise<Map<string, { spend: number; revenue: number }>> {
   const account = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
   const rows = await graph(`act_${account}/insights`, {
     fields: 'spend,actions,action_values',
@@ -158,7 +161,10 @@ async function detect(): Promise<Alert[]> {
         (row) => String(row.effective_status) === 'ACTIVE' && Number(row.daily_budget ?? 0) > 0,
       )
       if (live.length > 0) {
-        const names = live.slice(0, 3).map((row) => String(row.name ?? '')).join(', ')
+        const names = live
+          .slice(0, 3)
+          .map((row) => String(row.name ?? ''))
+          .join(', ')
         alerts.push({
           kind: 'noDelivery',
           level: 'critical',
@@ -183,7 +189,10 @@ async function detect(): Promise<Alert[]> {
         level: 'warn',
         title: '광고 지출이 갑자기 늘었습니다',
         detail: `어제 ${Math.round(yesterday.spend).toLocaleString()}원으로, 전주 같은 요일(${Math.round(lastWeekSame.spend).toLocaleString()}원)보다 ${Math.round((ratio - 1) * 100)}% 많습니다.`,
-        evidence: { yesterday: Math.round(yesterday.spend), lastWeek: Math.round(lastWeekSame.spend) },
+        evidence: {
+          yesterday: Math.round(yesterday.spend),
+          lastWeek: Math.round(lastWeekSame.spend),
+        },
         fingerprint: `spendSpike:${day(-1)}`,
       })
     }
@@ -252,7 +261,10 @@ async function detect(): Promise<Alert[]> {
     })
     const rejected = rows.filter((row) => String(row.effective_status) === 'DISAPPROVED')
     if (rejected.length > 0) {
-      const names = rejected.slice(0, 5).map((row) => String(row.name ?? '')).join(', ')
+      const names = rejected
+        .slice(0, 5)
+        .map((row) => String(row.name ?? ''))
+        .join(', ')
       alerts.push({
         kind: 'adRejected',
         level: 'warn',
@@ -421,6 +433,19 @@ async function claimOnce(kind: string, periodKey: string): Promise<boolean> {
   return response.ok
 }
 
+/**
+ * 잡아 둔 자물쇠를 푼다.
+ *
+ * 자물쇠를 먼저 잡고 일을 하는데, 그 일이 실패하면 보내지도 못한 채 자물쇠만 남는다.
+ * 그러면 그 주 리포트는 영영 오지 않는다. 실패했으면 풀어서 다음에 다시 하게 한다.
+ */
+async function releaseClaim(kind: string, periodKey: string): Promise<void> {
+  await fetch(`${DB}/rest/v1/notification_log?kind=eq.${kind}&period_key=eq.${periodKey}`, {
+    method: 'DELETE',
+    headers: dbHeaders(),
+  })
+}
+
 const won = (value: number) => `${Math.round(value).toLocaleString()}원`
 const ratio = (value: number) => value.toFixed(2)
 
@@ -474,28 +499,33 @@ async function dailySummary(settings: Record<string, unknown>) {
   const day = seoulDay(-1)
   if (!(await claimOnce('daily', day))) return { sent: false, why: '오늘 이미 보냈습니다' }
 
-  const t = await totals(day, day)
-  const open = await countOpenSuggestions()
+  try {
+    const t = await totals(day, day)
+    const open = await countOpenSuggestions()
 
-  const body =
-    t.spend === 0
-      ? '어제는 광고가 돌지 않았습니다.'
-      : [
-          `지출 ${won(t.spend)} · 매출 ${won(t.revenue)}`,
-          `ROAS ${ratio(t.roas)} · 전환 ${t.results}건 · CPA ${t.results > 0 ? won(t.cpa) : '-'}`,
-        ].join('\n')
+    const body =
+      t.spend === 0
+        ? '어제는 광고가 돌지 않았습니다.'
+        : [
+            `지출 ${won(t.spend)} · 매출 ${won(t.revenue)}`,
+            `ROAS ${ratio(t.roas)} · 전환 ${t.results}건 · CPA ${t.results > 0 ? won(t.cpa) : '-'}`,
+          ].join('\n')
 
-  await toSlack(
-    [
-      `*어제 광고 요약* · ${day}`,
-      '',
-      body,
-      '',
-      open > 0 ? `오늘 볼 제안 ${open}개` : '새 제안은 없습니다',
-      `<${HOME}#/ads/actions|오늘의 액션>`,
-    ].join('\n'),
-  )
-  return { sent: true }
+    await toSlack(
+      [
+        `*어제 광고 요약* · ${day}`,
+        '',
+        body,
+        '',
+        open > 0 ? `오늘 볼 제안 ${open}개` : '새 제안은 없습니다',
+        `<${HOME}#/ads/actions|오늘의 액션>`,
+      ].join('\n'),
+    )
+    return { sent: true }
+  } catch (error) {
+    await releaseClaim('daily', day)
+    throw error
+  }
 }
 
 /** ── 승인 요청 (발생 즉시) ── */
@@ -543,144 +573,163 @@ async function weeklyReport(settings: Record<string, unknown>) {
   if (settings.notifyWeekly === false) return { sent: false, why: '설정에서 꺼져 있습니다' }
 
   const thisMonday = mondayOf(seoulDay(0))
-  if (!(await claimOnce('weekly', thisMonday))) return { sent: false, why: '이번 주에 이미 보냈습니다' }
+  if (!(await claimOnce('weekly', thisMonday)))
+    return { sent: false, why: '이번 주에 이미 보냈습니다' }
 
-  const shift = (day: string, by: number) => {
-    const date = new Date(`${day}T00:00:00Z`)
-    date.setUTCDate(date.getUTCDate() + by)
-    return date.toISOString().slice(0, 10)
-  }
-  const lastFrom = shift(thisMonday, -7)
-  const lastTo = shift(thisMonday, -1)
-  const beforeFrom = shift(thisMonday, -14)
-  const beforeTo = shift(thisMonday, -8)
-
-  const now = await totals(lastFrom, lastTo)
-  const before = await totals(beforeFrom, beforeTo)
-
-  // 태그별 성과 — 광고별 지표에 어드민 태그를 붙여 묶는다
-  const account = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
-  const adRows = await graph(`act_${account}/insights`, {
-    level: 'ad',
-    fields: 'ad_id,spend,actions,action_values',
-    time_range: JSON.stringify({ since: lastFrom, until: lastTo }),
-    limit: '500',
-  })
-  const tagRows = await rows('ad_tags?select=ad_id,angle,format')
-  const tags = new Map(
-    tagRows.map((row) => [
-      String(row.ad_id),
-      { angle: String(row.angle ?? ''), format: String(row.format ?? '') },
-    ]),
-  )
-
-  const group = (key: 'angle' | 'format') => {
-    const map = new Map<string, { spend: number; revenue: number }>()
-    for (const row of adRows) {
-      const tag = tags.get(String(row.ad_id))?.[key]
-      if (!tag) continue
-      const cur = map.get(tag) ?? { spend: 0, revenue: 0 }
-      map.set(tag, {
-        spend: cur.spend + Number(row.spend ?? 0),
-        revenue: cur.revenue + pick(row.action_values, PURCHASE),
-      })
+  try {
+    const shift = (day: string, by: number) => {
+      const date = new Date(`${day}T00:00:00Z`)
+      date.setUTCDate(date.getUTCDate() + by)
+      return date.toISOString().slice(0, 10)
     }
-    return [...map.entries()]
-      .filter(([, v]) => v.spend > 0)
-      .map(([name, v]) => ({ name, spend: v.spend, roas: v.revenue / v.spend }))
-      .sort((a, b) => b.roas - a.roas)
-  }
+    const lastFrom = shift(thisMonday, -7)
+    const lastTo = shift(thisMonday, -1)
+    const beforeFrom = shift(thisMonday, -14)
+    const beforeTo = shift(thisMonday, -8)
 
-  const angles = group('angle')
-  const formats = group('format')
+    const now = await totals(lastFrom, lastTo)
+    const before = await totals(beforeFrom, beforeTo)
 
-  // 지난주에 실행한 것과 결과
-  const logs = await rows(
-    `action_logs?created_at=gte.${lastFrom}&select=kind,action,target_name,outcome`,
-  )
-  const done = logs.filter((row) => row.action === 'executed')
+    // 태그별 성과 — 광고별 지표에 어드민 태그를 붙여 묶는다
+    const account = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').replace(/^act_/, '')
+    const adRows = await graph(`act_${account}/insights`, {
+      level: 'ad',
+      fields: 'ad_id,spend,actions,action_values',
+      time_range: JSON.stringify({ since: lastFrom, until: lastTo }),
+      limit: '500',
+    })
+    const tagRows = await rows('ad_tags?select=ad_id,angle,format')
+    const tags = new Map(
+      tagRows.map((row) => [
+        String(row.ad_id),
+        { angle: String(row.angle ?? ''), format: String(row.format ?? '') },
+      ]),
+    )
 
-  // 실험
-  const experiments = await rows('experiments?select=name,status,verdict,learning')
-  const running = experiments.filter((row) => row.status === 'running')
-  const finished = experiments.filter((row) => row.status === 'done' && row.verdict)
-
-  const open = await countOpenSuggestions()
-
-  // 여기까지가 숫자다. 아래 서술만 Claude 가 쓴다.
-  const facts = [
-    `기간: ${lastFrom} ~ ${lastTo}`,
-    `지출 ${won(now.spend)} (전주 ${won(before.spend)})`,
-    `매출 ${won(now.revenue)} (전주 ${won(before.revenue)})`,
-    `ROAS ${ratio(now.roas)} (전주 ${ratio(before.roas)})`,
-    `전환 ${now.results}건 (전주 ${before.results}건)`,
-    `CPA ${now.results > 0 ? won(now.cpa) : '-'}`,
-    '',
-    `앵글 상위: ${angles.slice(0, 3).map((a) => `${a.name} ROAS ${ratio(a.roas)}`).join(', ') || '없음'}`,
-    `앵글 하위: ${angles.slice(-2).map((a) => `${a.name} ROAS ${ratio(a.roas)}`).join(', ') || '없음'}`,
-    `포맷: ${formats.map((f) => `${f.name} ROAS ${ratio(f.roas)}`).join(', ') || '없음'}`,
-    '',
-    `실행한 액션 ${done.length}건`,
-    `진행 중 실험 ${running.length}개 · 끝난 실험 ${finished.length}개`,
-    `열린 제안 ${open}개`,
-  ].join('\n')
-
-  let narrative = ''
-  const claudeKey = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').trim()
-  if (claudeKey) {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': claudeKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-5',
-          max_tokens: 700,
-          system:
-            '너는 브리보의 퍼포먼스 마케터다. 주간 리포트의 해설을 쓴다.\n' +
-            '주어진 숫자만 쓴다. 없는 숫자를 지어내지 마라.\n' +
-            '3~4문장으로, 무엇이 달라졌고 이번 주에 무엇을 볼지 적어라.\n' +
-            '인사말이나 머리말 없이 본문만 쓴다.',
-          messages: [{ role: 'user', content: facts }],
-        }),
-      })
-      const body = await response.json()
-      narrative = (body.content ?? [])
-        .filter((part: { type: string }) => part.type === 'text')
-        .map((part: { text: string }) => part.text)
-        .join('')
-        .trim()
-    } catch {
-      // 해설을 못 써도 숫자는 보낸다
+    const group = (key: 'angle' | 'format') => {
+      const map = new Map<string, { spend: number; revenue: number }>()
+      for (const row of adRows) {
+        const tag = tags.get(String(row.ad_id))?.[key]
+        if (!tag) continue
+        const cur = map.get(tag) ?? { spend: 0, revenue: 0 }
+        map.set(tag, {
+          spend: cur.spend + Number(row.spend ?? 0),
+          revenue: cur.revenue + pick(row.action_values, PURCHASE),
+        })
+      }
+      return [...map.entries()]
+        .filter(([, v]) => v.spend > 0)
+        .map(([name, v]) => ({ name, spend: v.spend, roas: v.revenue / v.spend }))
+        .sort((a, b) => b.roas - a.roas)
     }
-  }
 
-  await toSlack(
-    [
-      `*지난주 광고 리포트* · ${lastFrom} ~ ${lastTo}`,
+    const angles = group('angle')
+    const formats = group('format')
+
+    // 지난주에 실행한 것과 결과
+    const logs = await rows(
+      `action_logs?created_at=gte.${lastFrom}&select=kind,action,target_name,outcome`,
+    )
+    const done = logs.filter((row) => row.action === 'executed')
+
+    // 실험
+    const experiments = await rows('experiments?select=name,status,verdict,learning')
+    const running = experiments.filter((row) => row.status === 'running')
+    const finished = experiments.filter((row) => row.status === 'done' && row.verdict)
+
+    const open = await countOpenSuggestions()
+
+    // 여기까지가 숫자다. 아래 서술만 Claude 가 쓴다.
+    const facts = [
+      `기간: ${lastFrom} ~ ${lastTo}`,
+      `지출 ${won(now.spend)} (전주 ${won(before.spend)})`,
+      `매출 ${won(now.revenue)} (전주 ${won(before.revenue)})`,
+      `ROAS ${ratio(now.roas)} (전주 ${ratio(before.roas)})`,
+      `전환 ${now.results}건 (전주 ${before.results}건)`,
+      `CPA ${now.results > 0 ? won(now.cpa) : '-'}`,
       '',
-      `지출 ${won(now.spend)} · 매출 ${won(now.revenue)} · ROAS ${ratio(now.roas)} · 전환 ${now.results}건`,
-      `전주 대비 지출 ${arrow(now.spend, before.spend)} · ROAS ${arrow(now.roas, before.roas)}`,
+      `앵글 상위: ${
+        angles
+          .slice(0, 3)
+          .map((a) => `${a.name} ROAS ${ratio(a.roas)}`)
+          .join(', ') || '없음'
+      }`,
+      `앵글 하위: ${
+        angles
+          .slice(-2)
+          .map((a) => `${a.name} ROAS ${ratio(a.roas)}`)
+          .join(', ') || '없음'
+      }`,
+      `포맷: ${formats.map((f) => `${f.name} ROAS ${ratio(f.roas)}`).join(', ') || '없음'}`,
       '',
-      angles.length > 0
-        ? `앵글 상위 — ${angles.slice(0, 3).map((a) => `${a.name} ${ratio(a.roas)}`).join(' · ')}`
-        : '앵글별로 볼 자료가 아직 없습니다 (태깅이 필요합니다)',
-      formats.length > 0
-        ? `포맷 — ${formats.map((f) => `${f.name} ${ratio(f.roas)}`).join(' · ')}`
-        : '',
-      '',
-      `실행한 액션 ${done.length}건 · 진행 중 실험 ${running.length}개 · 열린 제안 ${open}개`,
-      narrative ? `\n${narrative}` : '',
-      '',
-      `<${HOME}#/ads/insights|성과 분석> · <${HOME}#/ads/actions|오늘의 액션>`,
-    ]
-      .filter((line) => line !== '')
-      .join('\n'),
-  )
-  return { sent: true }
+      `실행한 액션 ${done.length}건`,
+      `진행 중 실험 ${running.length}개 · 끝난 실험 ${finished.length}개`,
+      `열린 제안 ${open}개`,
+    ].join('\n')
+
+    let narrative = ''
+    const claudeKey = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').trim()
+    if (claudeKey) {
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': claudeKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-5',
+            max_tokens: 700,
+            system:
+              '너는 브리보의 퍼포먼스 마케터다. 주간 리포트의 해설을 쓴다.\n' +
+              '주어진 숫자만 쓴다. 없는 숫자를 지어내지 마라.\n' +
+              '3~4문장으로, 무엇이 달라졌고 이번 주에 무엇을 볼지 적어라.\n' +
+              '인사말이나 머리말 없이 본문만 쓴다.',
+            messages: [{ role: 'user', content: facts }],
+          }),
+        })
+        const body = await response.json()
+        narrative = (body.content ?? [])
+          .filter((part: { type: string }) => part.type === 'text')
+          .map((part: { text: string }) => part.text)
+          .join('')
+          .trim()
+      } catch {
+        // 해설을 못 써도 숫자는 보낸다
+      }
+    }
+
+    await toSlack(
+      [
+        `*지난주 광고 리포트* · ${lastFrom} ~ ${lastTo}`,
+        '',
+        `지출 ${won(now.spend)} · 매출 ${won(now.revenue)} · ROAS ${ratio(now.roas)} · 전환 ${now.results}건`,
+        `전주 대비 지출 ${arrow(now.spend, before.spend)} · ROAS ${arrow(now.roas, before.roas)}`,
+        '',
+        angles.length > 0
+          ? `앵글 상위 — ${angles
+              .slice(0, 3)
+              .map((a) => `${a.name} ${ratio(a.roas)}`)
+              .join(' · ')}`
+          : '앵글별로 볼 자료가 아직 없습니다 (태깅이 필요합니다)',
+        formats.length > 0
+          ? `포맷 — ${formats.map((f) => `${f.name} ${ratio(f.roas)}`).join(' · ')}`
+          : '',
+        '',
+        `실행한 액션 ${done.length}건 · 진행 중 실험 ${running.length}개 · 열린 제안 ${open}개`,
+        narrative ? `\n${narrative}` : '',
+        '',
+        `<${HOME}#/ads/insights|성과 분석> · <${HOME}#/ads/actions|오늘의 액션>`,
+      ]
+        .filter((line) => line !== '')
+        .join('\n'),
+    )
+    return { sent: true }
+  } catch (error) {
+    await releaseClaim('weekly', thisMonday)
+    throw error
+  }
 }
 
 /** 전주 대비 오르내림 */
