@@ -51,11 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const client = supabase
 
     const loadProfile = async (userId: string, fallbackEmail: string) => {
-      const { data } = await client
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
+      const { data } = await client.from('profiles').select('*').eq('id', userId).maybeSingle()
       setUser({
         id: userId,
         email: data?.email ?? fallbackEmail,

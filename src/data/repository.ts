@@ -2,11 +2,16 @@ import type { MetaUploadPreset, MetaUploadPresetInput } from './metaTypes'
 import type {
   CustomerGroup,
   CustomerGroupInput,
+  Campaign,
+  CampaignConversion,
+  CampaignImportRow,
+  CampaignOption,
+  CampaignPatch,
+  CampaignSendInput,
   CustomerOptout,
   CustomerPreview,
   GroupConditions,
-  MessageSend,
-  MessageSendInput,
+  OptionKind,
   SendTargets,
 } from './types'
 import type {
@@ -138,14 +143,33 @@ export interface DataRepository {
    */
   listSendTargets(conditions: GroupConditions, limit: number): Promise<SendTargets>
 
-  /** 보낸 기록 — 최근 것부터 */
-  listMessageSends(): Promise<MessageSend[]>
+  /** 캠페인 — 최근 것부터. 어드민 발송과 CSV로 올린 예전 기록이 함께 담긴다 */
+  listCampaigns(): Promise<Campaign[]>
+  getCampaign(id: string): Promise<Campaign | null>
+
+  /** 사후 태깅과 성과 숫자를 고친다. 보낸 원문은 고치지 않는다 */
+  updateCampaign(id: string, patch: CampaignPatch): Promise<void>
+  deleteCampaign(id: string): Promise<void>
 
   /**
    * 실제로 보낸다. 되돌릴 수 없다.
-   * 보내기 전에 기록을 먼저 남기고, 결과를 받아 채운다.
+   * draftOnly면 보내지 않고 임시저장만 한다.
    */
-  sendMessage(input: MessageSendInput, actorId: string): Promise<MessageSend>
+  sendCampaign(input: CampaignSendInput, actorId: string): Promise<Campaign>
+
+  /**
+   * 받은 사람 중 발송 뒤 windowDays 안에 주문한 것을 센다.
+   * 저장해 둔 숫자가 아니라 주문 자료에서 그때그때 센다.
+   */
+  campaignConversion(id: string, windowDays: number): Promise<CampaignConversion>
+
+  /** 예전 캠페인 기록을 한꺼번에 올린다. 같은 채널·일시·유형이면 덮어쓴다 */
+  importCampaigns(rows: CampaignImportRow[]): Promise<number>
+
+  /** 목적·컨셉·오퍼 선택지 */
+  listCampaignOptions(): Promise<CampaignOption[]>
+  addCampaignOption(kind: OptionKind, label: string): Promise<void>
+  removeCampaignOption(id: string): Promise<void>
 
   /** 수신거부 명단 */
   listOptouts(): Promise<CustomerOptout[]>

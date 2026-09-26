@@ -178,7 +178,8 @@ export default function ShipmentsPage() {
                         variant="ghost"
                         className="text-rose-500 hover:bg-rose-50"
                         onClick={() => {
-                          if (confirm('이 출고 건을 삭제할까요?')) deleteShipment.mutate(shipment.id)
+                          if (confirm('이 출고 건을 삭제할까요?'))
+                            deleteShipment.mutate(shipment.id)
                         }}
                       >
                         삭제

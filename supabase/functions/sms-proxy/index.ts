@@ -13,7 +13,7 @@
  *   SOLAPI_API_KEY      솔라피 API Key
  *   SOLAPI_API_SECRET   솔라피 API Secret
  *   SOLAPI_SENDER       사전등록한 발신번호 (숫자만, 예: 15222696)
- *   SOLAPI_PFID         (알림톡을 쓸 때만) 카카오 채널 pfId
+ *   SOLAPI_PFID         (브랜드 메시지를 쓸 때만) 카카오 채널 pfId
  */
 
 const SOLAPI = 'https://api.solapi.com'
@@ -136,6 +136,15 @@ async function patch(table: string, match: string, body: unknown): Promise<void>
   })
 }
 
+/** 고친 뒤의 캠페인을 다시 읽어 화면에 그대로 넘긴다 */
+async function reload(id: string): Promise<unknown> {
+  const response = await fetch(`${DB}/rest/v1/message_campaigns?id=eq.${id}&select=*`, {
+    headers: dbHeaders(),
+  })
+  const [row] = await response.json()
+  return row
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -159,10 +168,27 @@ Deno.serve(async (request) => {
       return json({ error: '발송 설정이 아직 없습니다. 솔라피 열쇠와 발신번호를 넣어주세요.' }, 400)
     }
 
-    const { title, body, channel, isAd, groupId, groupName, conditions } = params
-    if (!body || !String(body).trim()) return json({ error: '보낼 내용이 비어 있습니다.' }, 400)
+    const {
+      title,
+      messageBody,
+      channel,
+      messageType,
+      isAd,
+      segmentId,
+      segmentName,
+      conditions,
+      purpose,
+      concepts,
+      offerType,
+      offerValue,
+      hypothesis,
+      draftOnly,
+    } = params
 
-    if (isAd && isNightInKorea()) {
+    const text = String(messageBody ?? '')
+    if (!draftOnly && !text.trim()) return json({ error: '보낼 내용이 비어 있습니다.' }, 400)
+
+    if (!draftOnly && isAd && isNightInKorea()) {
       return json(
         { error: '광고 문자는 밤 9시부터 아침 8시까지 보낼 수 없습니다. 낮에 다시 시도해주세요.' },
         400,
@@ -170,30 +196,43 @@ Deno.serve(async (request) => {
     }
 
     // 대상은 브라우저가 아니라 DB에서 다시 뽑는다
-    const targets = await rpc<{ rows: Target[]; sendable: number }>('list_send_targets', {
+    const targets = await rpc<{ rows: Target[] }>('list_send_targets', {
       conditions,
       row_limit: 100000,
     })
     const rows = targets.rows ?? []
-    if (rows.length === 0) return json({ error: '보낼 수 있는 대상이 없습니다.' }, 400)
+    if (!draftOnly && rows.length === 0) {
+      return json({ error: '보낼 수 있는 대상이 없습니다.' }, 400)
+    }
 
-    const text = String(body)
-    const kind = messageBytes(text) > 90 ? 'LMS' : 'SMS'
-    const unit = channel === 'alimtalk' ? 10 : kind === 'LMS' ? 50 : 20
+    const kind = channel === 'brand_message' ? String(messageType) : messageBytes(text) > 90 ? 'LMS' : 'SMS'
+    const unit = channel === 'brand_message' ? 15 : kind === 'LMS' ? 50 : kind === 'MMS' ? 100 : 20
 
     // 보내기 전에 먼저 남긴다. 중간에 끊겨도 무엇을 보내려 했는지 알 수 있어야 한다.
-    const [send] = await insert<{ id: string }[]>('message_sends', {
-      title: title ?? '',
-      body: text,
+    const [campaign] = await insert<{ id: string }[]>('message_campaigns', {
       channel: channel ?? 'sms',
-      is_ad: !!isAd,
-      group_id: groupId ?? null,
-      group_name: groupName ?? '',
-      conditions,
+      status: draftOnly ? 'draft' : 'pending',
+      message_type: kind,
+      title: title ?? '',
       target_count: rows.length,
       cost_won: rows.length * unit,
-      status: 'sending',
+      segment_id: segmentId ?? null,
+      segment_name: segmentName ?? '',
+      conditions,
+      message_body: text,
+      is_ad: !!isAd,
+      source: 'admin_send',
+      purpose: purpose ?? '',
+      concepts: concepts ?? [],
+      offer_type: offerType ?? '없음',
+      offer_value: offerValue ?? '',
+      hypothesis: hypothesis ?? '',
     })
+
+    // 임시저장이면 여기서 멈춘다. 아무 데도 보내지 않는다.
+    if (draftOnly) {
+      return json({ campaign: await reload(campaign.id) })
+    }
 
     let sent = 0
     let failed = 0
@@ -206,7 +245,6 @@ Deno.serve(async (request) => {
         from: SENDER,
         text,
         ...(title ? { subject: String(title) } : {}),
-        ...(channel === 'alimtalk' && PFID ? { kakaoOptions: { pfId: PFID } } : {}),
       }))
 
       const response = await fetch(`${SOLAPI}/messages/v4/send-many/detail`, {
@@ -225,30 +263,27 @@ Deno.serve(async (request) => {
       sent += Number(result?.groupInfo?.count?.registeredSuccess ?? part.length)
       failed += Number(result?.groupInfo?.count?.registeredFailed ?? 0)
 
-      await insert('message_receipts', part.map((target) => ({
-        send_id: send.id,
-        member_code: target.memberCode,
-        callnum: target.callnum,
-        status: 'sent',
-      })))
+      // 받은 사람을 남긴다 — 나중에 이들의 주문을 세어 구매 전환을 낸다
+      await insert(
+        'campaign_recipients',
+        part.map((target) => ({
+          campaign_id: campaign.id,
+          member_code: target.memberCode,
+          callnum: target.callnum,
+          status: 'sent',
+        })),
+      )
     }
 
-    await patch('message_sends', `id=eq.${send.id}`, {
-      sent_count: sent,
-      failed_count: failed,
+    await patch('message_campaigns', `id=eq.${campaign.id}`, {
+      success_count: sent,
       cost_won: sent * unit,
-      status: failed > 0 && sent === 0 ? 'failed' : 'sent',
+      status: sent === 0 ? 'failed' : 'sent',
       error: failures.join(' / ').slice(0, 500),
       sent_at: new Date().toISOString(),
     })
 
-    // 화면이 결과를 바로 보여줄 수 있게 갱신된 기록을 돌려준다
-    const fresh = await fetch(`${DB}/rest/v1/message_sends?id=eq.${send.id}&select=*`, {
-      headers: dbHeaders(),
-    })
-    const [record] = await fresh.json()
-
-    return json({ send: record })
+    return json({ campaign: await reload(campaign.id) })
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : String(error) }, 500)
   }

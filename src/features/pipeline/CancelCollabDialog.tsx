@@ -3,12 +3,7 @@ import { useCurrentUser } from '@/auth/AuthProvider'
 import TagPicker from '@/components/TagPicker'
 import { Button, Field, Modal, Textarea } from '@/components/ui'
 import type { Collab } from '@/data/types'
-import {
-  useCancelCollab,
-  useChangeDnc,
-  useDeleteCollab,
-  useInfluencers,
-} from '@/hooks/queries'
+import { useCancelCollab, useChangeDnc, useDeleteCollab, useInfluencers } from '@/hooks/queries'
 
 export default function CancelCollabDialog({
   collab,
@@ -128,7 +123,11 @@ export default function CancelCollabDialog({
   return (
     <Modal open={open} onClose={close} title="거절 처리" description={heading}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="거절 사유" required hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다">
+        <Field
+          label="거절 사유"
+          required
+          hint="여러 개 고를 수 있고, 없는 사유는 새로 만들 수 있습니다"
+        >
           <TagPicker selected={reasons} onChange={setReasons} />
         </Field>
 

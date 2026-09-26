@@ -48,10 +48,7 @@ export default function CollabFormDialog({
   }, [open])
 
   // 한 사람당 카드 한 장 — 이미 올라와 있는지 표시해준다.
-  const alreadyInPipeline = useMemo(
-    () => new Set(collabs.map((c) => c.influencerId)),
-    [collabs],
-  )
+  const alreadyInPipeline = useMemo(() => new Set(collabs.map((c) => c.influencerId)), [collabs])
 
   const matches = useMemo(() => {
     const q = normalize(query)
@@ -90,7 +87,7 @@ export default function CollabFormDialog({
         lastContactedAt: null,
         meetingAt: null,
         marketDate: null,
-      marketEndDate: null,
+        marketEndDate: null,
         marketRevenue: 0,
         marketUnits: 0,
         isSettled: false,

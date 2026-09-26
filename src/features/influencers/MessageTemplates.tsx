@@ -133,19 +133,15 @@ export default function MessageTemplates() {
               </div>
 
               <p className="mt-2 text-xs text-slate-400">
-                고치면 대표님 화면에도 같이 바뀝니다. 목록의 `DM 보내러 가기`를 누르면 이
-                문구가 자동으로 복사되고 프로필이 열립니다 — 거기서 `메시지 보내기` →
-                `우선순위 메시지 보내기` 로 들어가 붙여넣으세요.
+                고치면 대표님 화면에도 같이 바뀝니다. 목록의 `DM 보내러 가기`를 누르면 이 문구가
+                자동으로 복사되고 프로필이 열립니다 — 거기서 `메시지 보내기` → `우선순위 메시지
+                보내기` 로 들어가 붙여넣으세요.
               </p>
             </>
           ) : (
             <div className="py-6 text-center">
               <p className="text-sm text-slate-500">등록된 문구가 없습니다.</p>
-              <Button
-                size="sm"
-                className="mt-3"
-                onClick={() => create.mutate('시딩 첫 연락')}
-              >
+              <Button size="sm" className="mt-3" onClick={() => create.mutate('시딩 첫 연락')}>
                 시딩 문구 만들기
               </Button>
             </div>

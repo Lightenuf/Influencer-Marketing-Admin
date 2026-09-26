@@ -425,16 +425,222 @@ export interface CustomerPreview {
   syncedAt: string | null
 }
 
-// ── 문자·알림톡 발송 ──
+// ── 캠페인 (문자·브랜드 메시지) ──
 
-/** 보낼 수 있는 통로 */
-export const SEND_CHANNELS = ['sms', 'alimtalk'] as const
-export type SendChannel = (typeof SEND_CHANNELS)[number]
-
-export const SEND_CHANNEL_LABELS: Record<SendChannel, string> = {
+export const CHANNELS = ['sms', 'brand_message'] as const
+export type Channel = (typeof CHANNELS)[number]
+export const CHANNEL_LABELS: Record<Channel, string> = {
   sms: '문자',
-  alimtalk: '알림톡',
+  brand_message: '브랜드 메시지',
 }
+
+/** 통로마다 고를 수 있는 메시지 유형이 다르다 */
+export const MESSAGE_TYPES: Record<Channel, readonly string[]> = {
+  sms: ['SMS', 'LMS', 'MMS'],
+  brand_message: ['기본', '이미지', '와이드', '캐러셀'],
+}
+
+export const CAMPAIGN_STATUSES = ['draft', 'pending', 'sent', 'failed', 'canceled'] as const
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number]
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  draft: '임시저장',
+  pending: '발송 대기',
+  sent: '발송 완료',
+  failed: '발송 실패',
+  canceled: '발송 취소',
+}
+
+/** 어디서 들어온 기록인지 */
+export const CAMPAIGN_SOURCES = ['admin_send', 'imweb_import', 'manual'] as const
+export type CampaignSource = (typeof CAMPAIGN_SOURCES)[number]
+export const CAMPAIGN_SOURCE_LABELS: Record<CampaignSource, string> = {
+  admin_send: '어드민 발송',
+  imweb_import: '아임웹 기록',
+  manual: '직접 입력',
+}
+
+/** 목적·컨셉·오퍼 선택지 — 화면에서 늘릴 수 있다 */
+export const OPTION_KINDS = ['purpose', 'concept', 'offer_type'] as const
+export type OptionKind = (typeof OPTION_KINDS)[number]
+export const OPTION_KIND_LABELS: Record<OptionKind, string> = {
+  purpose: '목적',
+  concept: '컨셉',
+  offer_type: '오퍼 유형',
+}
+
+/** 처음 쓸 때 들어 있는 선택지. SQL의 것과 같아야 한다 — 화면에서 늘릴 수 있다. */
+export const DEFAULT_CAMPAIGN_OPTIONS: { kind: OptionKind; label: string; sortOrder: number }[] = [
+  { kind: 'purpose', label: '재구매 유도', sortOrder: 1 },
+  { kind: 'purpose', label: '신규 첫 구매', sortOrder: 2 },
+  { kind: 'purpose', label: '휴면 복귀', sortOrder: 3 },
+  { kind: 'purpose', label: '신제품 알림', sortOrder: 4 },
+  { kind: 'purpose', label: '관계 형성', sortOrder: 5 },
+  { kind: 'purpose', label: '기타', sortOrder: 99 },
+  { kind: 'concept', label: '할인', sortOrder: 1 },
+  { kind: 'concept', label: '진정성 콘텐츠', sortOrder: 2 },
+  { kind: 'concept', label: '제품 교육', sortOrder: 3 },
+  { kind: 'concept', label: '후기', sortOrder: 4 },
+  { kind: 'concept', label: '시즌', sortOrder: 5 },
+  { kind: 'concept', label: '기타', sortOrder: 99 },
+  { kind: 'offer_type', label: '없음', sortOrder: 1 },
+  { kind: 'offer_type', label: '% 할인', sortOrder: 2 },
+  { kind: 'offer_type', label: '금액 쿠폰', sortOrder: 3 },
+  { kind: 'offer_type', label: '무료배송', sortOrder: 4 },
+  { kind: 'offer_type', label: '증정', sortOrder: 5 },
+]
+
+export interface CampaignOption {
+  id: string
+  kind: OptionKind
+  label: string
+  sortOrder: number
+}
+
+export interface Campaign {
+  id: string
+  channel: Channel
+  status: CampaignStatus
+  sentAt: string | null
+  messageType: string
+  title: string
+
+  targetCount: number
+  successCount: number
+  clickCount: number
+  unsubscribeCount: number
+  visitCount: number
+  purchaseCount: number
+  purchaseAmount: number
+  costWon: number
+
+  segmentId: string | null
+  segmentName: string
+  conditions: GroupConditions
+
+  messageBody: string
+  imageUrl: string
+  isAd: boolean
+
+  source: CampaignSource
+
+  purpose: string
+  concepts: string[]
+  offerType: string
+  offerValue: string
+  hypothesis: string
+  retrospective: string
+
+  error: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** 새로 보낼 캠페인 */
+export interface CampaignSendInput {
+  title: string
+  messageBody: string
+  channel: Channel
+  messageType: string
+  isAd: boolean
+  segmentId: string | null
+  segmentName: string
+  conditions: GroupConditions
+  purpose: string
+  concepts: string[]
+  offerType: string
+  offerValue: string
+  hypothesis: string
+  /** 참이면 보내지 않고 임시저장만 한다 */
+  draftOnly?: boolean
+}
+
+/** 캠페인에서 나중에 고치는 것 — 사후 태깅과 성과 숫자 */
+export interface CampaignPatch {
+  title?: string
+  purpose?: string
+  concepts?: string[]
+  offerType?: string
+  offerValue?: string
+  hypothesis?: string
+  retrospective?: string
+  status?: CampaignStatus
+  sentAt?: string | null
+  targetCount?: number
+  successCount?: number
+  clickCount?: number
+  unsubscribeCount?: number
+  visitCount?: number
+  purchaseCount?: number
+  purchaseAmount?: number
+}
+
+/** CSV로 올리는 예전 캠페인 한 줄 */
+export interface CampaignImportRow {
+  channel: Channel
+  status: CampaignStatus
+  sentAt: string | null
+  messageType: string
+  title: string
+  targetCount: number
+  successCount: number
+  visitCount: number
+  purchaseAmount: number
+}
+
+/** 구매 전환 — 받은 사람 중 정해진 날 안에 주문한 것 */
+export interface CampaignConversion {
+  purchaseCount: number
+  purchaseAmount: number
+  buyers: number
+}
+
+// ── 볼 때 계산하는 비율 ──
+// 저장해 두면 원수가 고쳐졌을 때 비율만 옛날 값으로 남는다.
+
+const ratio = (top: number, bottom: number) => (bottom > 0 ? top / bottom : 0)
+
+export const successRate = (c: Campaign) => ratio(c.successCount, c.targetCount)
+export const clickRate = (c: Campaign) => ratio(c.clickCount, c.successCount)
+export const purchaseRate = (c: Campaign) => ratio(c.purchaseCount, c.successCount)
+export const unsubscribeRate = (c: Campaign) => ratio(c.unsubscribeCount, c.successCount)
+export const visitRate = (c: Campaign) => ratio(c.visitCount, c.successCount)
+
+/** 목적·컨셉이 비어 있으면 나중에 비교할 수 없다 — 화면에서 짚어 준다 */
+export const needsTagging = (c: Campaign) => !c.purpose || c.concepts.length === 0
+
+// ── 문자 길이 ──
+
+/** 문자 한 건에 담기는 바이트. 한글은 2바이트로 센다. */
+export function messageBytes(text: string): number {
+  let bytes = 0
+  for (const ch of text) bytes += ch.charCodeAt(0) > 0x7f ? 2 : 1
+  return bytes
+}
+
+export const SMS_BYTE_LIMIT = 90
+export const LMS_BYTE_LIMIT = 2000
+
+/** 90바이트를 넘으면 LMS로 바뀌고 요금이 오른다 */
+export const smsKindOf = (text: string): string =>
+  messageBytes(text) > SMS_BYTE_LIMIT ? 'LMS' : 'SMS'
+
+/** 건당 요금(원). 발송사 단가가 바뀌면 여기만 고친다. */
+export const UNIT_COST: Record<string, number> = {
+  SMS: 20,
+  LMS: 50,
+  MMS: 100,
+  brand_message: 15,
+}
+
+/**
+ * 광고 문자에 법으로 붙여야 하는 것.
+ * 앞에 (광고), 뒤에 무료 수신거부 번호. 빠지면 과태료 대상이라 사람이 잊지 않게 자동으로 붙인다.
+ */
+export const AD_PREFIX = '(광고) '
+export const buildAdBody = (body: string, optoutNumber: string) =>
+  `${AD_PREFIX}${body}\n무료수신거부 ${optoutNumber}`
+
+// ── 발송 대상 ──
 
 /** 보낼 수 있는 사람 한 명 — 이름과 번호만. 발송에 필요 없는 것은 받지 않는다. */
 export interface SendTarget {
@@ -455,69 +661,37 @@ export interface SendTargets {
   rows: SendTarget[]
 }
 
-/** 보낸 기록 한 건 */
-export interface MessageSend {
-  id: string
-  title: string
-  body: string
-  channel: SendChannel
-  isAd: boolean
-  groupId: string | null
-  groupName: string
-  targetCount: number
-  sentCount: number
-  failedCount: number
-  costWon: number
-  /** draft(준비) · sending(보내는 중) · sent(보냄) · failed(실패) */
-  status: string
-  error: string
-  createdAt: string
-  sentAt: string | null
-}
-
-export interface MessageSendInput {
-  title: string
-  body: string
-  channel: SendChannel
-  isAd: boolean
-  groupId: string | null
-  groupName: string
-  conditions: GroupConditions
-}
-
 /** 수신거부한 사람 */
 export interface CustomerOptout {
   callnum: string
   memberCode: string | null
   channel: string
   reason: string
-  /** admin(어드민에서 등록) · channeltalk(채널톡에서 넘어옴) · reply(수신거부 회신) */
   source: string
   optedOutAt: string
 }
 
-/** 문자 한 건에 담기는 바이트. 한글은 2바이트로 센다. */
-export function messageBytes(text: string): number {
-  let bytes = 0
-  for (const ch of text) bytes += ch.charCodeAt(0) > 0x7f ? 2 : 1
-  return bytes
+// ── 개인정보 가리기 ──
+// 화면에도 로그에도 그대로 두지 않는다.
+
+/** 한복순 → 한*순 */
+export function maskName(name: string): string {
+  if (!name) return '-'
+  if (name.length === 1) return name
+  if (name.length === 2) return `${name[0]}*`
+  return `${name[0]}${'*'.repeat(name.length - 2)}${name[name.length - 1]}`
 }
 
-/** 90바이트를 넘으면 LMS로 바뀌고 요금이 오른다 */
-export const SMS_BYTE_LIMIT = 90
-export const LMS_BYTE_LIMIT = 2000
+/** 010-1234-9778 → 010-****-9778 */
+export function maskPhone(phone: string): string {
+  const digits = (phone ?? '').replace(/[^0-9]/g, '')
+  if (digits.length < 7) return phone || '-'
+  return `${digits.slice(0, 3)}-****-${digits.slice(-4)}`
+}
 
-export type SmsKind = 'SMS' | 'LMS'
-export const smsKindOf = (text: string): SmsKind =>
-  messageBytes(text) > SMS_BYTE_LIMIT ? 'LMS' : 'SMS'
-
-/** 건당 요금(원). 발송사 단가가 바뀌면 여기만 고친다. */
-export const UNIT_COST: Record<string, number> = { SMS: 20, LMS: 50, alimtalk: 10 }
-
-/**
- * 광고 문자에 법으로 붙여야 하는 것.
- * 앞에 (광고), 뒤에 무료 수신거부 번호. 빠지면 과태료 대상이라 사람이 잊지 않게 자동으로 붙인다.
- */
-export const AD_PREFIX = '(광고) '
-export const buildAdBody = (body: string, optoutNumber: string) =>
-  `${AD_PREFIX}${body}\n무료수신거부 ${optoutNumber}`
+/** abcdef@domain.com → ab***@domain.com */
+export function maskEmail(email: string): string {
+  const [id, domain] = (email ?? '').split('@')
+  if (!domain) return email || '-'
+  return `${id.slice(0, 2)}***@${domain}`
+}

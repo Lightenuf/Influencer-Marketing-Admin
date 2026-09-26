@@ -1,7 +1,8 @@
 import clsx from 'clsx'
 import type { CollabStage, CollabType, InfluencerStatus, ShipmentStatus } from '@/data/types'
 
-const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap'
+const base =
+  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap'
 
 const statusTone: Record<InfluencerStatus, string> = {
   제안중: 'bg-slate-100 text-slate-600',

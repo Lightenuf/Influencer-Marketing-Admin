@@ -203,8 +203,8 @@ export default function RejectedListPage() {
         <h1 className="text-xl font-bold text-slate-900">거절 명단</h1>
         <p className="mt-1 text-sm text-slate-500">
           거절 의사를 밝혀 협업이 무산된 분들입니다.{' '}
-          <span className="font-medium text-amber-600">{formatNumber(laterContact.length)}명</span>은
-          시기만 안 맞았던 분이라 아래 '추후 연락'에, 연락 금지로 등록한{' '}
+          <span className="font-medium text-amber-600">{formatNumber(laterContact.length)}명</span>
+          은 시기만 안 맞았던 분이라 아래 '추후 연락'에, 연락 금지로 등록한{' '}
           <span className="font-medium text-rose-600">{formatNumber(blocked.length)}명</span>은 맨
           아래 영역에서 관리합니다.
         </p>
@@ -212,9 +212,7 @@ export default function RejectedListPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <MonthPicker value={month} onChange={setMonth} />
-        <span className="text-sm text-slate-500">
-          {formatNumber(rejected.length)}건
-        </span>
+        <span className="text-sm text-slate-500">{formatNumber(rejected.length)}건</span>
       </div>
 
       {rejected.length === 0 ? (

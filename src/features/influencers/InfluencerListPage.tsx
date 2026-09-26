@@ -311,7 +311,9 @@ export default function InfluencerListPage() {
           <Spinner />
         ) : filtered.length === 0 ? (
           <EmptyState
-            title={total === 0 ? '아직 등록된 인플루언서가 없습니다' : '조건에 맞는 결과가 없습니다'}
+            title={
+              total === 0 ? '아직 등록된 인플루언서가 없습니다' : '조건에 맞는 결과가 없습니다'
+            }
             description={
               total === 0
                 ? '직접 등록하거나, 화면을 먼저 둘러보려면 예시 데이터를 넣어보세요.'
@@ -364,115 +366,119 @@ export default function InfluencerListPage() {
                     </td>
                   </tr>,
                   ...group.items.map((influencer) => (
-                  <tr
-                    key={influencer.id}
-                    className={clsx(
-                      'hover:bg-slate-50',
-                      influencer.doNotContact && 'bg-rose-50/40',
-                    )}
-                  >
-                    <td className="px-5 py-3">
-                      <Link
-                        to={`/influencers/${influencer.id}/edit`}
-                        className="font-medium text-slate-900 hover:text-violet-600"
-                        title="정보 입력·수정"
-                      >
-                        {influencer.name}
-                      </Link>
-                      <div className="flex items-center gap-1.5">
+                    <tr
+                      key={influencer.id}
+                      className={clsx(
+                        'hover:bg-slate-50',
+                        influencer.doNotContact && 'bg-rose-50/40',
+                      )}
+                    >
+                      <td className="px-5 py-3">
+                        <Link
+                          to={`/influencers/${influencer.id}/edit`}
+                          className="font-medium text-slate-900 hover:text-violet-600"
+                          title="정보 입력·수정"
+                        >
+                          {influencer.name}
+                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          {(() => {
+                            const url = profileUrl(
+                              influencer.snsPlatform,
+                              influencer.snsHandle,
+                              influencer.snsUrl,
+                            )
+                            return url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={`${url} 새 창으로 열기`}
+                                className="text-xs text-slate-400 hover:text-violet-600 hover:underline"
+                              >
+                                @{influencer.snsHandle}
+                              </a>
+                            ) : (
+                              <span className="text-xs text-slate-400">
+                                @{influencer.snsHandle}
+                              </span>
+                            )
+                          })()}
+                          {influencer.doNotContact && <DncBadge compact />}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <StatusBadge status={influencer.status} />
+                      </td>
+                      <td className="px-3 py-3 text-slate-500">
+                        {formatDate(influencer.createdAt)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <ContactLog influencer={influencer} />
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
                         {(() => {
-                          const url = profileUrl(
-                            influencer.snsPlatform,
-                            influencer.snsHandle,
-                            influencer.snsUrl,
-                          )
-                          return url ? (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              title={`${url} 새 창으로 열기`}
-                              className="text-xs text-slate-400 hover:text-violet-600 hover:underline"
+                          const collab = collabByInfluencer.get(influencer.id)
+                          if (collab) {
+                            return (
+                              <Link
+                                to="/pipeline"
+                                className="text-xs text-slate-400 hover:text-violet-600"
+                              >
+                                파이프라인 · {collab.isOnHold ? '보류' : collab.stage}
+                              </Link>
+                            )
+                          }
+                          return (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={influencer.doNotContact || createCollab.isPending}
+                              title={
+                                influencer.doNotContact
+                                  ? '연락 금지 대상입니다. 먼저 해제해주세요.'
+                                  : `파이프라인 '${COLLAB_STAGES[0]}' 단계에 추가합니다`
+                              }
+                              onClick={() => markReplied(influencer)}
                             >
-                              @{influencer.snsHandle}
-                            </a>
-                          ) : (
-                            <span className="text-xs text-slate-400">@{influencer.snsHandle}</span>
+                              회신 받음
+                            </Button>
                           )
                         })()}
-                        {influencer.doNotContact && <DncBadge compact />}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <StatusBadge status={influencer.status} />
-                    </td>
-                    <td className="px-3 py-3 text-slate-500">{formatDate(influencer.createdAt)}</td>
-                    <td className="px-3 py-3">
-                      <ContactLog influencer={influencer} />
-                    </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                      {(() => {
-                        const collab = collabByInfluencer.get(influencer.id)
-                        if (collab) {
-                          return (
-                            <Link
-                              to="/pipeline"
-                              className="text-xs text-slate-400 hover:text-violet-600"
-                            >
-                              파이프라인 · {collab.isOnHold ? '보류' : collab.stage}
-                            </Link>
-                          )
-                        }
-                        return (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={influencer.doNotContact || createCollab.isPending}
-                            title={
-                              influencer.doNotContact
-                                ? '연락 금지 대상입니다. 먼저 해제해주세요.'
-                                : `파이프라인 '${COLLAB_STAGES[0]}' 단계에 추가합니다`
-                            }
-                            onClick={() => markReplied(influencer)}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        {hasProfile(influencer) ? (
+                          <Link
+                            to={`/influencers/${influencer.id}/edit`}
+                            className="text-xs font-medium text-emerald-600 hover:underline"
                           >
-                            회신 받음
-                          </Button>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                      {hasProfile(influencer) ? (
-                        <Link
-                          to={`/influencers/${influencer.id}/edit`}
-                          className="text-xs font-medium text-emerald-600 hover:underline"
+                            ✓ 입력 완료
+                          </Link>
+                        ) : (
+                          <Link
+                            to={`/influencers/${influencer.id}/edit`}
+                            className={clsx(
+                              'rounded-lg px-2.5 py-1.5 text-xs font-medium',
+                              // 회신까지 왔는데 정보가 비어 있으면 눈에 띄게 한다.
+                              collabByInfluencer.has(influencer.id)
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                : 'border border-slate-300 text-slate-600 hover:bg-slate-50',
+                            )}
+                          >
+                            정보 입력
+                          </Link>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <Button
+                          size="sm"
+                          variant={influencer.doNotContact ? 'secondary' : 'ghost'}
+                          onClick={() => setDncTarget(influencer)}
                         >
-                          ✓ 입력 완료
-                        </Link>
-                      ) : (
-                        <Link
-                          to={`/influencers/${influencer.id}/edit`}
-                          className={clsx(
-                            'rounded-lg px-2.5 py-1.5 text-xs font-medium',
-                            // 회신까지 왔는데 정보가 비어 있으면 눈에 띄게 한다.
-                            collabByInfluencer.has(influencer.id)
-                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                              : 'border border-slate-300 text-slate-600 hover:bg-slate-50',
-                          )}
-                        >
-                          정보 입력
-                        </Link>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <Button
-                        size="sm"
-                        variant={influencer.doNotContact ? 'secondary' : 'ghost'}
-                        onClick={() => setDncTarget(influencer)}
-                      >
-                        {influencer.doNotContact ? '해제' : '등록'}
-                      </Button>
-                    </td>
-                  </tr>
+                          {influencer.doNotContact ? '해제' : '등록'}
+                        </Button>
+                      </td>
+                    </tr>
                   )),
                 ])}
               </tbody>

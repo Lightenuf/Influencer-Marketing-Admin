@@ -2,9 +2,12 @@ import { requireSupabase } from '@/lib/supabase'
 import type { MetaUploadPreset } from './metaTypes'
 import {
   emptyConditions,
+  type Campaign,
+  type CampaignConversion,
+  type CampaignOption,
+  type CampaignPatch,
   type CustomerGroup,
   type CustomerPreview,
-  type MessageSend,
   type SendTargets,
 } from './types'
 import type {
@@ -177,23 +180,66 @@ const collabColumns = (
   return row
 }
 
-const toMessageSend = (row: Row): MessageSend => ({
+const toCampaign = (row: Row): Campaign => ({
   id: String(row.id),
+  channel: (row.channel as Campaign['channel']) ?? 'sms',
+  status: (row.status as Campaign['status']) ?? 'draft',
+  sentAt: (row.sent_at as string) ?? null,
+  messageType: String(row.message_type ?? ''),
   title: String(row.title ?? ''),
-  body: String(row.body ?? ''),
-  channel: (row.channel as MessageSend['channel']) ?? 'sms',
-  isAd: Boolean(row.is_ad),
-  groupId: (row.group_id as string) ?? null,
-  groupName: String(row.group_name ?? ''),
   targetCount: Number(row.target_count ?? 0),
-  sentCount: Number(row.sent_count ?? 0),
-  failedCount: Number(row.failed_count ?? 0),
+  successCount: Number(row.success_count ?? 0),
+  clickCount: Number(row.click_count ?? 0),
+  unsubscribeCount: Number(row.unsubscribe_count ?? 0),
+  visitCount: Number(row.visit_count ?? 0),
+  purchaseCount: Number(row.purchase_count ?? 0),
+  purchaseAmount: Number(row.purchase_amount ?? 0),
   costWon: Number(row.cost_won ?? 0),
-  status: String(row.status ?? 'draft'),
+  segmentId: (row.segment_id as string) ?? null,
+  segmentName: String(row.segment_name ?? ''),
+  conditions: (row.conditions as Campaign['conditions']) ?? emptyConditions(),
+  messageBody: String(row.message_body ?? ''),
+  imageUrl: String(row.image_url ?? ''),
+  isAd: Boolean(row.is_ad),
+  source: (row.source as Campaign['source']) ?? 'manual',
+  purpose: String(row.purpose ?? ''),
+  concepts: (row.concepts as string[]) ?? [],
+  offerType: String(row.offer_type ?? '없음'),
+  offerValue: String(row.offer_value ?? ''),
+  hypothesis: String(row.hypothesis ?? ''),
+  retrospective: String(row.retrospective ?? ''),
   error: String(row.error ?? ''),
   createdAt: String(row.created_at),
-  sentAt: (row.sent_at as string) ?? null,
+  updatedAt: String(row.updated_at ?? row.created_at),
 })
+
+/** 화면이 쓰는 이름을 DB 칸 이름으로 바꾼다 */
+const patchToRow = (patch: CampaignPatch): Row => {
+  const row: Row = {}
+  const map: Record<string, string> = {
+    title: 'title',
+    purpose: 'purpose',
+    concepts: 'concepts',
+    offerType: 'offer_type',
+    offerValue: 'offer_value',
+    hypothesis: 'hypothesis',
+    retrospective: 'retrospective',
+    status: 'status',
+    sentAt: 'sent_at',
+    targetCount: 'target_count',
+    successCount: 'success_count',
+    clickCount: 'click_count',
+    unsubscribeCount: 'unsubscribe_count',
+    visitCount: 'visit_count',
+    purchaseCount: 'purchase_count',
+    purchaseAmount: 'purchase_amount',
+  }
+  for (const [key, column] of Object.entries(map)) {
+    const value = (patch as Record<string, unknown>)[key]
+    if (value !== undefined) row[column] = value as Row[string]
+  }
+  return row
+}
 
 /** supabase-js는 오류 본문을 Response에 담아 준다 — 열어서 이유를 꺼낸다 */
 async function readFunctionError(error: unknown): Promise<string | null> {
@@ -577,15 +623,42 @@ export const supabaseAdapter: DataRepository = {
     }
   },
 
-  async listMessageSends() {
+  async listCampaigns() {
     const db = requireSupabase()
     const rows = unwrap<Row[]>(
-      await db.from('message_sends').select('*').order('created_at', { ascending: false }),
+      await db
+        .from('message_campaigns')
+        .select('*')
+        .order('sent_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false }),
     )
-    return rows.map(toMessageSend)
+    return rows.map(toCampaign)
   },
 
-  async sendMessage(input, _actorId) {
+  async getCampaign(id) {
+    const db = requireSupabase()
+    const { data, error } = await db
+      .from('message_campaigns')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    return data ? toCampaign(data as Row) : null
+  },
+
+  async updateCampaign(id, patch) {
+    const db = requireSupabase()
+    const { error } = await db.from('message_campaigns').update(patchToRow(patch)).eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async deleteCampaign(id) {
+    const db = requireSupabase()
+    const { error } = await db.from('message_campaigns').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  },
+
+  async sendCampaign(input, _actorId) {
     const db = requireSupabase()
     // 발송사 열쇠는 Edge Function만 쥔다. 브라우저에서 직접 부르지 않는다.
     const { data, error } = await db.functions.invoke('sms-proxy', {
@@ -593,12 +666,80 @@ export const supabaseAdapter: DataRepository = {
     })
     if (error) {
       const detail = await readFunctionError(error)
-      throw new Error(detail ?? '문자를 보내지 못했습니다.')
+      throw new Error(detail ?? '보내지 못했습니다.')
     }
     if (data && typeof data === 'object' && 'error' in data) {
       throw new Error(String((data as { error: unknown }).error))
     }
-    return toMessageSend((data as { send: Row }).send)
+    return toCampaign((data as { campaign: Row }).campaign)
+  },
+
+  async campaignConversion(id, windowDays) {
+    const db = requireSupabase()
+    const { data, error } = await db.rpc('campaign_conversion', {
+      campaign: id,
+      window_days: windowDays,
+    })
+    if (error) throw new Error(error.message)
+    const result = (data ?? {}) as Partial<CampaignConversion>
+    return {
+      purchaseCount: result.purchaseCount ?? 0,
+      purchaseAmount: result.purchaseAmount ?? 0,
+      buyers: result.buyers ?? 0,
+    }
+  },
+
+  async importCampaigns(rows) {
+    const db = requireSupabase()
+    const { error } = await db.from('message_campaigns').upsert(
+      rows.map((row) => ({
+        channel: row.channel,
+        status: row.status,
+        sent_at: row.sentAt,
+        message_type: row.messageType,
+        title: row.title,
+        target_count: row.targetCount,
+        success_count: row.successCount,
+        visit_count: row.visitCount,
+        purchase_amount: row.purchaseAmount,
+        source: 'imweb_import',
+      })),
+      { onConflict: 'channel,sent_at,message_type' },
+    )
+    if (error) throw new Error(error.message)
+    return rows.length
+  },
+
+  async listCampaignOptions() {
+    const db = requireSupabase()
+    const rows = unwrap<Row[]>(
+      await db
+        .from('campaign_options')
+        .select('*')
+        .order('kind')
+        .order('sort_order')
+        .order('label'),
+    )
+    return rows.map((row) => ({
+      id: String(row.id),
+      kind: row.kind as CampaignOption['kind'],
+      label: String(row.label),
+      sortOrder: Number(row.sort_order ?? 0),
+    }))
+  },
+
+  async addCampaignOption(kind, label) {
+    const db = requireSupabase()
+    const { error } = await db
+      .from('campaign_options')
+      .upsert({ kind, label, sort_order: 50 }, { onConflict: 'kind,label' })
+    if (error) throw new Error(error.message)
+  },
+
+  async removeCampaignOption(id) {
+    const db = requireSupabase()
+    const { error } = await db.from('campaign_options').delete().eq('id', id)
+    if (error) throw new Error(error.message)
   },
 
   async listOptouts() {

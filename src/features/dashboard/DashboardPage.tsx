@@ -124,8 +124,7 @@ export default function DashboardPage() {
 
     // 씨딩으로 세긴 했지만 배송일이 비어 있는 사람 — 캘린더와 기록에서 빠진다.
     const seededWithoutDate = [...seeded].filter(
-      (id) =>
-        !cohortCollabs.some((collab) => collab.influencerId === id && collab.sampleShipDate),
+      (id) => !cohortCollabs.some((collab) => collab.influencerId === id && collab.sampleShipDate),
     ).length
 
     const rate = (value: number, base: number) => (base ? Math.round((value / base) * 100) : 0)
@@ -179,7 +178,10 @@ export default function DashboardPage() {
   const stalled = useMemo(
     () =>
       collabs
-        .filter((c) => !c.isCancelled && c.stage !== LAST_STAGE && daysSince(c.stageEnteredAt) >= STALE_DAYS)
+        .filter(
+          (c) =>
+            !c.isCancelled && c.stage !== LAST_STAGE && daysSince(c.stageEnteredAt) >= STALE_DAYS,
+        )
         .sort((a, b) => a.stageEnteredAt.localeCompare(b.stageEnteredAt)),
     [collabs],
   )
@@ -337,7 +339,12 @@ export default function DashboardPage() {
               <BarChart data={stageData} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="stage" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 12, fill: '#94a3b8' }}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <Tooltip cursor={{ fill: '#f8fafc' }} />
                 <Legend
                   verticalAlign="top"

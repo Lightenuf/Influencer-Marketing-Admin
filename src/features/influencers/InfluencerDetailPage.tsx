@@ -13,12 +13,7 @@ import { SNS_PLATFORM_LABELS } from '@/data/types'
 import CommunicationLogSection from '@/features/communication/CommunicationLogSection'
 import DncAuditHistory from '@/features/dnc/DncAuditHistory'
 import DncChangeDialog from '@/features/dnc/DncChangeDialog'
-import {
-  useCollabs,
-  useDeleteInfluencer,
-  useInfluencer,
-  useTeamMembers,
-} from '@/hooks/queries'
+import { useCollabs, useDeleteInfluencer, useInfluencer, useTeamMembers } from '@/hooks/queries'
 import { formatDate, formatDateTime, formatNumber } from '@/utils/format'
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -114,7 +109,9 @@ export default function InfluencerDetailPage() {
                       <p className="mt-0.5 text-xs text-slate-400">
                         {formatDate(collab.startDate)} ~ {formatDate(collab.endDate)}
                         {collab.isCancelled && (
-                          <span className="ml-2 text-rose-500">취소됨 · {collab.cancelReasons.join(', ')}</span>
+                          <span className="ml-2 text-rose-500">
+                            취소됨 · {collab.cancelReasons.join(', ')}
+                          </span>
                         )}
                       </p>
                     </div>
@@ -180,11 +177,7 @@ export default function InfluencerDetailPage() {
         </div>
       </div>
 
-      <DncChangeDialog
-        influencer={influencer}
-        open={dncOpen}
-        onClose={() => setDncOpen(false)}
-      />
+      <DncChangeDialog influencer={influencer} open={dncOpen} onClose={() => setDncOpen(false)} />
     </div>
   )
 }

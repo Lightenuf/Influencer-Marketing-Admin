@@ -88,8 +88,19 @@ export function toCount(raw: string): number | null {
   if (Number.isNaN(n)) return null
   const unit = m[2]?.toLowerCase()
   const mul =
-    unit === '만' ? 10_000 : unit === '천' ? 1_000 : unit === '억' ? 100_000_000
-    : unit === 'k' ? 1_000 : unit === 'm' ? 1_000_000 : unit === 'b' ? 1_000_000_000 : 1
+    unit === '만'
+      ? 10_000
+      : unit === '천'
+        ? 1_000
+        : unit === '억'
+          ? 100_000_000
+          : unit === 'k'
+            ? 1_000
+            : unit === 'm'
+              ? 1_000_000
+              : unit === 'b'
+                ? 1_000_000_000
+                : 1
   return Math.round(n * mul)
 }
 

@@ -1,5 +1,12 @@
 import clsx from 'clsx'
-import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import {
+  useEffect,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react'
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
@@ -47,7 +54,15 @@ export function Card({ className, children }: { className?: string; children: Re
   )
 }
 
-export function CardHeader({ title, description, action }: { title: ReactNode; description?: ReactNode; action?: ReactNode }) {
+export function CardHeader({
+  title,
+  description,
+  action,
+}: {
+  title: ReactNode
+  description?: ReactNode
+  action?: ReactNode
+}) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
       <div>

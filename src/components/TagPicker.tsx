@@ -25,7 +25,8 @@ export default function TagPicker({
 
   const keyword = query.trim()
   const candidates = tags.filter(
-    (tag) => !selected.includes(tag.label) && tag.label.toLowerCase().includes(keyword.toLowerCase()),
+    (tag) =>
+      !selected.includes(tag.label) && tag.label.toLowerCase().includes(keyword.toLowerCase()),
   )
   const canCreate =
     keyword !== '' && !tags.some((tag) => tag.label.toLowerCase() === keyword.toLowerCase())
@@ -116,7 +117,9 @@ export default function TagPicker({
 
         {candidates.length === 0 && !canCreate && (
           <p className="px-2 py-1.5 text-xs text-slate-400">
-            {tags.length === selected.length ? '모든 사유를 골랐습니다.' : '일치하는 사유가 없습니다.'}
+            {tags.length === selected.length
+              ? '모든 사유를 골랐습니다.'
+              : '일치하는 사유가 없습니다.'}
           </p>
         )}
       </div>

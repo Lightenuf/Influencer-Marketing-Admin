@@ -9,7 +9,10 @@ import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
 import CreativeUploadPage from '@/features/ads/CreativeUploadPage'
 import CustomerGroupEditPage from '@/features/crm/CustomerGroupEditPage'
 import CustomerGroupsPage from '@/features/crm/CustomerGroupsPage'
-import MessageSendPage from '@/features/crm/MessageSendPage'
+import CampaignDetailPage from '@/features/crm/CampaignDetailPage'
+import CampaignSendPage from '@/features/crm/CampaignSendPage'
+import CampaignsPage from '@/features/crm/CampaignsPage'
+import CrmDashboardPage from '@/features/crm/CrmDashboardPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import DiscoveryPage from '@/features/discovery/DiscoveryPage'
 import RejectedListPage from '@/features/rejected/RejectedListPage'
@@ -47,7 +50,10 @@ export default function App() {
           <Route path="/crm/groups" element={<CustomerGroupsPage />} />
           <Route path="/crm/groups/new" element={<CustomerGroupEditPage />} />
           <Route path="/crm/groups/:id" element={<CustomerGroupEditPage />} />
-          <Route path="/crm/send" element={<MessageSendPage />} />
+          <Route path="/crm" element={<CrmDashboardPage />} />
+          <Route path="/crm/campaigns" element={<CampaignsPage />} />
+          <Route path="/crm/campaigns/new" element={<CampaignSendPage />} />
+          <Route path="/crm/campaigns/:id" element={<CampaignDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

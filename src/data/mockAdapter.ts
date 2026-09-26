@@ -1,5 +1,5 @@
-import { PRODUCTS } from './types'
-import type { CustomerGroup, CustomerOptout, MessageSend } from './types'
+import { DEFAULT_CAMPAIGN_OPTIONS, PRODUCTS, emptyConditions } from './types'
+import type { Campaign, CampaignOption, CustomerGroup, CustomerOptout } from './types'
 import type { MetaUploadPreset } from './metaTypes'
 import type {
   CollabInput,
@@ -29,7 +29,8 @@ export interface Database {
   discoveryRequests: DiscoveryRequest[]
   uploadPresets: MetaUploadPreset[]
   customerGroups: CustomerGroup[]
-  messageSends: MessageSend[]
+  campaigns: Campaign[]
+  campaignOptions: CampaignOption[]
   optouts: CustomerOptout[]
   reasonTags: ReasonTag[]
   messageTemplates: MessageTemplate[]
@@ -50,7 +51,8 @@ const emptyDb = (): Database => ({
   discoveryRequests: [],
   uploadPresets: [],
   customerGroups: [],
-  messageSends: [],
+  campaigns: [],
+  campaignOptions: [],
   optouts: [],
   reasonTags: [],
   messageTemplates: [],
@@ -456,35 +458,153 @@ export const mockAdapter: DataRepository = {
     })
   },
 
-  async listMessageSends() {
+  async listCampaigns() {
     const db = read()
-    return tick([...(db.messageSends ?? [])].reverse())
+    return tick(
+      [...(db.campaigns ?? [])].sort((a, b) =>
+        (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt),
+      ),
+    )
   },
 
-  async sendMessage(input, _actorId) {
-    // 미리보기 모드에서는 아무 데도 보내지 않는다. 보낸 척만 하고 기록만 남긴다.
+  async getCampaign(id) {
     const db = read()
-    const targets = await this.listSendTargets(input.conditions, 10_000)
-    const record: MessageSend = {
-      id: crypto.randomUUID(),
-      title: input.title,
-      body: input.body,
-      channel: input.channel,
-      isAd: input.isAd,
-      groupId: input.groupId,
-      groupName: input.groupName,
-      targetCount: targets.sendable,
-      sentCount: targets.sendable,
-      failedCount: 0,
-      costWon: 0,
-      status: 'sent',
-      error: '',
-      createdAt: new Date().toISOString(),
-      sentAt: new Date().toISOString(),
-    }
-    db.messageSends = [...(db.messageSends ?? []), record]
+    return tick((db.campaigns ?? []).find((c) => c.id === id) ?? null)
+  },
+
+  async updateCampaign(id, patch) {
+    const db = read()
+    db.campaigns = (db.campaigns ?? []).map((c) =>
+      c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c,
+    )
     write(db)
-    return tick(record)
+  },
+
+  async deleteCampaign(id) {
+    const db = read()
+    db.campaigns = (db.campaigns ?? []).filter((c) => c.id !== id)
+    write(db)
+  },
+
+  async sendCampaign(input, _actorId) {
+    // 미리보기 모드에서는 아무 데도 보내지 않는다. 기록만 남긴다.
+    const db = read()
+    const targets = await this.listSendTargets(input.conditions, 0)
+    const now = new Date().toISOString()
+    const made: Campaign = {
+      id: crypto.randomUUID(),
+      channel: input.channel,
+      status: input.draftOnly ? 'draft' : 'sent',
+      sentAt: input.draftOnly ? null : now,
+      messageType: input.messageType,
+      title: input.title,
+      targetCount: targets.sendable,
+      successCount: input.draftOnly ? 0 : targets.sendable,
+      clickCount: 0,
+      unsubscribeCount: 0,
+      visitCount: 0,
+      purchaseCount: 0,
+      purchaseAmount: 0,
+      costWon: 0,
+      segmentId: input.segmentId,
+      segmentName: input.segmentName,
+      conditions: input.conditions,
+      messageBody: input.messageBody,
+      imageUrl: '',
+      isAd: input.isAd,
+      source: 'admin_send',
+      purpose: input.purpose,
+      concepts: input.concepts,
+      offerType: input.offerType,
+      offerValue: input.offerValue,
+      hypothesis: input.hypothesis,
+      retrospective: '',
+      error: '',
+      createdAt: now,
+      updatedAt: now,
+    }
+    db.campaigns = [...(db.campaigns ?? []), made]
+    write(db)
+    return tick(made)
+  },
+
+  async campaignConversion(_id, _windowDays) {
+    // 미리보기 모드에는 주문 자료가 없다.
+    return tick({ purchaseCount: 0, purchaseAmount: 0, buyers: 0 })
+  },
+
+  async importCampaigns(rows) {
+    const db = read()
+    const now = new Date().toISOString()
+    const existing = db.campaigns ?? []
+    const keyOf = (c: { channel: string; sentAt: string | null; messageType: string }) =>
+      `${c.channel}|${c.sentAt}|${c.messageType}`
+
+    const made = rows.map<Campaign>((row) => ({
+      id: crypto.randomUUID(),
+      channel: row.channel,
+      status: row.status,
+      sentAt: row.sentAt,
+      messageType: row.messageType,
+      title: row.title,
+      targetCount: row.targetCount,
+      successCount: row.successCount,
+      clickCount: 0,
+      unsubscribeCount: 0,
+      visitCount: row.visitCount,
+      purchaseCount: 0,
+      purchaseAmount: row.purchaseAmount,
+      costWon: 0,
+      segmentId: null,
+      segmentName: '',
+      conditions: emptyConditions(),
+      messageBody: '',
+      imageUrl: '',
+      isAd: false,
+      source: 'imweb_import',
+      purpose: '',
+      concepts: [],
+      offerType: '없음',
+      offerValue: '',
+      hypothesis: '',
+      retrospective: '',
+      error: '',
+      createdAt: now,
+      updatedAt: now,
+    }))
+
+    // 같은 채널·일시·유형이면 덮어쓴다
+    const incoming = new Set(made.map(keyOf))
+    db.campaigns = [...existing.filter((c) => !incoming.has(keyOf(c))), ...made]
+    write(db)
+    return tick(made.length)
+  },
+
+  async listCampaignOptions() {
+    const db = read()
+    // 처음 열었을 때도 고를 것이 있어야 한다 — 기본 선택지를 깔아 둔다
+    if (!db.campaignOptions?.length) {
+      db.campaignOptions = DEFAULT_CAMPAIGN_OPTIONS.map((option) => ({
+        id: crypto.randomUUID(),
+        ...option,
+      }))
+      write(db)
+    }
+    return tick(db.campaignOptions)
+  },
+
+  async addCampaignOption(kind, label) {
+    const db = read()
+    const rows = db.campaignOptions ?? []
+    if (rows.some((o) => o.kind === kind && o.label === label)) return
+    db.campaignOptions = [...rows, { id: crypto.randomUUID(), kind, label, sortOrder: 50 }]
+    write(db)
+  },
+
+  async removeCampaignOption(id) {
+    const db = read()
+    db.campaignOptions = (db.campaignOptions ?? []).filter((o) => o.id !== id)
+    write(db)
   },
 
   async listOptouts() {

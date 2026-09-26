@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCurrentUser } from '@/auth/AuthProvider'
-import { Button, Card, CardHeader, EmptyState, Field, Input, Spinner, Textarea } from '@/components/ui'
+import {
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  Input,
+  Spinner,
+  Textarea,
+} from '@/components/ui'
 import type { Influencer } from '@/data/types'
 import {
   useCollabs,
@@ -286,10 +295,7 @@ export default function DiscoveryPage() {
       <Card>
         <CardHeader title="검색 조건" />
         <div className="space-y-4 p-5">
-          <Field
-            label="검색 키워드"
-            hint="Enter 또는 쉼표로 구분됩니다. 하나만 넣어도 됩니다."
-          >
+          <Field label="검색 키워드" hint="Enter 또는 쉼표로 구분됩니다. 하나만 넣어도 됩니다.">
             <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-300 bg-white p-2 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
               {keywords.map((word) => (
                 <span
@@ -363,8 +369,7 @@ export default function DiscoveryPage() {
           )}
           {keywords.length === 1 && (
             <p className="text-xs text-slate-400">
-              비슷한 브랜드를 두세 개 함께 넣으면 후보가 더 모입니다. 키워드는 각각 따로
-              검색합니다.
+              비슷한 브랜드를 두세 개 함께 넣으면 후보가 더 모입니다. 키워드는 각각 따로 검색합니다.
             </p>
           )}
 
@@ -443,7 +448,9 @@ export default function DiscoveryPage() {
                 rows={5}
                 value={manualResult}
                 onChange={(e) => setManualResult(e.target.value)}
-                placeholder={'@healthy_table_kr | 4.2만 | 9/15 공구 오픈\n@new_market_kr | 3.5만 | 마켓 할인 진행'}
+                placeholder={
+                  '@healthy_table_kr | 4.2만 | 9/15 공구 오픈\n@new_market_kr | 3.5만 | 마켓 할인 진행'
+                }
               />
               <div className="flex justify-end">
                 <Button
@@ -471,7 +478,8 @@ export default function DiscoveryPage() {
             description={`발굴 대상 ${formatNumber(targets.length)}명 · 조건 미달 ${formatNumber(
               rows.filter((r) => r.verdict === '조건 미달').length,
             )}명 · 이미 접촉 ${formatNumber(
-              rows.filter((r) => ['이미 등록', '거절 이력', '연락 금지'].includes(r.verdict)).length,
+              rows.filter((r) => ['이미 등록', '거절 이력', '연락 금지'].includes(r.verdict))
+                .length,
             )}명`}
             action={
               targets.length > 0 ? (
@@ -534,7 +542,10 @@ export default function DiscoveryPage() {
                           @{candidate.handle}
                         </a>
                         {candidate.bio && (
-                          <p className="max-w-xs truncate text-xs text-slate-400" title={candidate.bio}>
+                          <p
+                            className="max-w-xs truncate text-xs text-slate-400"
+                            title={candidate.bio}
+                          >
                             {candidate.bio}
                           </p>
                         )}
@@ -598,10 +609,10 @@ export default function DiscoveryPage() {
 
       <p className="rounded-lg bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-500">
         <b>기본 조건</b> — 본인 계정에서 공동구매를 한다는 신호가{' '}
-        <b>소개글 · 소개글에 걸린 링크(인포크·리틀리 등) · 게시물 캡션</b> 중 한 곳에만 있어도
-        발굴 대상으로 봅니다. 신호는 {PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')}{' '}
-        또는 날짜(9/15 · 10월 5일 등)입니다. 여기에 위에서 정한 최소 팔로워수를 함께 확인합니다.
-        이미 셀러 리스트에 있거나 거절·연락 금지한 분은 자동으로 걸러집니다.
+        <b>소개글 · 소개글에 걸린 링크(인포크·리틀리 등) · 게시물 캡션</b> 중 한 곳에만 있어도 발굴
+        대상으로 봅니다. 신호는 {PROFILE_KEYWORDS.map((word) => `'${word}'`).join(' · ')} 또는
+        날짜(9/15 · 10월 5일 등)입니다. 여기에 위에서 정한 최소 팔로워수를 함께 확인합니다. 이미
+        셀러 리스트에 있거나 거절·연락 금지한 분은 자동으로 걸러집니다.
       </p>
     </div>
   )

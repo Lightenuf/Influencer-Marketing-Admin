@@ -113,9 +113,7 @@ export default function BulkUploadForm() {
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             disabled={running}
-            placeholder={
-              '5452_home\n@happyhabits_s\nhttps://www.instagram.com/nalssin_cook/\n...'
-            }
+            placeholder={'5452_home\n@happyhabits_s\nhttps://www.instagram.com/nalssin_cook/\n...'}
             autoFocus
           />
 
