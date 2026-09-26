@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui'
 import { repository } from '@/data'
-import type { GroupConditions } from '@/data/types'
+import { maskEmail, maskName, maskPhone, type GroupConditions } from '@/data/types'
 import { downloadCsv } from '@/utils/csv'
 import { formatDate, formatDateTime, formatNumber } from '@/utils/format'
 
@@ -25,6 +25,8 @@ export default function CustomerListDialog({
   onClose: () => void
 }) {
   const [agreed, setAgreed] = useState(false)
+  // 기본은 가린다. 명단을 띄워 둔 채 자리를 비우거나 화면을 공유할 때를 생각한 것이다.
+  const [unmasked, setUnmasked] = useState(false)
 
   const preview = useQuery({
     queryKey: ['customerPreview', group?.conditions, agreed],
@@ -34,6 +36,7 @@ export default function CustomerListDialog({
 
   const close = () => {
     setAgreed(false)
+    setUnmasked(false)
     onClose()
   }
 
@@ -101,9 +104,18 @@ export default function CustomerListDialog({
       width="max-w-4xl"
     >
       <div className="space-y-3">
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
-          개인정보가 담긴 화면입니다. 필요한 만큼만 보고, 내려받은 파일은 다 쓴 뒤 지워주세요.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2">
+          <p className="text-xs leading-relaxed text-amber-800">
+            개인정보가 담긴 화면입니다. 필요한 만큼만 보고, 내려받은 파일은 다 쓴 뒤 지워주세요.
+          </p>
+          <button
+            type="button"
+            onClick={() => setUnmasked((prev) => !prev)}
+            className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-xs text-amber-800 hover:bg-amber-100"
+          >
+            {unmasked ? '다시 가리기' : '가림 해제'}
+          </button>
+        </div>
 
         {data && rows.length > 0 && data.smsAgreed === 0 && (
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
@@ -140,9 +152,15 @@ export default function CustomerListDialog({
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => (
                     <tr key={row.memberCode} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 whitespace-nowrap text-slate-900">{row.name}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-slate-600">{row.callnum}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-slate-600">{row.email}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-slate-900">
+                        {unmasked ? row.name : maskName(row.name)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-slate-600">
+                        {unmasked ? row.callnum : maskPhone(row.callnum)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-slate-600">
+                        {unmasked ? row.email : maskEmail(row.email)}
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap text-slate-500">
                         {row.memberGrade || '-'}
                       </td>
