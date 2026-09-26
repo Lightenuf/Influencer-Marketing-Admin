@@ -27,6 +27,14 @@ export interface MetaPeriod {
  * 실연동은 Supabase Edge Function을 거친다 — System User 토큰을 브라우저에 두지 않기 위함이다.
  */
 export interface MetaRepository {
+  /**
+   * 쓸 수 있는 광고 계정. 두 개를 오간다.
+   * 어느 계정을 볼지는 `setAccount`로 정하고, 이후 호출이 그 계정을 본다.
+   */
+  listAccounts(): Promise<{ id: string; name: string }[]>
+  setAccount(accountId: string): void
+  getAccount(): string
+
   listCampaigns(): Promise<MetaCampaign[]>
   listAdSets(): Promise<MetaAdSet[]>
   listAds(): Promise<MetaAd[]>

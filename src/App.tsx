@@ -3,7 +3,9 @@ import LoginPage from '@/auth/LoginPage'
 import ProtectedRoute from '@/auth/ProtectedRoute'
 import SignupPage from '@/auth/SignupPage'
 import AppShell from '@/components/layout/AppShell'
+import AdTaggingPage from '@/features/ads/AdTaggingPage'
 import AdsDashboardPage from '@/features/ads/AdsDashboardPage'
+import AdsSettingsPage from '@/features/ads/AdsSettingsPage'
 import AdsManagePage from '@/features/ads/AdsManagePage'
 import CreativePerformancePage from '@/features/ads/CreativePerformancePage'
 import CreativeUploadPage from '@/features/ads/CreativeUploadPage'
@@ -47,6 +49,8 @@ export default function App() {
           <Route path="/ads/creatives" element={<CreativePerformancePage />} />
           <Route path="/ads/manage" element={<AdsManagePage />} />
           <Route path="/ads/upload" element={<CreativeUploadPage />} />
+          <Route path="/ads/tagging" element={<AdTaggingPage />} />
+          <Route path="/ads/settings" element={<AdsSettingsPage />} />
           <Route path="/crm/groups" element={<CustomerGroupsPage />} />
           <Route path="/crm/groups/new" element={<CustomerGroupEditPage />} />
           <Route path="/crm/groups/:id" element={<CustomerGroupEditPage />} />

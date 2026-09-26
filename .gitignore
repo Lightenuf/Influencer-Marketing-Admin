@@ -30,3 +30,6 @@ dist-ssr
 
 # Claude Code 로컬 실행 설정 (컴퓨터마다 경로가 달라 공유하지 않음)
 .claude/
+
+# 요청서 원본 — 저장소에 올리지 않는다
+docs/perf-admin-spec.md

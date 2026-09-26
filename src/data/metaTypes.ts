@@ -54,6 +54,10 @@ export interface MetaAd {
   thumbnailUrl: string | null
   /** 파트너십 광고(구 브랜디드 콘텐츠)로 돌고 있는지 */
   isPartnership: boolean
+  /** 같은 소재를 알아보는 재료 — 없을 수도 있다 (5-4) */
+  imageHash: string | null
+  videoId: string | null
+  postId: string | null
   createdAt: string
 }
 

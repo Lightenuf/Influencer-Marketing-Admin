@@ -9,7 +9,10 @@
  *
  * 필요한 Secret
  *   META_ACCESS_TOKEN    System User 토큰
- *   META_AD_ACCOUNT_ID   광고 계정 번호 (act_ 없이 숫자만, 예: 1234567890)
+ *   META_AD_ACCOUNT_ID   기본 광고 계정 번호 (act_ 없이 숫자만, 예: 1234567890)
+ *   META_AD_ACCOUNT_IDS  (선택) 쉼표로 이어 붙인 계정 목록. 계정을 오갈 때 쓴다.
+ *                        여기 적힌 계정만 부를 수 있다 — 브라우저가 아무 계정이나
+ *                        넘기지 못하게 하기 위함이다.
  */
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
@@ -20,6 +23,7 @@ const GRAPH = 'https://graph.facebook.com/v21.0'
  */
 let TOKEN = ''
 let ACCOUNT = ''
+let ACCOUNTS: string[] = []
 
 /** 크리에이티브를 만들 때 '누가 올리는 광고인지'로 쓰인다 */
 let PAGE_ID = ''
@@ -28,6 +32,14 @@ let INSTAGRAM_ID = ''
 function loadSecrets() {
   TOKEN = (Deno.env.get('META_ACCESS_TOKEN') ?? '').trim()
   ACCOUNT = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').trim().replace(/^act_/, '')
+  // 기본 계정은 늘 목록에 있다. 설정하지 않았으면 계정 하나로 동작한다.
+  ACCOUNTS = [
+    ...new Set(
+      [ACCOUNT, ...(Deno.env.get('META_AD_ACCOUNT_IDS') ?? '').split(',')]
+        .map((id) => id.trim().replace(/^act_/, ''))
+        .filter(Boolean),
+    ),
+  ]
   PAGE_ID = (Deno.env.get('META_PAGE_ID') ?? '').trim()
   INSTAGRAM_ID = (Deno.env.get('META_INSTAGRAM_ACTOR_ID') ?? '').trim()
 }
@@ -128,6 +140,7 @@ Deno.serve(async (request) => {
     return json({
       tokenLength: TOKEN.length,
       accountId: ACCOUNT ? `${ACCOUNT.slice(0, 4)}…(${ACCOUNT.length}자리)` : '(없음)',
+      accountCount: ACCOUNTS.length,
       pageId: PAGE_ID || '(없음 — 소재 업로드에 필요)',
       instagramId: INSTAGRAM_ID || '(없음 — 소재 업로드에 필요)',
       metaSecretNames: Object.keys(Deno.env.toObject()).filter((key) => key.includes('META')),
@@ -143,7 +156,12 @@ Deno.serve(async (request) => {
 
   try {
     const { action, params = {} } = await request.json()
-    const act = `act_${ACCOUNT}`
+    // 브라우저가 고른 계정을 그대로 믿지 않는다. 허용 목록에 있는 것만 받는다.
+    const asked = String(params.accountId ?? '').trim().replace(/^act_/, '')
+    if (asked && !ACCOUNTS.includes(asked)) {
+      return json({ error: `허용되지 않은 광고 계정입니다: ${asked}` }, 400)
+    }
+    const act = `act_${asked || ACCOUNT}`
 
     switch (action) {
       case 'campaigns': {
@@ -187,7 +205,7 @@ Deno.serve(async (request) => {
       case 'ads': {
         const rows = await graph(`${act}/ads`, {
           fields:
-            'id,adset_id,name,status,created_time,creative{object_type,thumbnail_url,branded_content_sponsor_page_id,instagram_branded_content}',
+            'id,adset_id,name,status,created_time,creative{object_type,thumbnail_url,image_hash,video_id,effective_object_story_id,branded_content_sponsor_page_id,instagram_branded_content}',
           limit: '500',
         })
         return json(
@@ -204,10 +222,32 @@ Deno.serve(async (request) => {
               isPartnership:
                 creative.branded_content_sponsor_page_id != null ||
                 creative.instagram_branded_content != null,
+              // 같은 소재가 여러 세트에 복제돼 있어, 합산하려면 무엇이 같은 소재인지 알아야 한다 (5-4)
+              imageHash: creative.image_hash ? String(creative.image_hash) : null,
+              videoId: creative.video_id ? String(creative.video_id) : null,
+              postId: creative.effective_object_story_id
+                ? String(creative.effective_object_story_id)
+                : null,
               createdAt: String(row.created_time ?? ''),
             }
           }),
         )
+      }
+
+      case 'accounts': {
+        // 이름까지 붙여 준다 — 화면에서 번호만 보면 어느 계정인지 알 수 없다
+        const rows = await Promise.all(
+          ACCOUNTS.map(async (id) => {
+            try {
+              const [info] = await graph(`act_${id}`, { fields: 'name' })
+              return { id, name: String(info?.name ?? `계정 ${id}`) }
+            } catch {
+              // 토큰에 권한이 없는 계정이면 이름을 못 읽는다. 목록에는 남긴다.
+              return { id, name: `계정 ${id} (이름을 읽지 못함)` }
+            }
+          }),
+        )
+        return json(rows)
       }
 
       case 'audiences': {

@@ -104,7 +104,13 @@ const ADSETS: MetaAdSet[] = [
   },
 ]
 
-const AD_SEEDS: Array<Omit<MetaAd, 'createdAt'> & { day: number }> = [
+/**
+ * 소재 식별 재료(imageHash·videoId·postId)는 씨앗마다 적지 않고 아래에서 채운다.
+ * `sameAs`를 적어 둔 둘은 같은 소재가 두 세트에 복제된 상황을 흉내 낸다 (5-4).
+ */
+const AD_SEEDS: Array<
+  Omit<MetaAd, 'createdAt' | 'imageHash' | 'videoId' | 'postId'> & { day: number; sameAs?: string }
+> = [
   {
     id: 'ad-1',
     adsetId: 'as-1',
@@ -207,8 +213,11 @@ const AD_SEEDS: Array<Omit<MetaAd, 'createdAt'> & { day: number }> = [
   },
 ]
 
-const ADS: MetaAd[] = AD_SEEDS.map(({ day, ...ad }) => ({
+const ADS: MetaAd[] = AD_SEEDS.map(({ day, sameAs, ...ad }) => ({
   ...ad,
+  imageHash: ad.creativeType === 'image' ? `img_${sameAs ?? ad.id}` : null,
+  videoId: ad.creativeType === 'video' ? `vid_${sameAs ?? ad.id}` : null,
+  postId: null,
   createdAt: `2026-09-${String(day).padStart(2, '0')}T09:00:00.000Z`,
 }))
 
@@ -285,7 +294,24 @@ const writeOverrides = (value: Overrides) => {
 
 const delay = () => new Promise((resolve) => setTimeout(resolve, 120))
 
+/** 미리보기 모드에도 계정이 둘인 것처럼 보여준다 — 전환 화면을 눌러볼 수 있어야 한다 */
+let mockAccount = '1205452401012863'
+
 export const metaMockAdapter: MetaRepository = {
+  async listAccounts() {
+    await delay()
+    return [
+      { id: '1205452401012863', name: '브리보 (예시)' },
+      { id: '2341089806399642', name: '브리보 2 (예시)' },
+    ]
+  },
+
+  setAccount(accountId) {
+    mockAccount = accountId
+  },
+
+  getAccount: () => mockAccount,
+
   async listCampaigns() {
     await delay()
     const { dailyBudget } = readOverrides()

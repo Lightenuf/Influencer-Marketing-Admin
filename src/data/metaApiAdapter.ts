@@ -21,11 +21,23 @@ import type {
  * System User 토큰은 그 함수만 쥐고 있고 브라우저로 내려오지 않는다.
  */
 
+/**
+ * 지금 보고 있는 광고 계정.
+ * 비어 있으면 함수가 기본 계정을 쓴다. 이 브라우저에만 기억한다.
+ */
+let account = (() => {
+  try {
+    return localStorage.getItem('breevo:metaAccount') ?? ''
+  } catch {
+    return ''
+  }
+})()
+
 async function call<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   if (!supabase) throw new Error('로그인 정보가 없습니다. 다시 로그인해주세요.')
 
   const { data, error } = await supabase.functions.invoke('meta-proxy', {
-    body: { action, params },
+    body: { action, params: { ...params, accountId: account } },
   })
 
   if (error) {
@@ -54,6 +66,19 @@ async function readError(error: unknown): Promise<string | null> {
 }
 
 export const metaApiAdapter: MetaRepository = {
+  listAccounts: () => call('accounts'),
+
+  setAccount(accountId) {
+    account = accountId
+    try {
+      localStorage.setItem('breevo:metaAccount', accountId)
+    } catch {
+      // 저장이 막혀도 이번 세션 동안은 동작한다
+    }
+  },
+
+  getAccount: () => account,
+
   listCampaigns: () => call<MetaCampaign[]>('campaigns'),
   listAdSets: () => call<MetaAdSet[]>('adsets'),
   listAds: () => call<MetaAd[]>('ads'),
