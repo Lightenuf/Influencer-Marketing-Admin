@@ -92,6 +92,20 @@ export interface OpsSettings {
   testAdSetIds: string[]
   /** 목록 기본 필터를 '기간 내 지출 > 0'으로 둘지 (5-6) */
   spentOnlyByDefault: boolean
+
+  /**
+   * 메타가 잡는 매출은 실제 자사몰 매출보다 적게 나온다.
+   * 개별 광고는 메타 숫자로만 판단할 수 있으므로, 손익분기를 그만큼 낮춰 잡는다.
+   * 1이면 보정하지 않는다.
+   */
+  metaAttributionFactor: number
+  /** 한 번에 이 금액 이상 올리면 승인을 받는다 */
+  approvalAmountWon: number
+  approverIds: string[]
+  /** 세트에 켜진 광고가 이보다 적으면 '소재 부족' */
+  minAdsPerAdSet: number
+  /** 실행 뒤 며칠 있다가 결과를 재는지 */
+  measureAfterDays: number
 }
 
 export const DEFAULT_OPS: OpsSettings = {
@@ -109,6 +123,11 @@ export const DEFAULT_OPS: OpsSettings = {
   dailyIncreaseCap: 0.3,
   testAdSetIds: [],
   spentOnlyByDefault: true,
+  metaAttributionFactor: 1,
+  approvalAmountWon: 100_000,
+  approverIds: [],
+  minAdsPerAdSet: 3,
+  measureAfterDays: 7,
 }
 
 /**
@@ -124,8 +143,11 @@ export function derivedOps(ops: OpsSettings, revenue30d: number, results30d: num
         : 0
 
   // LTV 보정을 켜면 한 명이 재구매까지 가져다주는 값을 얹어 본다
-  const effectiveRoas =
+  const ltvAdjusted =
     ops.roasBasis === 'ltv' ? ops.breakEvenRoas / (1 + ops.repurchaseRate) : ops.breakEvenRoas
+
+  // 메타 집계 보정 — 개별 광고를 메타 숫자로 판단할 때 쓰는 손익분기
+  const effectiveRoas = ltvAdjusted * (ops.metaAttributionFactor || 1)
 
   const breakEvenCpa = effectiveRoas > 0 ? Math.round(aov / effectiveRoas) : 0
   const minSpend = Math.round(breakEvenCpa * ops.minSpendMultiplier)

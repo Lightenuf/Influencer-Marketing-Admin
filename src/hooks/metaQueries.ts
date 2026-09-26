@@ -70,6 +70,15 @@ export const useMetaWeeklySeries = (adIds: string[], period: MetaPeriod) =>
     enabled: adIds.length > 0,
   })
 
+/** 하루치 — 피로도 판단에 쓴다. 광고를 많이 넣으면 응답이 커지니 부르는 쪽에서 추린다 */
+export const useMetaDailySeries = (adIds: string[], period: MetaPeriod) =>
+  useQuery({
+    queryKey: ['meta', 'daily', [...adIds].sort().join(','), period.from, period.to] as const,
+    queryFn: () => metaRepository.getDailySeries(adIds, period),
+    staleTime: FRESH_FOR,
+    enabled: adIds.length > 0,
+  })
+
 export function useSetAdStatus() {
   const client = useQueryClient()
   return useMutation({

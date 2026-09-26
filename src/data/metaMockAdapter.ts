@@ -312,6 +312,37 @@ export const metaMockAdapter: MetaRepository = {
 
   getAccount: () => mockAccount,
 
+  async getDailySeries(adIds, period) {
+    await delay()
+    const out = []
+    const from = new Date(`${period.from}T00:00:00Z`)
+    const to = new Date(`${period.to}T00:00:00Z`)
+    for (const adId of adIds) {
+      for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
+        const day = d.toISOString().slice(0, 10)
+        const seed = hash(`${adId}:${day}`)
+        const impressions = 1_000 + (seed % 4_000)
+        const reach = Math.round(impressions / (1.1 + ((seed % 90) / 100)))
+        const linkClicks = Math.round(impressions * (0.008 + ((seed % 25) / 1000)))
+        const spend = Math.round(linkClicks * (900 + (seed % 900)))
+        const results = Math.round(linkClicks * (0.02 + ((seed % 60) / 1000)))
+        out.push({
+          adId,
+          day,
+          spend,
+          revenue: results * 40_000,
+          results,
+          impressions,
+          reach,
+          linkClicks,
+          ctr: impressions > 0 ? (linkClicks / impressions) * 100 : 0,
+          frequency: reach > 0 ? impressions / reach : 0,
+        })
+      }
+    }
+    return out
+  },
+
   async listCampaigns() {
     await delay()
     const { dailyBudget } = readOverrides()

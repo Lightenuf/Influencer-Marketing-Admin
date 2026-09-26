@@ -68,6 +68,8 @@ async function readError(error: unknown): Promise<string | null> {
 export const metaApiAdapter: MetaRepository = {
   listAccounts: () => call('accounts'),
 
+  getDailySeries: (adIds, period) => call('daily', { adIds, ...period }),
+
   setAccount(accountId) {
     account = accountId
     try {

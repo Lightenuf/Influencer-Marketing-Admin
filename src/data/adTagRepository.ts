@@ -36,6 +36,60 @@ export interface AdTagRepository {
    * 메타가 말하는 매출은 메타 기준이라, 실제로 번 돈은 주문에서 직접 센다.
    */
   getShopRevenue(from: string, to: string): Promise<ShopRevenue>
+
+  // ── 오늘의 액션 ──
+  listSuggestions(): Promise<StoredSuggestion[]>
+  /** 다시 계산 — 열려 있던 제안을 덮어쓴다 */
+  replaceSuggestions(rows: NewSuggestion[]): Promise<number>
+  /** 실행·보류·무시. 무엇을 왜 했는지 남긴다 */
+  decideSuggestion(input: DecideInput): Promise<void>
+  listActionLogs(): Promise<ActionLog[]>
+  /** 실행 뒤 재서 결과를 붙인다 */
+  attachOutcome(logId: string, after: Record<string, number>, outcome: string): Promise<void>
+}
+
+export interface NewSuggestion {
+  kind: string
+  targetLevel: string
+  targetId: string
+  targetName: string
+  accountId: string
+  evidence: Record<string, unknown>
+  effect: Record<string, unknown> | null
+  confident: boolean
+  needsApproval: boolean
+  title: string
+}
+
+export interface StoredSuggestion extends NewSuggestion {
+  id: string
+  status: string
+  reason: string
+  computedAt: string
+}
+
+export interface DecideInput {
+  suggestion: StoredSuggestion
+  /** executed · held · ignored */
+  action: string
+  reason: string
+  before: Record<string, number>
+  actorId: string
+}
+
+export interface ActionLog {
+  id: string
+  kind: string
+  targetLevel: string
+  targetId: string
+  targetName: string
+  action: string
+  reason: string
+  before: Record<string, number>
+  after: Record<string, number> | null
+  outcome: string | null
+  createdAt: string
+  measuredAt: string | null
 }
 
 export interface ShopRevenue {
@@ -100,6 +154,44 @@ const toRow = (input: AdTagsInput): Row => {
   }
   return row
 }
+
+const toSuggestion = (row: Row): StoredSuggestion => {
+  const evidence = (row.evidence ?? {}) as Record<string, unknown>
+  const { __title, ...rest } = evidence
+  return {
+    id: String(row.id),
+    kind: String(row.kind),
+    targetLevel: String(row.target_level),
+    targetId: String(row.target_id),
+    targetName: String(row.target_name ?? ''),
+    accountId: String(row.account_id ?? ''),
+    title: String(__title ?? ''),
+    evidence: rest,
+    effect: Object.keys((row.effect ?? {}) as object).length
+      ? (row.effect as Record<string, unknown>)
+      : null,
+    confident: row.confident !== false,
+    needsApproval: row.needs_approval === true,
+    status: String(row.status ?? 'open'),
+    reason: String(row.reason ?? ''),
+    computedAt: String(row.computed_at ?? ''),
+  }
+}
+
+const toActionLog = (row: Row): ActionLog => ({
+  id: String(row.id),
+  kind: String(row.kind),
+  targetLevel: String(row.target_level),
+  targetId: String(row.target_id),
+  targetName: String(row.target_name ?? ''),
+  action: String(row.action),
+  reason: String(row.reason ?? ''),
+  before: (row.before ?? {}) as Record<string, number>,
+  after: (row.after as Record<string, number>) ?? null,
+  outcome: (row.outcome as string) ?? null,
+  createdAt: String(row.created_at),
+  measuredAt: (row.measured_at as string) ?? null,
+})
 
 const supabaseAdTags: AdTagRepository = {
   async listTagOptions() {
@@ -203,6 +295,91 @@ const supabaseAdTags: AdTagRepository = {
     }
   },
 
+  async listSuggestions() {
+    const db = requireDb()
+    const { data, error } = await db
+      .from('action_suggestions')
+      .select('*')
+      .eq('status', 'open')
+      .order('computed_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(toSuggestion)
+  },
+
+  async replaceSuggestions(rows) {
+    const db = requireDb()
+    // 열려 있던 것을 지우고 새로 쌓는다. 결정한 것(실행·보류·무시)은 건드리지 않는다.
+    const { error: clearError } = await db.from('action_suggestions').delete().eq('status', 'open')
+    if (clearError) throw new Error(clearError.message)
+    if (rows.length === 0) return 0
+
+    const { error } = await db.from('action_suggestions').insert(
+      rows.map((row) => ({
+        kind: row.kind,
+        target_level: row.targetLevel,
+        target_id: row.targetId,
+        target_name: row.targetName,
+        account_id: row.accountId,
+        evidence: { ...row.evidence, __title: row.title },
+        effect: row.effect ?? {},
+        confident: row.confident,
+        needs_approval: row.needsApproval,
+      })),
+    )
+    if (error) throw new Error(error.message)
+    return rows.length
+  },
+
+  async decideSuggestion(input) {
+    const db = requireDb()
+    const status = { executed: 'done', held: 'held', ignored: 'ignored' }[input.action] ?? 'open'
+
+    const { error: logError } = await db.from('action_logs').insert({
+      suggestion_id: input.suggestion.id,
+      kind: input.suggestion.kind,
+      target_level: input.suggestion.targetLevel,
+      target_id: input.suggestion.targetId,
+      target_name: input.suggestion.targetName,
+      action: input.action,
+      reason: input.reason,
+      before: input.before,
+      detail: input.suggestion.effect ?? {},
+      actor_id: input.actorId,
+    })
+    if (logError) throw new Error(logError.message)
+
+    const { error } = await db
+      .from('action_suggestions')
+      .update({
+        status,
+        reason: input.reason,
+        decided_by: input.actorId,
+        decided_at: new Date().toISOString(),
+      })
+      .eq('id', input.suggestion.id)
+    if (error) throw new Error(error.message)
+  },
+
+  async listActionLogs() {
+    const db = requireDb()
+    const { data, error } = await db
+      .from('action_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(toActionLog)
+  },
+
+  async attachOutcome(logId, after, outcome) {
+    const db = requireDb()
+    const { error } = await db
+      .from('action_logs')
+      .update({ after, outcome, measured_at: new Date().toISOString() })
+      .eq('id', logId)
+    if (error) throw new Error(error.message)
+  },
+
   async saveOpsSettings(patch) {
     const db = requireDb()
     const rows = Object.entries(patch).map(([key, value]) => ({
@@ -226,6 +403,8 @@ interface LocalDb {
   aliases: NameAlias[]
   tags: AdTags[]
   ops: Partial<OpsSettings>
+  suggestions?: StoredSuggestion[]
+  logs?: ActionLog[]
 }
 
 const readLocal = (): LocalDb => {
@@ -344,6 +523,65 @@ const mockAdTags: AdTagRepository = {
       newRevenue: 0,
       syncedAt: null,
     })
+  },
+
+  async listSuggestions() {
+    return tick((readLocal().suggestions ?? []).filter((row) => row.status === 'open'))
+  },
+
+  async replaceSuggestions(rows) {
+    const db = readLocal()
+    const decided = (db.suggestions ?? []).filter((row) => row.status !== 'open')
+    db.suggestions = [
+      ...decided,
+      ...rows.map((row) => ({
+        ...row,
+        id: crypto.randomUUID(),
+        status: 'open',
+        reason: '',
+        computedAt: new Date().toISOString(),
+      })),
+    ]
+    writeLocal(db)
+    return tick(rows.length)
+  },
+
+  async decideSuggestion(input) {
+    const db = readLocal()
+    const status = { executed: 'done', held: 'held', ignored: 'ignored' }[input.action] ?? 'open'
+    db.suggestions = (db.suggestions ?? []).map((row) =>
+      row.id === input.suggestion.id ? { ...row, status, reason: input.reason } : row,
+    )
+    db.logs = [
+      {
+        id: crypto.randomUUID(),
+        kind: input.suggestion.kind,
+        targetLevel: input.suggestion.targetLevel,
+        targetId: input.suggestion.targetId,
+        targetName: input.suggestion.targetName,
+        action: input.action,
+        reason: input.reason,
+        before: input.before,
+        after: null,
+        outcome: null,
+        createdAt: new Date().toISOString(),
+        measuredAt: null,
+      },
+      ...(db.logs ?? []),
+    ]
+    writeLocal(db)
+  },
+
+  async listActionLogs() {
+    return tick(readLocal().logs ?? [])
+  },
+
+  async attachOutcome(logId, after, outcome) {
+    const db = readLocal()
+    db.logs = (db.logs ?? []).map((row) =>
+      row.id === logId ? { ...row, after, outcome, measuredAt: new Date().toISOString() } : row,
+    )
+    writeLocal(db)
   },
 
   async saveOpsSettings(patch) {

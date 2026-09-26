@@ -61,6 +61,21 @@ export interface MetaAd {
   createdAt: string
 }
 
+/** 하루치 — 피로도(빈도 상승 + CTR 연속 하락)를 보려면 하루 단위가 필요하다 */
+export interface MetaDayPoint {
+  adId: string
+  day: string
+  spend: number
+  revenue: number
+  results: number
+  impressions: number
+  reach: number
+  linkClicks: number
+  ctr: number
+  /** 한 사람이 평균 몇 번 봤나 */
+  frequency: number
+}
+
 /**
  * 한 노드의 기간 집계.
  * 메타 insights 응답에서 필요한 값만 추린 모양이다.

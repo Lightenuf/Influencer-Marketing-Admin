@@ -7,6 +7,7 @@ import type {
   MetaAdSet,
   MetaCampaign,
   MetaCustomAudience,
+  MetaDayPoint,
   MetaInsight,
   MetaLevel,
   MetaStatus,
@@ -47,6 +48,9 @@ export interface MetaRepository {
 
   /** 고른 광고들의 주 단위 ROAS 추세 */
   getWeeklySeries(adIds: string[], period: MetaPeriod): Promise<MetaWeekPoint[]>
+
+  /** 고른 광고들의 하루치 — 피로도 판단과 일별 추이에 쓴다 */
+  getDailySeries(adIds: string[], period: MetaPeriod): Promise<MetaDayPoint[]>
 
   /**
    * 소재 파일을 메타에 올린다.

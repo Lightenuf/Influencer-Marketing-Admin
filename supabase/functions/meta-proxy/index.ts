@@ -278,6 +278,43 @@ Deno.serve(async (request) => {
         return json(rows.map((row) => toInsight(row, level)))
       }
 
+      case 'daily': {
+        // 피로도(빈도 상승 + CTR 연속 하락)를 보려면 하루 단위가 필요하다.
+        // 주 단위로는 사흘 연속 떨어지는 흐름이 보이지 않는다.
+        const adIds = (params.adIds ?? []) as string[]
+        if (adIds.length === 0) return json([])
+        const rows = await graph(`${act}/insights`, {
+          level: 'ad',
+          fields: INSIGHT_FIELDS,
+          time_range: JSON.stringify({ since: params.from, until: params.to }),
+          time_increment: '1',
+          filtering: JSON.stringify([{ field: 'ad.id', operator: 'IN', value: adIds }]),
+          limit: '2000',
+        })
+        return json(
+          rows.map((row) => {
+            const spend = Number(row.spend ?? 0)
+            const revenue = pick(row.action_values, PURCHASE_TYPES)
+            const impressions = Number(row.impressions ?? 0)
+            const reach = Number(row.reach ?? 0)
+            const linkClicks = Number(row.inline_link_clicks ?? 0)
+            return {
+              adId: String(row.ad_id ?? ''),
+              day: String(row.date_start ?? ''),
+              spend,
+              revenue,
+              results: pick(row.actions, PURCHASE_TYPES),
+              impressions,
+              reach,
+              linkClicks,
+              ctr: impressions > 0 ? (linkClicks / impressions) * 100 : 0,
+              // 한 사람이 평균 몇 번 봤나. 오르면 같은 사람에게 반복 노출되고 있다는 뜻이다.
+              frequency: reach > 0 ? impressions / reach : 0,
+            }
+          }),
+        )
+      }
+
       case 'weekly': {
         const adIds = (params.adIds ?? []) as string[]
         if (adIds.length === 0) return json([])
