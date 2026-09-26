@@ -326,16 +326,56 @@ async function saveAndNotify(alerts: Alert[]): Promise<{ saved: number; notified
 
   if (!webhook) return { saved: fresh.length, notified: 0 }
 
+  // '왜?'를 슬랙에서 되묻지 않게, 판단에 쓴 숫자를 같이 싣는다.
+  // 되물으려면 Claude 를 불러야 하고 그건 돈이 든다.
   const icon = { critical: '🚨', warn: '⚠️', info: 'ℹ️' }
+  const won = (value: number) => `${Math.round(value).toLocaleString()}원`
+
+  const evidenceLine = (alert: Alert): string => {
+    const e = alert.evidence as Record<string, number>
+    switch (alert.kind) {
+      case 'spendStopped':
+        return `어제 ${won(e.yesterday ?? 0)} · 직전 7일 평균 ${won(e.average ?? 0)}`
+      case 'noDelivery':
+        return `예산이 잡힌 캠페인 ${e.campaigns ?? 0}개 · 최근 ${e.days ?? 0}일 지출 0원`
+      case 'spendSpike':
+        return `어제 ${won(e.yesterday ?? 0)} · 전주 같은 요일 ${won(e.lastWeek ?? 0)}`
+      case 'roasDrop':
+        return `최근 3일 ROAS ${e.now ?? 0} · 그 앞 기간 ${e.before ?? 0}`
+      case 'adRejected':
+        return `반려된 광고 ${e.count ?? 0}개`
+      case 'tokenExpiring':
+        return e.daysLeft != null ? `${e.daysLeft}일 남음` : '지금 만료됨'
+      default:
+        return ''
+    }
+  }
+
+  const home = 'https://lightenuf.github.io/Influencer-Marketing-Admin/'
   const text = fresh
-    .map((alert) => `${icon[alert.level]} *${alert.title}*\n${alert.detail}`)
+    .map((alert) => {
+      const evidence = evidenceLine(alert)
+      return [
+        `${icon[alert.level]} *${alert.title}*`,
+        alert.detail,
+        evidence ? `\`${evidence}\`` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    })
     .join('\n\n')
 
   await fetch(webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      text: `브리보 광고 알림\n\n${text}\n\n<https://lightenuf.github.io/Influencer-Marketing-Admin/#/ads/actions|오늘의 액션에서 보기>`,
+      text: [
+        `*브리보 광고 알림* · ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
+        '',
+        text,
+        '',
+        `<${home}#/ads/actions|오늘의 액션> · <${home}#/ads/insights|성과 분석>`,
+      ].join('\n'),
     }),
   })
 
